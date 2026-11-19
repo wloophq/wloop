@@ -23,6 +23,7 @@ Each entry is a file under `docs/src/content/docs/architecture/decisions/`, with
 | [Clients are thin and speak one versioned API](/architecture/decisions/clients-are-thin-and-speak-one-versioned-api/) | The daemon computes what clients show; clients speak internal/api and decide nothing. |
 | [Every spawn is metered](/architecture/decisions/every-spawn-is-metered/) | A package that spawns a process imports the meter, which counts each boundary call. |
 | [Every turn starts through the turn start](/architecture/decisions/every-turn-starts-through-the-turn-start/) | A new turn starts only through turns.Starter, and only internal/core/turns records a turn. |
+| [Every write in your name is a draft](/architecture/decisions/every-write-in-your-name-is-a-draft/) | Every write in your name is a draft, published once and only when approved. |
 | [Gates hold every decision](/architecture/decisions/gates-hold-every-decision/) | A decision the loop could wait on is a gate; you decide which wait for you, no rule that releases one reads an untrusted fact, and no unattended agent resolves one. |
 | [Go reads categories, never states](/architecture/decisions/go-reads-categories/) | The profile names a task's states; Go and the store's SQL read only the closed set of categories. |
 | [One adapter reaches each outside tool](/architecture/decisions/one-adapter-reaches-each-outside-tool/) | Each outside tool is reached by one adapter, and its name stays there and in the root. |
@@ -44,5 +45,4 @@ Each entry is a file under `docs/src/content/docs/architecture/decisions/`, with
 | [The store is the truth](/architecture/decisions/the-store-is-the-truth/) | Managers and boards receive a projection of the store and are never read back as state. |
 | [The store migrates forward](/architecture/decisions/the-store-migrates-forward/) | Every schema change is a new version with a migration, and a newer store is refused. |
 | [Units generalize the pull request](/architecture/decisions/units-generalize-the-pull-request/) | Work is keyed by unit.Unit, and only a provider's codec mints and parses a key. |
-| [What the loop proposes to post is a draft](/architecture/decisions/what-the-loop-proposes-to-post-is-a-draft/) | What the loop proposes to post is a draft, published once and only when approved. |
 | [Workflows trigger each other in a bounded chain](/architecture/decisions/workflows-trigger-each-other-in-a-bounded-chain/) | Every verb records its event with its actor and its chain, and an event trigger stops at its depth and never re-enters its chain. |

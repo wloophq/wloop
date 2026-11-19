@@ -59,10 +59,6 @@ func (g *Gates) Supersede(ctx context.Context, id int64, by task.Actor) error {
 	return g.Service.Supersede(ctx, id, by)
 }
 
-func (g *Gates) RecordSent(ctx context.Context, gt gate.Gate) (gate.Gate, error) {
-	return g.Service.RecordSent(ctx, gt)
-}
-
 // TaskOf is the task the gates service would open gt on.
 func (g *Gates) TaskOf(ctx context.Context, gt gate.Gate) (task.ID, error) {
 	return g.Service.TaskOf(ctx, gt)

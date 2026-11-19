@@ -188,26 +188,6 @@ func TestOnlyAUserDrivenSessionResolvesAGateOfEveryKind(t *testing.T) {
 	}
 }
 
-func TestRecordSentIsNotAResolution(t *testing.T) {
-	f := newFixture(t, nil, bundled)
-	ctx := context.Background()
-	sent, err := f.store.RecordSent(ctx, gate.Gate{Task: "t-0000000000000001", Unit: acme, Kind: gate.KindDraft, Name: "draft", Subject: "4", Intents: []string{"approve", "discard"}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if sent.Status != gate.Approved {
-		t.Fatalf("recorded gate is %s, want approved", sent.Status)
-	}
-	for _, r := range []gates.Resolution{{Intent: "discard", By: task.ActorPerson}, {Intent: "approve", By: task.ActorAgent}} {
-		if err := f.svc.Resolve(ctx, sent.ID, r); !errors.Is(err, gates.ErrResolved) {
-			t.Errorf("Resolve(%+v) on a recorded post = %v, want ErrResolved", r, err)
-		}
-	}
-	if len(f.cons.Calls) != 0 {
-		t.Fatalf("a recorded post applied %v; it is posted already", f.cons.Calls)
-	}
-}
-
 func TestAPolicyRuleReleasesADraftGate(t *testing.T) {
 	send := policy{dec: gates.Decision{Mode: gate.ModeSend, Rule: "rule[1]"}}
 	f := newFixture(t, send, bundled)

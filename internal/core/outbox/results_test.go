@@ -38,19 +38,6 @@ func fromTask(p Proposal) Proposal {
 	return p
 }
 
-func TestARecordedPostAttachesItsUnitToTheTurnsTask(t *testing.T) {
-	e := newEnv()
-	e.svc.Posts = postsMessages
-	r := &postResults{intents: []string{"begin"}}
-	e.svc.Results = r
-	if _, err := e.svc.RecordSent(ctx, fromTask(reply("shipped")), draft.Evidence{Ref: "1.3"}); err != nil {
-		t.Fatal(err)
-	}
-	if len(r.attached) != 1 || r.attached[0] != thread {
-		t.Fatalf("attached = %v, want the thread", r.attached)
-	}
-}
-
 func TestASentPostAttachesItsUnitToTheTurnsTask(t *testing.T) {
 	e := newEnv()
 	e.svc.Posts = postsMessages
@@ -87,7 +74,11 @@ func TestOnlyAPostOfAnAttachingTaskTurnAttaches(t *testing.T) {
 			e.svc.Posts = postsMessages
 			r := &postResults{intents: []string{"begin"}}
 			e.svc.Results = r
-			if _, err := e.svc.RecordSent(ctx, p, draft.Evidence{Ref: "1.3"}); err != nil {
+			d := e.propose(p)
+			if _, err := e.approve(d.ID, nil); err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := e.svc.Send(ctx); err != nil {
 				t.Fatal(err)
 			}
 			if len(r.attached) != 0 {

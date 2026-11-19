@@ -12,11 +12,11 @@ import (
 
 func TestGateStoreContract(t *testing.T) {
 	t.Parallel()
-	gatestest.StoreContract(t, func(t *testing.T) (gates.Store, gates.Reader, gates.Sent) {
+	gatestest.StoreContract(t, func(t *testing.T) (gates.Store, gates.Reader) {
 		db, _ := openTemp(t)
 		applyTask(t, db, "t-01")
 		s := db.Gates(func() time.Time { return gatestest.Epoch })
-		return s, s, s
+		return s, s
 	})
 }
 

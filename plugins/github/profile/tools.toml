@@ -8,7 +8,7 @@ description = "Write a GitHub post on the pull request of your turn, in the user
 "payload" = "what the kind's schema shapes beside text: for a review, its event (APPROVE, REQUEST_CHANGES or COMMENT) and its inline comments; for a request_review, its reviewers, GitHub logins without @"
 "basis" = "for a review, the head commit you read the pull request at"
 "draft" = "true, the default, makes a draft for the user; false posts it at once in the user's name, only when the user told you to"
-"hold" = "with draft true: keep the draft waiting for the user even where one of their approval rules would post it, such as for a draft your question asks about"
+"hold" = "true: no approval rule of the user's posts this draft; use it for a draft your question pins"
 "effects" = "what posting it does besides the post; empty for none"
 "effects[]" = "an effect name your intent lists in drafts.allowed_effects"
 "why" = "why you write it, for the user reviewing it"
@@ -26,10 +26,10 @@ problem_basis_required = "basis: required for a review, the head commit you read
 problem_hold = "hold: only with draft true; a post with draft false waits for nobody"
 stale = "Nothing was written: you read the pull request at {{.Basis}}, and its head is {{.Head}} now; read what changed and write it again."
 drafted = "Drafted {{.ID}} (rev {{.Rev}}) on {{.Unit}}; nothing was posted. It waits for the user{{with .Link}} at {{.}}{{end}}, where they review, edit and post it."
-approved = "Drafted {{.ID}} (rev {{.Rev}}) on {{.Unit}}; one of the user's approval rules posts it now."
+rule_posts = "Drafted {{.ID}} (rev {{.Rev}}) on {{.Unit}}; one of the user's approval rules posts it now."
 dry_run = "Drafted {{.ID}} (rev {{.Rev}}) on {{.Unit}} as a dry run: the user's approval stores drafts and never posts them, so it will not be posted."
 posting = "Posting {{.ID}} (rev {{.Rev}}) on {{.Unit}} now, in the user's name; draft_read shows its link once it is posted."
-kept = "Nothing was posted: {{.Name}} posts at once only from a session the user drives, and {{.Name}} typed into this one last, with no prompt of the user's since. It is draft {{.ID}} (rev {{.Rev}}) on {{.Unit}}{{with .Link}}, at {{.}}{{end}}. Give the user the link and tell them: \"It is ready in {{.Name}}; post it from there, or tell me here to post it.\""
+waits = "Nothing was posted: {{.Name}} posts at once only from a session the user drives, and {{.Name}} typed into this one last, with no prompt of the user's since. It is draft {{.ID}} (rev {{.Rev}}) on {{.Unit}}{{with .Link}}, at {{.}}{{end}}. Give the user the link and tell them: \"It is ready in {{.Name}}; post it from there, or tell me here to post it.\""
 
 [github_threads]
 description = "Read the unresolved review threads of the pull request of your turn, each with its comments and their REST ids, which a thread_reply or a resolve targets as comment:<id>, and each reviewer's latest review. It writes nothing."

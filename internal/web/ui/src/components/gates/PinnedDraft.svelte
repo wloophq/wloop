@@ -18,10 +18,10 @@
 </script>
 
 {#if !d}
-  <div class="d-pin"><p class="d-note err">{t("Approves draft #{id}, which is gone.", { id: ref.id })}</p></div>
+  <div class="d-pin"><p class="d-note err">{t("Picking this option posts draft #{id}, which is gone.", { id: ref.id })}</p></div>
 {:else}
   <div class="d-pin" data-draft={String(ref.id)} data-rev={String(d.rev)}>
-    <p class="d-note">{t("Approves draft #{id} at rev {rev}:", { id: ref.id, rev: d.rev })}</p>
+    <p class="d-note">{t("Picking this option posts draft #{id} at rev {rev}:", { id: ref.id, rev: d.rev })}</p>
     {#if d.rev !== ref.rev}<p class="d-note err">{t("It changed since the question pinned it and is now at rev {rev}; picking this option posts what it says now.", { rev: d.rev })}</p>{/if}
     {#if d.preview}<div class="d-preview"><Markdown text={d.preview} key={`${scope}:pin-preview`} names={d.names || {}} /></div>{/if}
     <DraftWhere draft={d} />

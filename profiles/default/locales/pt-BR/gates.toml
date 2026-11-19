@@ -1,8 +1,8 @@
 [gates.draft]
-label = "Enviar este rascunho?"
+label = "Postar este rascunho?"
 
 [gates.draft.intents.approve]
-label = "Aprovar"
+label = "Postar"
 
 [gates.draft.intents.discard]
 label = "Descartar"

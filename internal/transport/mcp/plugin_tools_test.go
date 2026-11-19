@@ -148,7 +148,7 @@ func TestRedactSecretsCoversEveryKind(t *testing.T) {
 }
 
 func TestAnswersComeFromTheProfile(t *testing.T) {
-	f := &fakePlugin{answer: psource.Answer{Name: "drafted", Fields: map[string]any{"ID": 7, "Unit": "", "Where": "#releases",
+	f := &fakePlugin{answer: psource.Answer{Name: "drafted", Fields: map[string]any{"ID": 7, "Rev": 1, "Unit": "", "Where": "#releases",
 		"Link": "http://127.0.0.1:1/#task=draft%3A7"}}}
 	texts := map[string]ToolText{"slack_post": {Answers: map[string]string{
 		"drafted": "Drafted for {{.Where}} by {{.Name}}; review it at {{.Link}}",

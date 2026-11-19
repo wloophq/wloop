@@ -49,8 +49,9 @@ Run no other command than the `gh` commands in these instructions and the
 record step's, and call no other tool than `github_post` and the record
 step's. This session posts nothing to GitHub on its own: it refuses every
 command that comments or changes anything there. The comment is a draft you
-write, with `draft` left out; {{name}} posts it once the user, or a rule of
-theirs, approves it.
+write with `github_post`, which waits for the user unless a rule of theirs
+posts it; set `draft: false` only when the user tells you, in this session,
+to post.
 
 {{if .Automated -}}
 A workflow of the user's started this nudge. The comment goes out under the
@@ -146,12 +147,12 @@ read as "the maintainers".
 
 Call `github_post` with `kind` `comment`, no `target`, and the comment as
 `text`. If this session has no such tool, draft through
-`{{.Command}} draft propose`, whose help says how.
+`{{.Command}} draft write`, whose help says how.
 
 Draft exactly one comment. Never review, approve, request changes, edit
 labels or reviewers, push, or touch the checkout. Never draft it twice:
 if the call fails or its outcome is unclear, report what you know without
-drafting again. Reply to the user with the draft's id and the text
-drafted, then record `done`.
+drafting again. Reply to the user with the draft's id, the text
+drafted and whether it waits or is posting now, then record `done`.
 {{template "record" .}}
 {{template "judgment" .}}

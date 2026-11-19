@@ -9,15 +9,15 @@ import (
 )
 
 func TestGateStoreContract(t *testing.T) {
-	gatestest.StoreContract(t, func(t *testing.T) (gates.Store, gates.Reader, gates.Sent) {
+	gatestest.StoreContract(t, func(t *testing.T) (gates.Store, gates.Reader) {
 		s := gatestest.NewStore(func() time.Time { return gatestest.Epoch })
-		return s, s, s
+		return s, s
 	})
 }
 
 func TestDraftGateContract(t *testing.T) {
-	gatestest.DraftGateContract(t, func(t *testing.T) (gates.Store, gates.Reader, gates.Sent) {
+	gatestest.DraftGateContract(t, func(t *testing.T) (gates.Store, gates.Reader) {
 		s := gatestest.NewStore(func() time.Time { return gatestest.Epoch })
-		return s, s, s
+		return s, s
 	})
 }

@@ -133,7 +133,7 @@ func newSessionWiring(t *testing.T) *sessionWiring {
 		_, err := te.pluginKind.Client(string(slackPlugin))
 		return err == nil
 	})
-	w.deps = (mcpEndpoint{tools: te.pluginTools(db), intents: func() *dintent.Registry { return te.loadedIntents().Registry }, texts: te.Env.toolTexts, log: w.logf}).wire(te.serveDeps(ctx, db, te.cfg, t.Logf, &lock.Mutex{}, nil), te.cfg)
+	w.deps = (mcpEndpoint{tools: te.pluginTools, intents: func() *dintent.Registry { return te.loadedIntents().Registry }, texts: te.Env.toolTexts, log: w.logf}).wire(te.serveDeps(ctx, db, te.cfg, t.Logf, &lock.Mutex{}, nil), te.cfg)
 	w.srv = w.deps.MCP.(*mcp.Server)
 	te.newDaemon(w.deps)
 	return w

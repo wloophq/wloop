@@ -197,18 +197,18 @@ func (r *running) post(ctx context.Context, call src.ToolCall) src.ToolResult {
 }
 
 // postAnswer is github_post's answer for a post whose draft its gate left in state st, now when it asked to post
-// at once: posting once it is on its way, kept when it waits for the user, drafted when it was asked to, approved
-// by a rule of the user's, dry_run under a dry run.
+// at once: posting once it is on its way, waits when it waits for the user, drafted when it was asked to,
+// rule_posts when a rule of the user's posts it, dry_run under a dry run.
 func postAnswer(now bool, st string) string {
 	switch {
 	case st == stateDropped:
 		return "dry_run"
 	case now && st == stateHeld:
-		return "kept"
+		return "waits"
 	case now:
 		return "posting"
 	case st == stateQueued || st == stateSending || st == stateSent:
-		return "approved"
+		return "rule_posts"
 	}
 	return "drafted"
 }

@@ -189,7 +189,7 @@ func TestTheDraftCommandPostsAtOnceOnlyWithDraftFalse(t *testing.T) {
 	ctx := context.Background()
 	c := &draftCalls{}
 	for _, args := range [][]string{{"--kind", "comment", "--text", "hi"}, {"--kind", "comment", "--text", "hi", "--draft=false"}} {
-		if _, code, err := draftCall(ctx, c, "term_1", "propose", args); code != 0 || err != nil {
+		if _, code, err := draftCall(ctx, c, "term_1", "write", args); code != 0 || err != nil {
 			t.Fatalf("propose %v: %d %v", args, code, err)
 		}
 	}

@@ -62,10 +62,9 @@ type SessionBooks interface {
 	BookOf(ctx context.Context, session string) (dturn.Book, bool, error)
 }
 
-// DraftGate is the host's outbox as a plugin proposes and records drafts.
+// DraftGate is the host's outbox as a plugin writes drafts.
 type DraftGate interface {
 	Propose(ctx context.Context, p outbox.Proposal) (draft.Draft, error)
-	RecordSent(ctx context.Context, p outbox.Proposal, ev draft.Evidence) (draft.Draft, error)
 	PublisherOf(d draft.Draft) unit.ProviderID
 }
 

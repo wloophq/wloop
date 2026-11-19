@@ -15,7 +15,6 @@ import (
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/pkg/plugin"
-	"github.com/wloophq/wloop/pkg/plugin/manifest"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
@@ -233,48 +232,6 @@ func sessionOrigin(b dturn.Book, t *dturn.Turn, u unit.Unit, kind draft.OriginKi
 		o.Unit = b.Unit
 	}
 	return o
-}
-
-// RecordSent records a post one of the plugin's tools made at once, on the
-// plugin's unit it landed in, as a sent draft whose origin is the session's
-// newest turn, or the session itself when it has none or the call named
-// no session, with a draft gate already approved by the agent, its rule the
-// tool. A tool the manifest does not mark posts = "now", or a named
-// session that is not live, is refused.
-func (g gates) RecordSent(ctx context.Context, d src.Draft, session, tool string) (src.GateRef, error) {
-	h := g.b.Hosted
-	if h == nil || h.Drafts == nil || h.Sessions == nil {
-		return src.GateRef{}, src.ErrUnsupported
-	}
-	if !postsNow(g.b.Manifest, tool) {
-		return src.GateRef{}, fmt.Errorf("tool %s of plugin %s does not post at once", tool, g.b.ID)
-	}
-	if session != "" {
-		if err := liveSession(ctx, h.Sessions, session); err != nil {
-			return src.GateRef{}, err
-		}
-	}
-	u, err := g.b.Units.Own(g.b.ID, d.Unit)
-	if err != nil {
-		return src.GateRef{}, err
-	}
-	origin := draft.Origin{Kind: draft.OriginSession}
-	if b, t, err := g.turnOf(ctx, session); session != "" && err == nil {
-		origin = sessionOrigin(b, t, u, draft.OriginSession)
-	}
-	origin.Session = session
-	p := outbox.Proposal{Unit: u, Purpose: d.Purpose, Delivery: draft.Delivery(d.Delivery), Target: d.Target, Text: d.Text, Reaction: d.Reaction,
-		Replaced: d.Replaced, Origin: origin, Tool: tool}
-	sent, err := h.Drafts.RecordSent(ctx, p, draft.Evidence(d.Evidence))
-	if err != nil {
-		return src.GateRef{}, err
-	}
-	return src.GateRef{Gate: "draft", Draft: int64(sent.ID), State: string(sent.State)}, nil
-}
-
-// postsNow says the manifest marks tool posts = "now".
-func postsNow(m *manifest.Source, tool string) bool {
-	return m != nil && slices.ContainsFunc(m.Tools, func(t manifest.Tool) bool { return t.Name == tool && t.Posts == "now" })
 }
 
 // RehomeDrafts moves the drafts of each move's From onto its To, both the

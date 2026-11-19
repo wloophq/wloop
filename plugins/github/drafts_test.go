@@ -131,10 +131,6 @@ func cmpOr(a, b string) string {
 	return b
 }
 
-func (h *draftHost) RecordSent(context.Context, src.Draft, string, string) (src.GateRef, error) {
-	return src.GateRef{}, src.ErrUnsupported
-}
-
 func (h *draftHost) RehomeDrafts(context.Context, []src.UnitMove) (int, error) { return 0, nil }
 
 func (h *draftHost) SetOverride(context.Context, sdk.Unit, map[string]string, map[string]string) (bool, error) {
@@ -244,7 +240,7 @@ func TestGithubPostDrafts(t *testing.T) {
 	}
 
 	h.state = "queued"
-	if name, _ := callPost(t, p, "s1", `{"kind":"comment","text":"Thanks!"}`); name != "approved" {
+	if name, _ := callPost(t, p, "s1", `{"kind":"comment","text":"Thanks!"}`); name != "rule_posts" {
 		t.Fatalf("a rule's approval answered %s", name)
 	}
 	h.state = "dropped"
@@ -451,7 +447,7 @@ func BenchmarkGithubDraftReview(b *testing.B) {
 // a session the user does not drive, kept as a draft, and hold with draft false is refused.
 func TestGithubPostDraftFalseAsksTheHostToPost(t *testing.T) {
 	t.Parallel()
-	for _, c := range []struct{ state, want string }{{"queued", "posting"}, {"held", "kept"}} {
+	for _, c := range []struct{ state, want string }{{"queued", "posting"}, {"held", "waits"}} {
 		p, _, h := startedLive(t)
 		h.state = c.state
 		name, _ := callPost(t, p, "s1", `{"kind":"comment","text":"Looks good.","draft":false}`)

@@ -17,6 +17,7 @@ import (
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/change"
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/ingest/ingesttest"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
@@ -113,8 +114,7 @@ func insertDraftGate(t *testing.T, db *sqlite.DB, d draft.Draft, deadline time.T
 		_, err = st.Open(ctx, g)
 	case draft.Dropped:
 	default:
-		g.Intent, g.By = "approve", task.ActorPerson
-		_, err = st.RecordSent(ctx, g)
+		err = storeApproved(ctx, st, g)
 	}
 	if err != nil {
 		t.Fatal(err)
@@ -290,4 +290,16 @@ func TestThePinnedPublisherForwardsWhereAPostLanded(t *testing.T) {
 	if _, ok, err := (pinnedEffects{Effects: &recordingPublisher{}}).Landed(ctx, draft.Draft{}); err != nil || ok {
 		t.Fatalf("a publisher that cannot say landed: %v %v", ok, err)
 	}
+}
+
+// storeApproved stores g approved by a person, its consequence applied: a draft an earlier daemon queued.
+func storeApproved(ctx context.Context, st sqlite.GateStore, g gate.Gate) error {
+	opened, err := st.Open(ctx, g)
+	if err != nil {
+		return err
+	}
+	if _, err := st.Resolve(ctx, opened.ID, gates.Resolution{Status: gate.Approved, Intent: "approve", By: task.ActorPerson}); err != nil {
+		return err
+	}
+	return st.Applied(ctx, opened.ID)
 }

@@ -48,11 +48,6 @@ func (r *recorder) OpenGate(_ context.Context, req source.GateRequest) (source.G
 	return source.GateRef{Gate: "g-1", Draft: 4, State: "approved"}, nil
 }
 
-func (r *recorder) RecordSent(_ context.Context, d source.Draft, session, tool string) (source.GateRef, error) {
-	r.note("sent %s %s %s", session, tool, d.Text)
-	return source.GateRef{Gate: "g-2", Draft: 5}, nil
-}
-
 func (r *recorder) RehomeDrafts(_ context.Context, moves []source.UnitMove) (int, error) {
 	r.note("rehome %s->%s", moves[0].From.Key, moves[0].To.Key)
 	return len(moves), nil
@@ -250,9 +245,6 @@ func (s tooler) CallTool(ctx context.Context, call source.ToolCall) (source.Tool
 	if err != nil {
 		return source.ToolResult{}, err
 	}
-	if _, err := h.RecordSent(ctx, source.Draft{Unit: se.Unit, Text: "Done"}, call.Session, call.Tool); err != nil {
-		return source.ToolResult{}, err
-	}
 	moved, err := h.RehomeDrafts(ctx, []source.UnitMove{{From: plugin.Unit{Provider: "pulls", Key: "a"}, To: plugin.Unit{Provider: "pulls", Key: "b"}}})
 	if err != nil {
 		return source.ToolResult{}, err
@@ -319,7 +311,7 @@ func TestBrokerCallbackReachesTheHost(t *testing.T) {
 	}
 	rec.mu.Lock()
 	defer rec.mu.Unlock()
-	if want := []string{"open s-1 nudge Any news?", "sent s-1 pull_read Done", "rehome a->b", "override acme/api#12 set map[muted_until:] if map[muted_kind:review]"}; !slices.Equal(rec.gates, want) {
+	if want := []string{"open s-1 nudge Any news?", "rehome a->b", "override acme/api#12 set map[muted_until:] if map[muted_kind:review]"}; !slices.Equal(rec.gates, want) {
 		t.Errorf("gates\n%q\nwant\n%q", rec.gates, want)
 	}
 	if !slices.Equal(rec.sessions, []string{"s-1"}) {

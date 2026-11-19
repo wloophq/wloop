@@ -1174,16 +1174,16 @@ See [Turns and rounds](/concepts/turns/).
 
 ### draft
 
-Propose, read, revise or withdraw your drafts.
+Write, read, revise, post or withdraw your drafts.
 
 ```sh
-{{command}} draft propose --kind <kind> [--unit <provider>/<key>] [--text <t> | --text-file <path>] [--payload <json> | --payload-file <path>] [--basis <b>] [--hold]
+{{command}} draft write --kind <kind> [--unit <provider>/<key>] [--text <t> | --text-file <path>] [--payload <json> | --payload-file <path>] [--basis <b>] [--hold] [--draft=false]
 {{command}} draft read <id>
-{{command}} draft update <id> --rev <rev> [--text <t>] [--payload <json>] [--basis <b>]
+{{command}} draft update <id> --rev <rev> [--text <t>] [--payload <json>] [--basis <b>] [--draft=false]
 {{command}} draft withdraw <id> --rev <rev> [--reason <r>]
 ```
 
-An agent session's drafts, as the MCP draft tools reach them: {{name}} posts a draft only once the user, or a rule of the user's, approves it. propose drafts on this session's turn's unit unless `--unit` names another; read reaches any draft on that unit or proposed from it, update and withdraw only those an agent proposed there, never a person's or a workflow's; both apply at the rev read, so a revision made meanwhile is never overwritten. Each prints the draft as JSON.
+An agent session's drafts, as the MCP draft tools reach them: each is a draft that waits for the user unless a rule of theirs posts it, and `--draft=false` posts it at once from a session the user drives. write drafts on this session's turn's unit unless `--unit` names another; read reaches any draft on that unit or written from it, update and withdraw only those an agent wrote there, never a person's or a workflow's; both apply at the rev read, so a revision made meanwhile is never overwritten. Each prints the draft as JSON.
 
 | Flag | Description |
 | --- | --- |
@@ -1191,7 +1191,8 @@ An agent session's drafts, as the MCP draft tools reach them: {{name}} posts a d
 | `--rev <rev>` | The rev you read |
 | `--payload <json>` | What the kind's schema shapes beside the text |
 | `--basis <b>` | What you read the unit at, such as a pull request's head commit |
-| `--hold` | Keep the draft waiting for the user whatever the approval rules say |
+| `--hold` | No approval rule of the user's posts this draft; use it for a draft your question pins |
+| `--draft=false` | Post at once in the user's name, from a session the user drives; only when the user told you to |
 
 Examples:
 

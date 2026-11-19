@@ -90,7 +90,7 @@ func (s *Server) draftUpdate(ctx context.Context, session string, arguments json
 	if a.Draft != nil && !*a.Draft {
 		done = "posting"
 		if d.State == string(draft.Held) {
-			done = "kept"
+			done = "waits"
 		}
 	}
 	return s.draftAnswer(ctx, draftUpdateName, done, d, err)

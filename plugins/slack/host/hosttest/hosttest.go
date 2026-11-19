@@ -62,7 +62,6 @@ type Host struct {
 	tasks     []src.Task
 	sessions  map[string]src.Session
 	gates     []src.GateRequest
-	sent      []Sent
 	moves     []src.UnitMove
 	drafts    map[unit.Unit]int
 	briefs    []src.Brief
@@ -107,13 +106,6 @@ func (h *Host) Wakes() []JobWake {
 type stored struct {
 	seq int
 	it  items.Item
-}
-
-// Sent is a RecordSent call.
-type Sent struct {
-	Draft   src.Draft
-	Session string
-	Tool    string
 }
 
 // Broker is the fake as the plugin's broker.
@@ -543,14 +535,7 @@ func (h *Host) OpenGate(_ context.Context, req src.GateRequest) (src.GateRef, er
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.gates = append(h.gates, req)
-	return src.GateRef{Gate: "draft", Draft: int64(len(h.gates) + len(h.sent)), State: h.GateState}, nil
-}
-
-func (h *Host) RecordSent(_ context.Context, d src.Draft, session, tool string) (src.GateRef, error) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.sent = append(h.sent, Sent{Draft: d, Session: session, Tool: tool})
-	return src.GateRef{Gate: "draft", Draft: int64(len(h.gates) + len(h.sent))}, nil
+	return src.GateRef{Gate: "draft", Draft: int64(len(h.gates)), State: h.GateState}, nil
 }
 
 // SetDrafts says u has n drafts, which RehomeDrafts moves and counts.
@@ -599,13 +584,6 @@ func (h *Host) Gates() []src.GateRequest {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return slices.Clone(h.gates)
-}
-
-// SentDrafts are the RecordSent calls.
-func (h *Host) SentDrafts() []Sent {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return slices.Clone(h.sent)
 }
 
 // Moves are the RehomeDrafts moves.

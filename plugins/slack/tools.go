@@ -432,7 +432,7 @@ func (t tools) propose(ctx context.Context, s *send.Service, d draft.Draft, now 
 	if pub, err := p.publisher(); err == nil {
 		where, _ = pub.Where(ctx, d)
 	}
-	return answer(postAnswer(now, draft.State(ref.State)), fields{"ID": ref.Draft, "Unit": unitName(wire.Unit, d.Unit), "Where": where, "Link": ref.Link}, false), nil
+	return answer(postAnswer(now, draft.State(ref.State)), fields{"ID": ref.Draft, "Rev": ref.Rev, "Unit": unitName(wire.Unit, d.Unit), "Where": where, "Link": ref.Link}, false), nil
 }
 
 // unitName is the unit a draft is on as its answer names it: "" for one that named none.
@@ -444,18 +444,18 @@ func unitName(wire sdk.Unit, u unit.Unit) string {
 }
 
 // postAnswer is slack_post's answer for a post whose draft its gate left in state st, now when it asked to post
-// at once: posting once it is on its way, kept when it waits for the user, drafted when it was asked to, approved
-// by a rule of the user's, dry_run under a dry run.
+// at once: posting once it is on its way, waits when it waits for the user, drafted when it was asked to,
+// rule_posts when a rule of the user's posts it, dry_run under a dry run.
 func postAnswer(now bool, st draft.State) string {
 	switch {
 	case st == draft.Dropped:
 		return "dry_run"
 	case now && st == draft.Held:
-		return "kept"
+		return "waits"
 	case now:
 		return "posting"
 	case st == draft.Queued || st == draft.Sending || st == draft.Sent:
-		return "approved"
+		return "rule_posts"
 	}
 	return "drafted"
 }

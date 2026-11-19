@@ -241,7 +241,7 @@ describe("qcard_test.go, the question's card", () => {
     const second = all(c, ".d-pin")[1];
     expect(texts(second, ".d-note.err")[0]).toContain("now at rev 4");
     expect(second.getAttribute("data-rev")).toBe("4");
-    expect(texts(all(c, ".d-pin")[2], ".d-note.err")).toEqual(["Approves draft #44, which is gone."]);
+    expect(texts(all(c, ".d-pin")[2], ".d-note.err")).toEqual(["Picking this option posts draft #44, which is gone."]);
     expect(texts(c, ".d-pin .pv").length).toBeGreaterThan(0);
   });
 });

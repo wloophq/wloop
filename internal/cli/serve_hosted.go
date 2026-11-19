@@ -207,14 +207,6 @@ func (d lateDrafts) Propose(ctx context.Context, p outbox.Proposal) (draft.Draft
 	return ob.Propose(ctx, p)
 }
 
-func (d lateDrafts) RecordSent(ctx context.Context, p outbox.Proposal, ev draft.Evidence) (draft.Draft, error) {
-	ob := d.h.outbox.Load()
-	if ob == nil {
-		return draft.Draft{}, errNoOutbox
-	}
-	return ob.RecordSent(ctx, p, ev)
-}
-
 func (d lateDrafts) PublisherOf(dr draft.Draft) unit.ProviderID {
 	if ob := d.h.outbox.Load(); ob != nil {
 		return ob.PublisherOf(dr)

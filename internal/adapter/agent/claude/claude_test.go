@@ -240,7 +240,7 @@ func TestDraftToolAllowedSendStillAsks(t *testing.T) {
 		t.Fatal("a DraftTools-only policy passes no settings")
 	}
 	doc := map[string]any{}
-	Home{AtOnceTools: testAtOnceTools}.installSettings(doc)
+	Home{WriteTools: testWriteTools}.installSettings(doc)
 	perms, _ := doc["permissions"].(map[string]any)
 	if ask, _ := perms["ask"].([]any); slices.Contains(ask, any(slackSendTool)) {
 		t.Fatalf("installed ask %v", perms["ask"])

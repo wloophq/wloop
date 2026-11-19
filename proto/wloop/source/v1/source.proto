@@ -92,7 +92,6 @@ service HostService {
 
   // Gates.
   rpc OpenGate(OpenGateRequest) returns (OpenGateResponse);
-  rpc RecordSent(RecordSentRequest) returns (RecordSentResponse);
   rpc RehomeDrafts(RehomeDraftsRequest) returns (RehomeDraftsResponse);
   rpc SetOverride(SetOverrideRequest) returns (SetOverrideResponse);
 
@@ -1123,19 +1122,6 @@ message OpenGateRequest {
 }
 
 message OpenGateResponse {
-  GateRef gate = 1;
-}
-
-// RecordSentRequest records a post a tool made at once; the host refuses it
-// for a session that is not live or a tool the manifest does not mark posts
-// "now".
-message RecordSentRequest {
-  Draft draft = 1;
-  string session = 2;
-  string tool = 3;
-}
-
-message RecordSentResponse {
   GateRef gate = 1;
 }
 

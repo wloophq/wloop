@@ -160,7 +160,7 @@ func (c askCard) answers(w *texts.Catalog) []string {
 		if pin == nil {
 			return ""
 		}
-		return " · " + w.T("approves draft #{id}", map[string]any{"id": pin.ID})
+		return " · " + w.T("posts draft #{id}", map[string]any{"id": pin.ID})
 	}
 	if c.confirm {
 		return []string{w.T("yes", nil) + approves(c.draft), w.T("no", nil)}
@@ -640,11 +640,11 @@ func servedWord(words map[string]string, name string) string {
 func (m *Model) pinFacts(c askCard, pin *record.DraftRef, fact func(label, text string, style func(string) string), para func(label, text string)) {
 	i := slices.IndexFunc(c.pinned, func(d api.Draft) bool { return d.ID == pin.ID })
 	if i < 0 {
-		fact("", m.w().T("Approves draft #{id}, which is gone.", map[string]any{"id": pin.ID}), m.t.Red)
+		fact("", m.w().T("Picking this option posts draft #{id}, which is gone.", map[string]any{"id": pin.ID}), m.t.Red)
 		return
 	}
 	d := c.pinned[i]
-	fact("", m.w().T("Approves draft #{id} at rev {rev}:", map[string]any{"id": pin.ID, "rev": d.Rev}), m.t.Dim)
+	fact("", m.w().T("Picking this option posts draft #{id} at rev {rev}:", map[string]any{"id": pin.ID, "rev": d.Rev}), m.t.Dim)
 	if d.Rev != pin.Rev {
 		fact("", m.w().T("It changed since the question pinned it and is now at rev {rev}; picking this option posts what it says now.", map[string]any{"rev": d.Rev}), m.t.Red)
 	}

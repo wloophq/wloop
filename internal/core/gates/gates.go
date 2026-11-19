@@ -464,43 +464,6 @@ func (s *Service) TaskEnded(ctx context.Context, id task.ID, by task.Actor, sess
 	return errors.Join(errs...)
 }
 
-// RecordSent records g, a post a tool made at once, as a gate already
-// approved by g.By with g.Rule, worded by gates.toml and on the task of its
-// unit when one holds it. It resolves no gate and applies no consequence.
-func (s *Service) RecordSent(ctx context.Context, g gate.Gate) (gate.Gate, error) {
-	sent, ok := s.d.Store.(Sent)
-	if !ok {
-		return gate.Gate{}, errors.New("the gates store records no sent post")
-	}
-	def, err := s.def(g)
-	if err != nil {
-		return gate.Gate{}, err
-	}
-	g.Name, g.Kind = def.Name, def.Kind
-	if len(g.Intents) == 0 {
-		for _, in := range def.Intents {
-			g.Intents = append(g.Intents, in.Name)
-		}
-	}
-	if approve, ok := statusIntent(g, def, gate.Approved); ok {
-		g.Intent = approve.Name
-	}
-	if g.Task == "" {
-		if id, ok := task.IDOf(g.Unit); ok {
-			g.Task = id
-		} else if s.d.Tasks != nil && !g.Unit.IsZero() {
-			ts, err := s.d.Tasks.TasksOf(ctx, g.Unit)
-			if err != nil {
-				return gate.Gate{}, err
-			}
-			if len(ts) > 0 {
-				g.Task = ts[0].ID
-			}
-		}
-	}
-	return sent.RecordSent(ctx, g)
-}
-
 // Tick resolves every open gate whose Deadline is not after now to its
 // Default, with the rule window, but a draft gate a question pins, which it
 // leaves to the question, then runs the consequence of each resolved

@@ -705,9 +705,9 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `turn_end`: Records how the session's turn ended.
   - `task_post`: Posts a question or a note on the session's task during a turn, waiting on a gate.
   - `task_read`: Reads the session's task: the task, its brief, its open gates, the chat since the last read, the user's answers and what the task's turns learned, and marks them read.
-  - `draft_read`: Reads a draft on the session's turn's unit or proposed from it: its content, delivery state and revisions.
-  - `draft_update`: Revises a draft an agent proposed on the session's turn's unit or from it, at the rev it read; the revision waits for the user's approval again, and with draft false is posted at once from a session the user drives.
-  - `draft_withdraw`: Withdraws a draft an agent proposed on the session's turn's unit or from it, at the rev it read.
+  - `draft_read`: Reads a draft on the session's turn's unit or written from it: its content, delivery state and revisions.
+  - `draft_update`: Revises a draft an agent wrote on the session's turn's unit or from it, at the rev it read; the revision waits for the user's approval again, and with draft false is posted at once from a session the user drives.
+  - `draft_withdraw`: Withdraws a draft an agent wrote on the session's turn's unit or from it, at the rev it read.
   - `github_post`: Writes a GitHub comment, review, review thread reply, thread resolution or review request in the user's name: a draft for the user by default, posted at once with draft false from a session the user drives.
   - `github_threads`: Reads the unresolved review threads of the session's pull request, with their comment ids, and each reviewer's latest review.
   - `slack_post`: Writes a Slack message, a reaction or its removal, or an edit or deletion of one of the user's messages, in the user's name: a draft for the user by default, posted at once with draft false from a session the user drives.
@@ -772,7 +772,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `fix_these` (`Problems`): The arguments have problems, one per line.
   - `read` (`Draft`, `ID`: number, `Link`): The draft, as JSON, its id and the address of its card in the cockpit, "" when unknown.
   - `not_found` (`Error`): No such draft.
-  - `out_of_scope` (`Error`): The draft is neither on the session's turn's unit nor proposed from it, or, to revise, a person's or a workflow's.
+  - `out_of_scope` (`Error`): The draft is neither on the session's turn's unit nor written from it, or, to revise, a person's or a workflow's.
   - `failed` (`Error`): The call failed.
 - `draft_update`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
@@ -780,11 +780,11 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `fix_these` (`Problems`): The arguments have problems, one per line.
   - `updated` (`Draft`, `ID`: number, `Link`): The revised draft, as JSON, waiting for the user, its id and the address of its card.
   - `posting` (`Draft`, `ID`: number, `Link`): With draft false: the draft, revised or not, approved through the session the user drives and being posted, as JSON.
-  - `kept` (`Draft`, `ID`: number, `Link`): With draft false from a session the user does not drive: the draft, revised or not, still waiting for the user, as JSON, its id and the address of its card.
+  - `waits` (`Draft`, `ID`: number, `Link`): With draft false from a session the user does not drive: the draft, revised or not, still waiting for the user, as JSON, its id and the address of its card.
   - `rev_conflict` (`Error`): The draft is at another rev than the one given.
   - `stale` (`Error`): The basis given is not the unit's live one.
   - `not_found` (`Error`): No such draft.
-  - `out_of_scope` (`Error`): The draft is neither on the session's turn's unit nor proposed from it, or, to revise, a person's or a workflow's.
+  - `out_of_scope` (`Error`): The draft is neither on the session's turn's unit nor written from it, or, to revise, a person's or a workflow's.
   - `failed` (`Error`): The call failed.
 - `draft_withdraw`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
@@ -793,7 +793,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `withdrawn` (`Draft`, `ID`: number, `Link`): The withdrawn draft, as JSON, its id and the address of its card.
   - `rev_conflict` (`Error`): The draft is at another rev than the one given.
   - `not_found` (`Error`): No such draft.
-  - `out_of_scope` (`Error`): The draft is neither on the session's turn's unit nor proposed from it, or, to revise, a person's or a workflow's.
+  - `out_of_scope` (`Error`): The draft is neither on the session's turn's unit nor written from it, or, to revise, a person's or a workflow's.
   - `failed` (`Error`): The call failed.
 - `github_post`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
@@ -807,10 +807,10 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `problem_hold`: A problem: hold is set with draft false.
   - `stale` (`Basis`, `Head`): The basis is not the pull request's head now; nothing was written.
   - `drafted` (`ID`: number, `Rev`: number, `Unit`, `Link`): The draft waits for the user: Link is its card, "" when unknown.
-  - `approved` (`ID`: number, `Rev`: number, `Unit`, `Link`): A rule of the user's approved the draft, and it will be posted.
+  - `rule_posts` (`ID`: number, `Rev`: number, `Unit`, `Link`): A rule of the user's posts the draft.
   - `dry_run` (`ID`: number, `Rev`: number, `Unit`, `Link`): The draft's approval is a dry run: it is stored and never posted.
   - `posting` (`ID`: number, `Rev`: number, `Unit`, `Link`): With draft false: the post is approved through the session the user drives and on its way.
-  - `kept` (`ID`: number, `Rev`: number, `Unit`, `Link`): With draft false from a session the user does not drive: nothing was posted, and the draft waits for the user.
+  - `waits` (`ID`: number, `Rev`: number, `Unit`, `Link`): With draft false from a session the user does not drive: nothing was posted, and the draft waits for the user.
 - `github_threads`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
@@ -830,11 +830,11 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `problem_message_not_yours`: A problem: the message an edit or delete post targets is not the user's.
   - `problem_text_required`: A problem: text is missing or empty.
   - `problem_hold`: A problem: hold is set with draft false.
-  - `drafted` (`ID`: number, `Unit`, `Where`, `Link`): The draft waits for the user: Unit is "" for one on the session itself, Link its card, "" when unknown.
-  - `approved` (`ID`: number, `Unit`, `Where`, `Link`): A rule of the user's approved the draft, and it will be posted.
-  - `dry_run` (`ID`: number, `Unit`, `Where`, `Link`): The draft's approval is a dry run: it is stored and never posted.
-  - `posting` (`ID`: number, `Unit`, `Where`, `Link`): With draft false: the post is approved through the session the user drives and on its way.
-  - `kept` (`ID`: number, `Unit`, `Where`, `Link`): With draft false from a session the user does not drive: nothing was posted, and the draft waits for the user.
+  - `drafted` (`ID`: number, `Rev`: number, `Unit`, `Where`, `Link`): The draft waits for the user: Unit is "" for one on the session itself, Link its card, "" when unknown.
+  - `rule_posts` (`ID`: number, `Rev`: number, `Unit`, `Where`, `Link`): A rule of the user's posts the draft.
+  - `dry_run` (`ID`: number, `Rev`: number, `Unit`, `Where`, `Link`): The draft's approval is a dry run: it is stored and never posted.
+  - `posting` (`ID`: number, `Rev`: number, `Unit`, `Where`, `Link`): With draft false: the post is approved through the session the user drives and on its way.
+  - `waits` (`ID`: number, `Rev`: number, `Unit`, `Where`, `Link`): With draft false from a session the user does not drive: nothing was posted, and the draft waits for the user.
 - `slack_read`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.

@@ -367,8 +367,7 @@ name = "status"
 [[source.tools]]
 name = "slack_post"
 doc = "Writes a Slack message, a reaction or its removal, or an edit or deletion of one of the user's messages, in the user's name: a draft for the user by default, posted at once with draft false from a session the user drives."
-proposes = true
-posts = "now"
+writes = true
 input = '{"type":"object","properties":{"text":{"type":"string"},"kind":{"type":"string","enum":["reply","nudge","close","ask_owner","react","unreact","edit","delete"]},"target":{"type":"string"},"items":{"type":"array","items":{"type":"string"}},"reaction":{"type":"string"},"effects":{"type":"array","items":{"type":"string"}},"broadcast":{"type":"boolean"},"payload":{"type":"object"},"basis":{"type":"string"},"draft":{"type":"boolean"},"hold":{"type":"boolean"}},"additionalProperties":false}'
 
 [[source.tools.answers]]
@@ -412,27 +411,27 @@ doc = "A problem: hold is set with draft false."
 [[source.tools.answers]]
 name = "drafted"
 doc = "The draft waits for the user: Unit is \"\" for one on the session itself, Link its card, \"\" when unknown."
-fields = [{ name = "ID", number = true }, { name = "Unit" }, { name = "Where" }, { name = "Link" }]
+fields = [{ name = "ID", number = true }, { name = "Rev", number = true }, { name = "Unit" }, { name = "Where" }, { name = "Link" }]
 
 [[source.tools.answers]]
-name = "approved"
-doc = "A rule of the user's approved the draft, and it will be posted."
-fields = [{ name = "ID", number = true }, { name = "Unit" }, { name = "Where" }, { name = "Link" }]
+name = "rule_posts"
+doc = "A rule of the user's posts the draft."
+fields = [{ name = "ID", number = true }, { name = "Rev", number = true }, { name = "Unit" }, { name = "Where" }, { name = "Link" }]
 
 [[source.tools.answers]]
 name = "dry_run"
 doc = "The draft's approval is a dry run: it is stored and never posted."
-fields = [{ name = "ID", number = true }, { name = "Unit" }, { name = "Where" }, { name = "Link" }]
+fields = [{ name = "ID", number = true }, { name = "Rev", number = true }, { name = "Unit" }, { name = "Where" }, { name = "Link" }]
 
 [[source.tools.answers]]
 name = "posting"
 doc = "With draft false: the post is approved through the session the user drives and on its way."
-fields = [{ name = "ID", number = true }, { name = "Unit" }, { name = "Where" }, { name = "Link" }]
+fields = [{ name = "ID", number = true }, { name = "Rev", number = true }, { name = "Unit" }, { name = "Where" }, { name = "Link" }]
 
 [[source.tools.answers]]
-name = "kept"
+name = "waits"
 doc = "With draft false from a session the user does not drive: nothing was posted, and the draft waits for the user."
-fields = [{ name = "ID", number = true }, { name = "Unit" }, { name = "Where" }, { name = "Link" }]
+fields = [{ name = "ID", number = true }, { name = "Rev", number = true }, { name = "Unit" }, { name = "Where" }, { name = "Link" }]
 
 [[source.tools]]
 name = "slack_read"

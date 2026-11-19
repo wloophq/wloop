@@ -10,8 +10,8 @@ import (
 	"github.com/wloophq/wloop/internal/transport/mcp"
 )
 
-// proposingTools are the tools the bundled manifests mark proposes = true, as an agent calls them.
-func proposingTools(t *testing.T) (proposes, others []string) {
+// writeTools are the tools the bundled manifests mark proposes = true, as an agent calls them.
+func writeTools(t *testing.T) (proposes, others []string) {
 	t.Helper()
 	ms, err := bundled.Manifests()
 	if err != nil || len(ms) == 0 {
@@ -23,7 +23,7 @@ func proposingTools(t *testing.T) (proposes, others []string) {
 			t.Fatalf("plugin %s: %v", m.ID, err)
 		}
 		for _, tool := range s.Tools {
-			if tool.Proposes {
+			if tool.Writes {
 				proposes = append(proposes, brand.ToolPrefix()+tool.Name)
 			} else {
 				others = append(others, brand.ToolPrefix()+tool.Name)
@@ -34,7 +34,7 @@ func proposingTools(t *testing.T) (proposes, others []string) {
 }
 
 func TestDraftToolsAllowedFromManifests(t *testing.T) {
-	proposes, others := proposingTools(t)
+	proposes, others := writeTools(t)
 	if len(proposes) < 2 {
 		t.Fatalf("the bundled manifests propose through %v", proposes)
 	}

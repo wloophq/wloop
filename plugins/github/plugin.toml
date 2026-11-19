@@ -921,8 +921,7 @@ name = "teams"
 [[source.tools]]
 name = "github_post"
 doc = "Writes a GitHub comment, review, review thread reply, thread resolution or review request in the user's name: a draft for the user by default, posted at once with draft false from a session the user drives."
-proposes = true
-posts = "now"
+writes = true
 input = '{"type":"object","properties":{"kind":{"type":"string","enum":["comment","review","thread_reply","resolve","request_review"]},"target":{"type":"string"},"text":{"type":"string"},"payload":{"type":"object"},"basis":{"type":"string"},"draft":{"type":"boolean"},"hold":{"type":"boolean"},"effects":{"type":"array","items":{"type":"string"}},"why":{"type":"string"}},"required":["kind"],"additionalProperties":false}'
 
 [[source.tools.answers]]
@@ -963,8 +962,8 @@ doc = "The draft waits for the user: Link is its card, \"\" when unknown."
 fields = [{ name = "ID", number = true }, { name = "Rev", number = true }, { name = "Unit" }, { name = "Link" }]
 
 [[source.tools.answers]]
-name = "approved"
-doc = "A rule of the user's approved the draft, and it will be posted."
+name = "rule_posts"
+doc = "A rule of the user's posts the draft."
 fields = [{ name = "ID", number = true }, { name = "Rev", number = true }, { name = "Unit" }, { name = "Link" }]
 
 [[source.tools.answers]]
@@ -978,7 +977,7 @@ doc = "With draft false: the post is approved through the session the user drive
 fields = [{ name = "ID", number = true }, { name = "Rev", number = true }, { name = "Unit" }, { name = "Link" }]
 
 [[source.tools.answers]]
-name = "kept"
+name = "waits"
 doc = "With draft false from a session the user does not drive: nothing was posted, and the draft waits for the user."
 fields = [{ name = "ID", number = true }, { name = "Rev", number = true }, { name = "Unit" }, { name = "Link" }]
 

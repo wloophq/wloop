@@ -62,7 +62,7 @@ notify_pinned = "An answer approves a draft: open the question to see it before 
 
 notify_proposal = "Proposal"
 
-notify_post = "Agent posts"
+notify_post = "Agent says"
 
 notify_yes = "Yes"
 
@@ -70,7 +70,7 @@ notify_no = "No"
 
 notify_recommended = "{{.Label}} (recommended)"
 
-notify_draft = "Draft to approve"
+notify_draft = "Draft to post"
 
 notify_draft_failed = "Draft failed"
 

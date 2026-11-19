@@ -1,10 +1,10 @@
 count: 24
 == review/first/by-hand/guidance
-id: a74ae247d643
-prompt: First review of acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions review --turn a74ae247d643 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 99b2cd2f0cda
+prompt: First review of acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions review --turn 99b2cd2f0cda https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions a74ae247d643 for review in acme/api.
+Instructions 99b2cd2f0cda for review in acme/api.
 
 # First review of acme/api#7, asked for by you.
 
@@ -29,8 +29,8 @@ The guide never relaxes the ambiguity gate (section 5) or drafting (section 6). 
 This session writes nothing to GitHub, and refuses `gh api` calls that
 pass a method or a field flag, GraphQL reads included: read through `gh pr
 view`, `gh pr diff` and `gh api` with a REST path alone. Every post is a
-draft you write with `github_post`; {{name}} posts it once the user, or
-a rule of theirs, approves it.
+draft you write with `github_post`, which waits for the user unless a rule
+of theirs posts it; `draft: false` only when the user says so here.
 
 ## Steps
 
@@ -124,14 +124,13 @@ rules allow it, **unless** one of these holds:
   another human reviewer. Automated reviewers never trigger this gate:
   accounts whose `type` is `Bot`, logins ending in `[bot]`. Disagreeing with them is the normal case: write it as usual.
 
-When one holds, or the verdict is `APPROVE`, write the review with
-`"hold": true`. Alone, it is the decision: record `done` with the verdict,
-the counts and the draft in `outcome.draft`, no question. For
-`APPROVE`, also write its `COMMENT` variant (same body and comments, held),
-which posts your findings without approving, and record `asked`
+When one holds, write the review with `"hold": true`. Alone, it ends the
+turn: record `done` with the verdict, counts and `outcome.draft`. For `APPROVE`, which no rule posts, also
+write its `COMMENT` variant (held), which posts your findings without
+approving, and record `asked`
 with a `choice` question: each option carries `draft` with the `id` and
 `rev` its `github_post` answer gave; picking it posts that draft and
-withdraws the other's. A free answer comes back to you.
+withdraws the other's; a free answer comes back to you.
 
 ### 6. Draft
 
@@ -160,7 +159,7 @@ One draft per review, so inline comments and verdict land together. Call
 is rejected with 422. Move that finding to the body instead.
 
 Without a `github_post` tool, draft through `'/opt/loop/bin/loop' draft
-propose`, whose help says how. The answer says whether the draft waits for
+write`, whose help says how. The answer says whether the draft waits for
 the user or a rule of theirs sends it. A stale answer means the head moved:
 review what changed and write it again.
 
@@ -172,8 +171,8 @@ it names, such as an inline comment outside the diff.
 
 ### 7. Report
 
-Reply to the user with each draft's id and whether it waits for them or a
-rule of theirs sends it, the blocking and non-blocking counts, or the
+Reply to the user with each draft's id and whether it waits for them, a
+rule of theirs sends it or it is posting, the blocking and non-blocking counts, or the
 question.
 
 ### Record the end of the turn
@@ -240,11 +239,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/first/automated
-id: c8f4eea72198
-prompt: First review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn c8f4eea72198 https://github.com/acme/api/pull/7` and follow what it prints.
+id: e507c70c7515
+prompt: First review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn e507c70c7515 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions c8f4eea72198 for review in acme/api.
+Instructions e507c70c7515 for review in acme/api.
 
 # First review of acme/api#7, started by {{name}}.
 
@@ -263,8 +262,8 @@ The guide never relaxes the ambiguity gate (section 5) or drafting (section 6). 
 This session writes nothing to GitHub, and refuses `gh api` calls that
 pass a method or a field flag, GraphQL reads included: read through `gh pr
 view`, `gh pr diff` and `gh api` with a REST path alone. Every post is a
-draft you write with `github_post`; {{name}} posts it once the user, or
-a rule of theirs, approves it.
+draft you write with `github_post`, which waits for the user unless a rule
+of theirs posts it; `draft: false` only when the user says so here.
 
 ## Steps
 
@@ -358,14 +357,13 @@ rules allow it, **unless** one of these holds:
   another human reviewer. Automated reviewers never trigger this gate:
   accounts whose `type` is `Bot`, logins ending in `[bot]`. Disagreeing with them is the normal case: write it as usual.
 
-When one holds, or the verdict is `APPROVE`, write the review with
-`"hold": true`. Alone, it is the decision: record `done` with the verdict,
-the counts and the draft in `outcome.draft`, no question. For
-`APPROVE`, also write its `COMMENT` variant (same body and comments, held),
-which posts your findings without approving, and record `asked`
+When one holds, write the review with `"hold": true`. Alone, it ends the
+turn: record `done` with the verdict, counts and `outcome.draft`. For `APPROVE`, which no rule posts, also
+write its `COMMENT` variant (held), which posts your findings without
+approving, and record `asked`
 with a `choice` question: each option carries `draft` with the `id` and
 `rev` its `github_post` answer gave; picking it posts that draft and
-withdraws the other's. A free answer comes back to you.
+withdraws the other's; a free answer comes back to you.
 
 ### 6. Draft
 
@@ -394,7 +392,7 @@ One draft per review, so inline comments and verdict land together. Call
 is rejected with 422. Move that finding to the body instead.
 
 Without a `github_post` tool, draft through `'/opt/loop/bin/loop' draft
-propose`, whose help says how. The answer says whether the draft waits for
+write`, whose help says how. The answer says whether the draft waits for
 the user or a rule of theirs sends it. A stale answer means the head moved:
 review what changed and write it again.
 
@@ -406,8 +404,8 @@ it names, such as an inline comment outside the diff.
 
 ### 7. Report
 
-Reply to the user with each draft's id and whether it waits for them or a
-rule of theirs sends it, the blocking and non-blocking counts, or the
+Reply to the user with each draft's id and whether it waits for them, a
+rule of theirs sends it or it is posting, the blocking and non-blocking counts, or the
 question.
 
 ### Record the end of the turn
@@ -474,11 +472,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/follow-up/automated/changes-requested
-id: bbce0ea3288d
-prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn bbce0ea3288d https://github.com/acme/api/pull/7` and follow what it prints.
+id: c932bf4f4920
+prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn c932bf4f4920 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions bbce0ea3288d for review in acme/api.
+Instructions c932bf4f4920 for review in acme/api.
 
 # Follow-up review of acme/api#7, started by {{name}}.
 
@@ -497,8 +495,8 @@ The guide never relaxes the ambiguity gate (section 5) or drafting (section 6). 
 This session writes nothing to GitHub, and refuses `gh api` calls that
 pass a method or a field flag, GraphQL reads included: read through `gh pr
 view`, `gh pr diff` and `gh api` with a REST path alone. Every post is a
-draft you write with `github_post`; {{name}} posts it once the user, or
-a rule of theirs, approves it.
+draft you write with `github_post`, which waits for the user unless a rule
+of theirs posts it; `draft: false` only when the user says so here.
 
 ## Steps
 
@@ -635,14 +633,13 @@ rules allow it, **unless** one of these holds:
   another human reviewer. Automated reviewers never trigger this gate:
   accounts whose `type` is `Bot`, logins ending in `[bot]`. Disagreeing with them is the normal case: write it as usual.
 
-When one holds, or the verdict is `APPROVE`, write the review with
-`"hold": true`. Alone, it is the decision: record `done` with the verdict,
-the counts and the draft in `outcome.draft`, no question. For
-`APPROVE`, also write its `COMMENT` variant (same body and comments, held),
-which posts your findings without approving, and record `asked`
+When one holds, write the review with `"hold": true`. Alone, it ends the
+turn: record `done` with the verdict, counts and `outcome.draft`. For `APPROVE`, which no rule posts, also
+write its `COMMENT` variant (held), which posts your findings without
+approving, and record `asked`
 with a `choice` question: each option carries `draft` with the `id` and
 `rev` its `github_post` answer gave; picking it posts that draft and
-withdraws the other's. A free answer comes back to you.
+withdraws the other's; a free answer comes back to you.
 
 ### 6. Draft
 
@@ -674,7 +671,7 @@ one of kind `resolve`; both take `target` `comment:<id>`, the `id` of the
 thread's first comment from `gh api repos/<owner>/<repo>/pulls/<n>/comments`.
 
 Without a `github_post` tool, draft through `'/opt/loop/bin/loop' draft
-propose`, whose help says how. The answer says whether the draft waits for
+write`, whose help says how. The answer says whether the draft waits for
 the user or a rule of theirs sends it. A stale answer means the head moved:
 review what changed and write it again.
 
@@ -686,8 +683,8 @@ it names, such as an inline comment outside the diff.
 
 ### 7. Report
 
-Reply to the user with each draft's id and whether it waits for them or a
-rule of theirs sends it, the blocking and non-blocking counts, or the
+Reply to the user with each draft's id and whether it waits for them, a
+rule of theirs sends it or it is posting, the blocking and non-blocking counts, or the
 question.
 
 ### Record the end of the turn
@@ -754,11 +751,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/follow-up/automated/no-review-read
-id: 6f98b00d4a64
-prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 6f98b00d4a64 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 862107ffdc50
+prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 862107ffdc50 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions 6f98b00d4a64 for review in acme/api.
+Instructions 862107ffdc50 for review in acme/api.
 
 # Follow-up review of acme/api#7, started by {{name}}.
 
@@ -777,8 +774,8 @@ The guide never relaxes the ambiguity gate (section 5) or drafting (section 6). 
 This session writes nothing to GitHub, and refuses `gh api` calls that
 pass a method or a field flag, GraphQL reads included: read through `gh pr
 view`, `gh pr diff` and `gh api` with a REST path alone. Every post is a
-draft you write with `github_post`; {{name}} posts it once the user, or
-a rule of theirs, approves it.
+draft you write with `github_post`, which waits for the user unless a rule
+of theirs posts it; `draft: false` only when the user says so here.
 
 ## Steps
 
@@ -915,14 +912,13 @@ rules allow it, **unless** one of these holds:
   another human reviewer. Automated reviewers never trigger this gate:
   accounts whose `type` is `Bot`, logins ending in `[bot]`. Disagreeing with them is the normal case: write it as usual.
 
-When one holds, or the verdict is `APPROVE`, write the review with
-`"hold": true`. Alone, it is the decision: record `done` with the verdict,
-the counts and the draft in `outcome.draft`, no question. For
-`APPROVE`, also write its `COMMENT` variant (same body and comments, held),
-which posts your findings without approving, and record `asked`
+When one holds, write the review with `"hold": true`. Alone, it ends the
+turn: record `done` with the verdict, counts and `outcome.draft`. For `APPROVE`, which no rule posts, also
+write its `COMMENT` variant (held), which posts your findings without
+approving, and record `asked`
 with a `choice` question: each option carries `draft` with the `id` and
 `rev` its `github_post` answer gave; picking it posts that draft and
-withdraws the other's. A free answer comes back to you.
+withdraws the other's; a free answer comes back to you.
 
 ### 6. Draft
 
@@ -954,7 +950,7 @@ one of kind `resolve`; both take `target` `comment:<id>`, the `id` of the
 thread's first comment from `gh api repos/<owner>/<repo>/pulls/<n>/comments`.
 
 Without a `github_post` tool, draft through `'/opt/loop/bin/loop' draft
-propose`, whose help says how. The answer says whether the draft waits for
+write`, whose help says how. The answer says whether the draft waits for
 the user or a rule of theirs sends it. A stale answer means the head moved:
 review what changed and write it again.
 
@@ -966,8 +962,8 @@ it names, such as an inline comment outside the diff.
 
 ### 7. Report
 
-Reply to the user with each draft's id and whether it waits for them or a
-rule of theirs sends it, the blocking and non-blocking counts, or the
+Reply to the user with each draft's id and whether it waits for them, a
+rule of theirs sends it or it is posting, the blocking and non-blocking counts, or the
 question.
 
 ### Record the end of the turn
@@ -1034,11 +1030,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/first-planned/automated/reviewed-before
-id: 522b39ba10f1
-prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 522b39ba10f1 https://github.com/acme/api/pull/7` and follow what it prints.
+id: b214a4f98207
+prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn b214a4f98207 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions 522b39ba10f1 for review in acme/api.
+Instructions b214a4f98207 for review in acme/api.
 
 # Follow-up review of acme/api#7, started by {{name}}.
 
@@ -1057,8 +1053,8 @@ The guide never relaxes the ambiguity gate (section 5) or drafting (section 6). 
 This session writes nothing to GitHub, and refuses `gh api` calls that
 pass a method or a field flag, GraphQL reads included: read through `gh pr
 view`, `gh pr diff` and `gh api` with a REST path alone. Every post is a
-draft you write with `github_post`; {{name}} posts it once the user, or
-a rule of theirs, approves it.
+draft you write with `github_post`, which waits for the user unless a rule
+of theirs posts it; `draft: false` only when the user says so here.
 
 ## Steps
 
@@ -1195,14 +1191,13 @@ rules allow it, **unless** one of these holds:
   another human reviewer. Automated reviewers never trigger this gate:
   accounts whose `type` is `Bot`, logins ending in `[bot]`. Disagreeing with them is the normal case: write it as usual.
 
-When one holds, or the verdict is `APPROVE`, write the review with
-`"hold": true`. Alone, it is the decision: record `done` with the verdict,
-the counts and the draft in `outcome.draft`, no question. For
-`APPROVE`, also write its `COMMENT` variant (same body and comments, held),
-which posts your findings without approving, and record `asked`
+When one holds, write the review with `"hold": true`. Alone, it ends the
+turn: record `done` with the verdict, counts and `outcome.draft`. For `APPROVE`, which no rule posts, also
+write its `COMMENT` variant (held), which posts your findings without
+approving, and record `asked`
 with a `choice` question: each option carries `draft` with the `id` and
 `rev` its `github_post` answer gave; picking it posts that draft and
-withdraws the other's. A free answer comes back to you.
+withdraws the other's; a free answer comes back to you.
 
 ### 6. Draft
 
@@ -1234,7 +1229,7 @@ one of kind `resolve`; both take `target` `comment:<id>`, the `id` of the
 thread's first comment from `gh api repos/<owner>/<repo>/pulls/<n>/comments`.
 
 Without a `github_post` tool, draft through `'/opt/loop/bin/loop' draft
-propose`, whose help says how. The answer says whether the draft waits for
+write`, whose help says how. The answer says whether the draft waits for
 the user or a rule of theirs sends it. A stale answer means the head moved:
 review what changed and write it again.
 
@@ -1246,8 +1241,8 @@ it names, such as an inline comment outside the diff.
 
 ### 7. Report
 
-Reply to the user with each draft's id and whether it waits for them or a
-rule of theirs sends it, the blocking and non-blocking counts, or the
+Reply to the user with each draft's id and whether it waits for them, a
+rule of theirs sends it or it is posting, the blocking and non-blocking counts, or the
 question.
 
 ### Record the end of the turn
@@ -1314,11 +1309,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/follow-up/by-hand/approved
-id: e1067db70140
-prompt: Follow-up review of acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions review --turn e1067db70140 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 2871d2e6a93b
+prompt: Follow-up review of acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions review --turn 2871d2e6a93b https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions e1067db70140 for review in acme/api.
+Instructions 2871d2e6a93b for review in acme/api.
 
 # Follow-up review of acme/api#7, asked for by you.
 
@@ -1337,8 +1332,8 @@ The guide never relaxes the ambiguity gate (section 5) or drafting (section 6). 
 This session writes nothing to GitHub, and refuses `gh api` calls that
 pass a method or a field flag, GraphQL reads included: read through `gh pr
 view`, `gh pr diff` and `gh api` with a REST path alone. Every post is a
-draft you write with `github_post`; {{name}} posts it once the user, or
-a rule of theirs, approves it.
+draft you write with `github_post`, which waits for the user unless a rule
+of theirs posts it; `draft: false` only when the user says so here.
 
 ## Steps
 
@@ -1475,14 +1470,13 @@ rules allow it, **unless** one of these holds:
   another human reviewer. Automated reviewers never trigger this gate:
   accounts whose `type` is `Bot`, logins ending in `[bot]`. Disagreeing with them is the normal case: write it as usual.
 
-When one holds, or the verdict is `APPROVE`, write the review with
-`"hold": true`. Alone, it is the decision: record `done` with the verdict,
-the counts and the draft in `outcome.draft`, no question. For
-`APPROVE`, also write its `COMMENT` variant (same body and comments, held),
-which posts your findings without approving, and record `asked`
+When one holds, write the review with `"hold": true`. Alone, it ends the
+turn: record `done` with the verdict, counts and `outcome.draft`. For `APPROVE`, which no rule posts, also
+write its `COMMENT` variant (held), which posts your findings without
+approving, and record `asked`
 with a `choice` question: each option carries `draft` with the `id` and
 `rev` its `github_post` answer gave; picking it posts that draft and
-withdraws the other's. A free answer comes back to you.
+withdraws the other's; a free answer comes back to you.
 
 ### 6. Draft
 
@@ -1514,7 +1508,7 @@ one of kind `resolve`; both take `target` `comment:<id>`, the `id` of the
 thread's first comment from `gh api repos/<owner>/<repo>/pulls/<n>/comments`.
 
 Without a `github_post` tool, draft through `'/opt/loop/bin/loop' draft
-propose`, whose help says how. The answer says whether the draft waits for
+write`, whose help says how. The answer says whether the draft waits for
 the user or a rule of theirs sends it. A stale answer means the head moved:
 review what changed and write it again.
 
@@ -1526,8 +1520,8 @@ it names, such as an inline comment outside the diff.
 
 ### 7. Report
 
-Reply to the user with each draft's id and whether it waits for them or a
-rule of theirs sends it, the blocking and non-blocking counts, or the
+Reply to the user with each draft's id and whether it waits for them, a
+rule of theirs sends it or it is posting, the blocking and non-blocking counts, or the
 question.
 
 ### Record the end of the turn
@@ -1753,11 +1747,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/oss-first-time
-id: f3bcf70174da
-prompt: First review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn f3bcf70174da https://github.com/acme/api/pull/7` and follow what it prints.
+id: 996b4bde7b51
+prompt: First review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 996b4bde7b51 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md; user: /home/me/prof/organization=acme/intent=review.md
-Instructions f3bcf70174da for review in acme/api.
+Instructions 996b4bde7b51 for review in acme/api.
 
 # First review of acme/api#7, started by {{name}}.
 
@@ -1776,8 +1770,8 @@ The guide never relaxes the ambiguity gate (section 5) or drafting (section 6). 
 This session writes nothing to GitHub, and refuses `gh api` calls that
 pass a method or a field flag, GraphQL reads included: read through `gh pr
 view`, `gh pr diff` and `gh api` with a REST path alone. Every post is a
-draft you write with `github_post`; {{name}} posts it once the user, or
-a rule of theirs, approves it.
+draft you write with `github_post`, which waits for the user unless a rule
+of theirs posts it; `draft: false` only when the user says so here.
 
 ## Steps
 
@@ -1871,14 +1865,13 @@ rules allow it, **unless** one of these holds:
   another human reviewer. Automated reviewers never trigger this gate:
   accounts whose `type` is `Bot`, logins ending in `[bot]`. Disagreeing with them is the normal case: write it as usual.
 
-When one holds, or the verdict is `APPROVE`, write the review with
-`"hold": true`. Alone, it is the decision: record `done` with the verdict,
-the counts and the draft in `outcome.draft`, no question. For
-`APPROVE`, also write its `COMMENT` variant (same body and comments, held),
-which posts your findings without approving, and record `asked`
+When one holds, write the review with `"hold": true`. Alone, it ends the
+turn: record `done` with the verdict, counts and `outcome.draft`. For `APPROVE`, which no rule posts, also
+write its `COMMENT` variant (held), which posts your findings without
+approving, and record `asked`
 with a `choice` question: each option carries `draft` with the `id` and
 `rev` its `github_post` answer gave; picking it posts that draft and
-withdraws the other's. A free answer comes back to you.
+withdraws the other's; a free answer comes back to you.
 
 ### 6. Draft
 
@@ -1907,7 +1900,7 @@ One draft per review, so inline comments and verdict land together. Call
 is rejected with 422. Move that finding to the body instead.
 
 Without a `github_post` tool, draft through `'/opt/loop/bin/loop' draft
-propose`, whose help says how. The answer says whether the draft waits for
+write`, whose help says how. The answer says whether the draft waits for
 the user or a rule of theirs sends it. A stale answer means the head moved:
 review what changed and write it again.
 
@@ -1919,8 +1912,8 @@ it names, such as an inline comment outside the diff.
 
 ### 7. Report
 
-Reply to the user with each draft's id and whether it waits for them or a
-rule of theirs sends it, the blocking and non-blocking counts, or the
+Reply to the user with each draft's id and whether it waits for them, a
+rule of theirs sends it or it is posting, the blocking and non-blocking counts, or the
 question.
 
 ### Record the end of the turn
@@ -1993,11 +1986,11 @@ Welcome a first-time contributor by name before any finding.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/brief/tag-block
-id: 707912a564b6
-prompt: First review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 707912a564b6 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 14bd0aa299f3
+prompt: First review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 14bd0aa299f3 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md; user: /home/me/prof/tags/lang=go/intent=review.md
-Instructions 707912a564b6 for review in acme/api.
+Instructions 14bd0aa299f3 for review in acme/api.
 
 # First review of acme/api#7, started by {{name}}.
 
@@ -2016,8 +2009,8 @@ The guide never relaxes the ambiguity gate (section 5) or drafting (section 6). 
 This session writes nothing to GitHub, and refuses `gh api` calls that
 pass a method or a field flag, GraphQL reads included: read through `gh pr
 view`, `gh pr diff` and `gh api` with a REST path alone. Every post is a
-draft you write with `github_post`; {{name}} posts it once the user, or
-a rule of theirs, approves it.
+draft you write with `github_post`, which waits for the user unless a rule
+of theirs posts it; `draft: false` only when the user says so here.
 
 ## Steps
 
@@ -2111,14 +2104,13 @@ rules allow it, **unless** one of these holds:
   another human reviewer. Automated reviewers never trigger this gate:
   accounts whose `type` is `Bot`, logins ending in `[bot]`. Disagreeing with them is the normal case: write it as usual.
 
-When one holds, or the verdict is `APPROVE`, write the review with
-`"hold": true`. Alone, it is the decision: record `done` with the verdict,
-the counts and the draft in `outcome.draft`, no question. For
-`APPROVE`, also write its `COMMENT` variant (same body and comments, held),
-which posts your findings without approving, and record `asked`
+When one holds, write the review with `"hold": true`. Alone, it ends the
+turn: record `done` with the verdict, counts and `outcome.draft`. For `APPROVE`, which no rule posts, also
+write its `COMMENT` variant (held), which posts your findings without
+approving, and record `asked`
 with a `choice` question: each option carries `draft` with the `id` and
 `rev` its `github_post` answer gave; picking it posts that draft and
-withdraws the other's. A free answer comes back to you.
+withdraws the other's; a free answer comes back to you.
 
 ### 6. Draft
 
@@ -2147,7 +2139,7 @@ One draft per review, so inline comments and verdict land together. Call
 is rejected with 422. Move that finding to the body instead.
 
 Without a `github_post` tool, draft through `'/opt/loop/bin/loop' draft
-propose`, whose help says how. The answer says whether the draft waits for
+write`, whose help says how. The answer says whether the draft waits for
 the user or a rule of theirs sends it. A stale answer means the head moved:
 review what changed and write it again.
 
@@ -2159,8 +2151,8 @@ it names, such as an inline comment outside the diff.
 
 ### 7. Report
 
-Reply to the user with each draft's id and whether it waits for them or a
-rule of theirs sends it, the blocking and non-blocking counts, or the
+Reply to the user with each draft's id and whether it waits for them, a
+rule of theirs sends it or it is posting, the blocking and non-blocking counts, or the
 question.
 
 ### Record the end of the turn
@@ -2238,11 +2230,11 @@ Every exported identifier needs a doc comment.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/no-brief
-id: 24ab2223f718
-prompt: First review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 24ab2223f718 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 808f8b867e75
+prompt: First review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 808f8b867e75 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions 24ab2223f718 for review in acme/api.
+Instructions 808f8b867e75 for review in acme/api.
 
 # First review of acme/api#7, started by {{name}}.
 
@@ -2261,8 +2253,8 @@ The guide never relaxes the ambiguity gate (section 5) or drafting (section 6). 
 This session writes nothing to GitHub, and refuses `gh api` calls that
 pass a method or a field flag, GraphQL reads included: read through `gh pr
 view`, `gh pr diff` and `gh api` with a REST path alone. Every post is a
-draft you write with `github_post`; {{name}} posts it once the user, or
-a rule of theirs, approves it.
+draft you write with `github_post`, which waits for the user unless a rule
+of theirs posts it; `draft: false` only when the user says so here.
 
 ## Steps
 
@@ -2356,14 +2348,13 @@ rules allow it, **unless** one of these holds:
   another human reviewer. Automated reviewers never trigger this gate:
   accounts whose `type` is `Bot`, logins ending in `[bot]`. Disagreeing with them is the normal case: write it as usual.
 
-When one holds, or the verdict is `APPROVE`, write the review with
-`"hold": true`. Alone, it is the decision: record `done` with the verdict,
-the counts and the draft in `outcome.draft`, no question. For
-`APPROVE`, also write its `COMMENT` variant (same body and comments, held),
-which posts your findings without approving, and record `asked`
+When one holds, write the review with `"hold": true`. Alone, it ends the
+turn: record `done` with the verdict, counts and `outcome.draft`. For `APPROVE`, which no rule posts, also
+write its `COMMENT` variant (held), which posts your findings without
+approving, and record `asked`
 with a `choice` question: each option carries `draft` with the `id` and
 `rev` its `github_post` answer gave; picking it posts that draft and
-withdraws the other's. A free answer comes back to you.
+withdraws the other's; a free answer comes back to you.
 
 ### 6. Draft
 
@@ -2392,7 +2383,7 @@ One draft per review, so inline comments and verdict land together. Call
 is rejected with 422. Move that finding to the body instead.
 
 Without a `github_post` tool, draft through `'/opt/loop/bin/loop' draft
-propose`, whose help says how. The answer says whether the draft waits for
+write`, whose help says how. The answer says whether the draft waits for
 the user or a rule of theirs sends it. A stale answer means the head moved:
 review what changed and write it again.
 
@@ -2404,8 +2395,8 @@ it names, such as an inline comment outside the diff.
 
 ### 7. Report
 
-Reply to the user with each draft's id and whether it waits for them or a
-rule of theirs sends it, the blocking and non-blocking counts, or the
+Reply to the user with each draft's id and whether it waits for them, a
+rule of theirs sends it or it is posting, the blocking and non-blocking counts, or the
 question.
 
 ### Record the end of the turn
@@ -2472,11 +2463,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/delegates
-id: 75fa7d72f884
-prompt: First review of acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions review --turn 75fa7d72f884 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 6ae02fcfbc32
+prompt: First review of acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions review --turn 6ae02fcfbc32 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions 75fa7d72f884 for review in acme/api.
+Instructions 6ae02fcfbc32 for review in acme/api.
 
 # First review of acme/api#7, asked for by you.
 
@@ -2495,8 +2486,8 @@ The guide never relaxes the ambiguity gate (section 5) or drafting (section 6). 
 This session writes nothing to GitHub, and refuses `gh api` calls that
 pass a method or a field flag, GraphQL reads included: read through `gh pr
 view`, `gh pr diff` and `gh api` with a REST path alone. Every post is a
-draft you write with `github_post`; {{name}} posts it once the user, or
-a rule of theirs, approves it.
+draft you write with `github_post`, which waits for the user unless a rule
+of theirs posts it; `draft: false` only when the user says so here.
 
 ## Steps
 
@@ -2590,14 +2581,13 @@ rules allow it, **unless** one of these holds:
   another human reviewer. Automated reviewers never trigger this gate:
   accounts whose `type` is `Bot`, logins ending in `[bot]`. Disagreeing with them is the normal case: write it as usual.
 
-When one holds, or the verdict is `APPROVE`, write the review with
-`"hold": true`. Alone, it is the decision: record `done` with the verdict,
-the counts and the draft in `outcome.draft`, no question. For
-`APPROVE`, also write its `COMMENT` variant (same body and comments, held),
-which posts your findings without approving, and record `asked`
+When one holds, write the review with `"hold": true`. Alone, it ends the
+turn: record `done` with the verdict, counts and `outcome.draft`. For `APPROVE`, which no rule posts, also
+write its `COMMENT` variant (held), which posts your findings without
+approving, and record `asked`
 with a `choice` question: each option carries `draft` with the `id` and
 `rev` its `github_post` answer gave; picking it posts that draft and
-withdraws the other's. A free answer comes back to you.
+withdraws the other's; a free answer comes back to you.
 
 ### 6. Draft
 
@@ -2626,7 +2616,7 @@ One draft per review, so inline comments and verdict land together. Call
 is rejected with 422. Move that finding to the body instead.
 
 Without a `github_post` tool, draft through `'/opt/loop/bin/loop' draft
-propose`, whose help says how. The answer says whether the draft waits for
+write`, whose help says how. The answer says whether the draft waits for
 the user or a rule of theirs sends it. A stale answer means the head moved:
 review what changed and write it again.
 
@@ -2638,8 +2628,8 @@ it names, such as an inline comment outside the diff.
 
 ### 7. Report
 
-Reply to the user with each draft's id and whether it waits for them or a
-rule of theirs sends it, the blocking and non-blocking counts, or the
+Reply to the user with each draft's id and whether it waits for them, a
+rule of theirs sends it or it is posting, the blocking and non-blocking counts, or the
 question.
 
 ### Record the end of the turn
@@ -2712,11 +2702,11 @@ In the finding step, also run each of these and verify what it returns like any 
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == address/by-hand/guidance
-id: 1fa4de4d2afd
-prompt: Address round on acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions address --turn 1fa4de4d2afd https://github.com/acme/api/pull/7` and follow what it prints.
+id: 8b32b166538c
+prompt: Address round on acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions address --turn 8b32b166538c https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=address.md
-Instructions 1fa4de4d2afd for address in acme/api.
+Instructions 8b32b166538c for address in acme/api.
 
 # Address round on acme/api#7, asked for by you.
 
@@ -2743,10 +2733,10 @@ below fails in a way you cannot recover from, stop, report and record
 The current checkout is the author workspace of this pull request, and the
 work is published under the user's name.
 
-Besides your push, this session writes nothing to GitHub: every reply,
-resolution, comment and review request is a draft you write with
-`github_post` (or `'/opt/loop/bin/loop' draft propose`), and {{name}} posts it once
-the user, or a rule of theirs, approves it.
+Besides your push, every reply, resolution, comment and review request is
+a draft you write with `github_post` (or `'/opt/loop/bin/loop' draft write`), which
+waits for the user unless a rule of theirs posts it; set `draft: false` only
+when the user tells you, in this session, to post.
 
 ## Steps
 
@@ -3048,11 +3038,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == address/automated/local-work/queued
-id: 5bf6fe295d51
-prompt: Address round on acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions address --turn 5bf6fe295d51 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 61186f45eac0
+prompt: Address round on acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions address --turn 61186f45eac0 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=address.md
-Instructions 5bf6fe295d51 for address in acme/api.
+Instructions 61186f45eac0 for address in acme/api.
 
 # Address round on acme/api#7, started by {{name}}.
 
@@ -3073,10 +3063,10 @@ below fails in a way you cannot recover from, stop, report and record
 The current checkout is the author workspace of this pull request, and the
 work is published under the user's name.
 
-Besides your push, this session writes nothing to GitHub: every reply,
-resolution, comment and review request is a draft you write with
-`github_post` (or `'/opt/loop/bin/loop' draft propose`), and {{name}} posts it once
-the user, or a rule of theirs, approves it.
+Besides your push, every reply, resolution, comment and review request is
+a draft you write with `github_post` (or `'/opt/loop/bin/loop' draft write`), which
+waits for the user unless a rule of theirs posts it; set `draft: false` only
+when the user tells you, in this session, to post.
 
 The prompt may arrive while you are in the middle of other work in this
 session: it was queued behind your turn. Finish or park what you were doing,
@@ -3395,11 +3385,11 @@ Instructions 474542163708 for address in acme/api.
 https://github.com/acme/api/pull/7 was opened by @ana, not by the user. Addressing it means pushing to their branch under the user's name. Ask the user whether to take it over. If they say yes, run `'/opt/loop/bin/loop' instructions address https://github.com/acme/api/pull/7 --take-over`, with the user's guidance after `--` when they gave any, and follow what it prints. Change nothing before that: no commit, push, reply, resolve, re-request or board move.
 == end
 == address/take-over
-id: 5a70c02a847d
-prompt: Take over acme/api#7 and address it, asked for by you. Run `'/opt/loop/bin/loop' instructions address --turn 5a70c02a847d https://github.com/acme/api/pull/7` and follow what it prints.
+id: f7f99474f0e0
+prompt: Take over acme/api#7 and address it, asked for by you. Run `'/opt/loop/bin/loop' instructions address --turn f7f99474f0e0 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=address.md
-Instructions 5a70c02a847d for address in acme/api.
+Instructions f7f99474f0e0 for address in acme/api.
 
 # Take over acme/api#7 and address it, asked for by you.
 
@@ -3420,10 +3410,10 @@ below fails in a way you cannot recover from, stop, report and record
 The current checkout is the author workspace of this pull request, and the
 work is published under the user's name.
 
-Besides your push, this session writes nothing to GitHub: every reply,
-resolution, comment and review request is a draft you write with
-`github_post` (or `'/opt/loop/bin/loop' draft propose`), and {{name}} posts it once
-the user, or a rule of theirs, approves it.
+Besides your push, every reply, resolution, comment and review request is
+a draft you write with `github_post` (or `'/opt/loop/bin/loop' draft write`), which
+waits for the user unless a rule of theirs posts it; set `draft: false` only
+when the user tells you, in this session, to post.
 
 ## Steps
 
@@ -3725,11 +3715,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/resume/answered
-id: 9d76e7329a8a
-prompt: Continue the review of acme/api#7: the user answered. Run `'/opt/loop/bin/loop' instructions review --turn 9d76e7329a8a https://github.com/acme/api/pull/7` and follow what it prints.
+id: 977b8c043fea
+prompt: Continue the review of acme/api#7: the user answered. Run `'/opt/loop/bin/loop' instructions review --turn 977b8c043fea https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions 9d76e7329a8a for review in acme/api.
+Instructions 977b8c043fea for review in acme/api.
 
 # Continue the review of acme/api#7: the user answered.
 
@@ -3787,8 +3777,8 @@ The guide never relaxes the ambiguity gate (section 5) or drafting (section 6). 
 This session writes nothing to GitHub, and refuses `gh api` calls that
 pass a method or a field flag, GraphQL reads included: read through `gh pr
 view`, `gh pr diff` and `gh api` with a REST path alone. Every post is a
-draft you write with `github_post`; {{name}} posts it once the user, or
-a rule of theirs, approves it.
+draft you write with `github_post`, which waits for the user unless a rule
+of theirs posts it; `draft: false` only when the user says so here.
 
 ## Steps
 
@@ -3882,14 +3872,13 @@ rules allow it, **unless** one of these holds:
   another human reviewer. Automated reviewers never trigger this gate:
   accounts whose `type` is `Bot`, logins ending in `[bot]`. Disagreeing with them is the normal case: write it as usual.
 
-When one holds, or the verdict is `APPROVE`, write the review with
-`"hold": true`. Alone, it is the decision: record `done` with the verdict,
-the counts and the draft in `outcome.draft`, no question. For
-`APPROVE`, also write its `COMMENT` variant (same body and comments, held),
-which posts your findings without approving, and record `asked`
+When one holds, write the review with `"hold": true`. Alone, it ends the
+turn: record `done` with the verdict, counts and `outcome.draft`. For `APPROVE`, which no rule posts, also
+write its `COMMENT` variant (held), which posts your findings without
+approving, and record `asked`
 with a `choice` question: each option carries `draft` with the `id` and
 `rev` its `github_post` answer gave; picking it posts that draft and
-withdraws the other's. A free answer comes back to you.
+withdraws the other's; a free answer comes back to you.
 
 ### 6. Draft
 
@@ -3918,7 +3907,7 @@ One draft per review, so inline comments and verdict land together. Call
 is rejected with 422. Move that finding to the body instead.
 
 Without a `github_post` tool, draft through `'/opt/loop/bin/loop' draft
-propose`, whose help says how. The answer says whether the draft waits for
+write`, whose help says how. The answer says whether the draft waits for
 the user or a rule of theirs sends it. A stale answer means the head moved:
 review what changed and write it again.
 
@@ -3930,8 +3919,8 @@ it names, such as an inline comment outside the diff.
 
 ### 7. Report
 
-Reply to the user with each draft's id and whether it waits for them or a
-rule of theirs sends it, the blocking and non-blocking counts, or the
+Reply to the user with each draft's id and whether it waits for them, a
+rule of theirs sends it or it is posting, the blocking and non-blocking counts, or the
 question.
 
 ### Record the end of the turn
@@ -3998,11 +3987,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/resume/answered-after-push
-id: c1888650c67b
-prompt: Continue the review of acme/api#7: the user answered. Run `'/opt/loop/bin/loop' instructions review --turn c1888650c67b https://github.com/acme/api/pull/7` and follow what it prints.
+id: a805b3cfcb71
+prompt: Continue the review of acme/api#7: the user answered. Run `'/opt/loop/bin/loop' instructions review --turn a805b3cfcb71 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions c1888650c67b for review in acme/api.
+Instructions a805b3cfcb71 for review in acme/api.
 
 # Continue the review of acme/api#7: the user answered.
 
@@ -4060,8 +4049,8 @@ The guide never relaxes the ambiguity gate (section 5) or drafting (section 6). 
 This session writes nothing to GitHub, and refuses `gh api` calls that
 pass a method or a field flag, GraphQL reads included: read through `gh pr
 view`, `gh pr diff` and `gh api` with a REST path alone. Every post is a
-draft you write with `github_post`; {{name}} posts it once the user, or
-a rule of theirs, approves it.
+draft you write with `github_post`, which waits for the user unless a rule
+of theirs posts it; `draft: false` only when the user says so here.
 
 ## Steps
 
@@ -4155,14 +4144,13 @@ rules allow it, **unless** one of these holds:
   another human reviewer. Automated reviewers never trigger this gate:
   accounts whose `type` is `Bot`, logins ending in `[bot]`. Disagreeing with them is the normal case: write it as usual.
 
-When one holds, or the verdict is `APPROVE`, write the review with
-`"hold": true`. Alone, it is the decision: record `done` with the verdict,
-the counts and the draft in `outcome.draft`, no question. For
-`APPROVE`, also write its `COMMENT` variant (same body and comments, held),
-which posts your findings without approving, and record `asked`
+When one holds, write the review with `"hold": true`. Alone, it ends the
+turn: record `done` with the verdict, counts and `outcome.draft`. For `APPROVE`, which no rule posts, also
+write its `COMMENT` variant (held), which posts your findings without
+approving, and record `asked`
 with a `choice` question: each option carries `draft` with the `id` and
 `rev` its `github_post` answer gave; picking it posts that draft and
-withdraws the other's. A free answer comes back to you.
+withdraws the other's; a free answer comes back to you.
 
 ### 6. Draft
 
@@ -4191,7 +4179,7 @@ One draft per review, so inline comments and verdict land together. Call
 is rejected with 422. Move that finding to the body instead.
 
 Without a `github_post` tool, draft through `'/opt/loop/bin/loop' draft
-propose`, whose help says how. The answer says whether the draft waits for
+write`, whose help says how. The answer says whether the draft waits for
 the user or a rule of theirs sends it. A stale answer means the head moved:
 review what changed and write it again.
 
@@ -4203,8 +4191,8 @@ it names, such as an inline comment outside the diff.
 
 ### 7. Report
 
-Reply to the user with each draft's id and whether it waits for them or a
-rule of theirs sends it, the blocking and non-blocking counts, or the
+Reply to the user with each draft's id and whether it waits for them, a
+rule of theirs sends it or it is posting, the blocking and non-blocking counts, or the
 question.
 
 ### Record the end of the turn
@@ -4271,11 +4259,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == address/resume/continue
-id: 6d60c67186fc
-prompt: Continue the address round on acme/api#7 where the last session stopped. Run `'/opt/loop/bin/loop' instructions address --turn 6d60c67186fc https://github.com/acme/api/pull/7` and follow what it prints.
+id: 0b0efad3da3c
+prompt: Continue the address round on acme/api#7 where the last session stopped. Run `'/opt/loop/bin/loop' instructions address --turn 0b0efad3da3c https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=address.md
-Instructions 6d60c67186fc for address in acme/api.
+Instructions 0b0efad3da3c for address in acme/api.
 
 # Continue the address round on acme/api#7 where the last session stopped.
 
@@ -4311,10 +4299,10 @@ below fails in a way you cannot recover from, stop, report and record
 The current checkout is the author workspace of this pull request, and the
 work is published under the user's name.
 
-Besides your push, this session writes nothing to GitHub: every reply,
-resolution, comment and review request is a draft you write with
-`github_post` (or `'/opt/loop/bin/loop' draft propose`), and {{name}} posts it once
-the user, or a rule of theirs, approves it.
+Besides your push, every reply, resolution, comment and review request is
+a draft you write with `github_post` (or `'/opt/loop/bin/loop' draft write`), which
+waits for the user unless a rule of theirs posts it; set `draft: false` only
+when the user tells you, in this session, to post.
 
 ## Steps
 
@@ -4616,11 +4604,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/history/injected
-id: bcfee041f28a
-prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn bcfee041f28a https://github.com/acme/api/pull/7` and follow what it prints.
+id: 725c9f7c1a1a
+prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 725c9f7c1a1a https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions bcfee041f28a for review in acme/api.
+Instructions 725c9f7c1a1a for review in acme/api.
 
 # Follow-up review of acme/api#7, started by {{name}}.
 
@@ -4639,8 +4627,8 @@ The guide never relaxes the ambiguity gate (section 5) or drafting (section 6). 
 This session writes nothing to GitHub, and refuses `gh api` calls that
 pass a method or a field flag, GraphQL reads included: read through `gh pr
 view`, `gh pr diff` and `gh api` with a REST path alone. Every post is a
-draft you write with `github_post`; {{name}} posts it once the user, or
-a rule of theirs, approves it.
+draft you write with `github_post`, which waits for the user unless a rule
+of theirs posts it; `draft: false` only when the user says so here.
 
 ## Steps
 
@@ -4796,14 +4784,13 @@ rules allow it, **unless** one of these holds:
   another human reviewer. Automated reviewers never trigger this gate:
   accounts whose `type` is `Bot`, logins ending in `[bot]`. Disagreeing with them is the normal case: write it as usual.
 
-When one holds, or the verdict is `APPROVE`, write the review with
-`"hold": true`. Alone, it is the decision: record `done` with the verdict,
-the counts and the draft in `outcome.draft`, no question. For
-`APPROVE`, also write its `COMMENT` variant (same body and comments, held),
-which posts your findings without approving, and record `asked`
+When one holds, write the review with `"hold": true`. Alone, it ends the
+turn: record `done` with the verdict, counts and `outcome.draft`. For `APPROVE`, which no rule posts, also
+write its `COMMENT` variant (held), which posts your findings without
+approving, and record `asked`
 with a `choice` question: each option carries `draft` with the `id` and
 `rev` its `github_post` answer gave; picking it posts that draft and
-withdraws the other's. A free answer comes back to you.
+withdraws the other's; a free answer comes back to you.
 
 ### 6. Draft
 
@@ -4835,7 +4822,7 @@ one of kind `resolve`; both take `target` `comment:<id>`, the `id` of the
 thread's first comment from `gh api repos/<owner>/<repo>/pulls/<n>/comments`.
 
 Without a `github_post` tool, draft through `'/opt/loop/bin/loop' draft
-propose`, whose help says how. The answer says whether the draft waits for
+write`, whose help says how. The answer says whether the draft waits for
 the user or a rule of theirs sends it. A stale answer means the head moved:
 review what changed and write it again.
 
@@ -4847,8 +4834,8 @@ it names, such as an inline comment outside the diff.
 
 ### 7. Report
 
-Reply to the user with each draft's id and whether it waits for them or a
-rule of theirs sends it, the blocking and non-blocking counts, or the
+Reply to the user with each draft's id and whether it waits for them, a
+rule of theirs sends it or it is posting, the blocking and non-blocking counts, or the
 question.
 
 ### Record the end of the turn
@@ -5038,11 +5025,11 @@ notice from {{name}} that names the gate answered, without the answer; read it
 with the `task_read` tool, or run `'/opt/loop/bin/loop' turn answer https://github.com/loop-e2e/probe/pull/1760000000`.
 == end
 == nudge/one-reviewer/guidance
-id: 333e476b8b0d
-prompt: Nudge on acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions nudge --turn 333e476b8b0d https://github.com/acme/api/pull/7` and follow what it prints.
+id: e9ace789430b
+prompt: Nudge on acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions nudge --turn e9ace789430b https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=nudge.md
-Instructions 333e476b8b0d for nudge in acme/api.
+Instructions e9ace789430b for nudge in acme/api.
 
 # Nudge on acme/api#7, asked for by you.
 
@@ -5089,8 +5076,9 @@ Run no other command than the `gh` commands in these instructions and the
 record step's, and call no other tool than `github_post` and the record
 step's. This session posts nothing to GitHub on its own: it refuses every
 command that comments or changes anything there. The comment is a draft you
-write, with `draft` left out; {{name}} posts it once the user, or a rule of
-theirs, approves it.
+write with `github_post`, which waits for the user unless a rule of theirs
+posts it; set `draft: false` only when the user tells you, in this session,
+to post.
 
 The user asked for this nudge by hand. The comment goes out under the user's
 name, to people who will read it as written by the user.
@@ -5139,13 +5127,13 @@ as the summary, when:
 
 Call `github_post` with `kind` `comment`, no `target`, and the comment as
 `text`. If this session has no such tool, draft through
-`'/opt/loop/bin/loop' draft propose`, whose help says how.
+`'/opt/loop/bin/loop' draft write`, whose help says how.
 
 Draft exactly one comment. Never review, approve, request changes, edit
 labels or reviewers, push, or touch the checkout. Never draft it twice:
 if the call fails or its outcome is unclear, report what you know without
-drafting again. Reply to the user with the draft's id and the text
-drafted, then record `done`.
+drafting again. Reply to the user with the draft's id, the text
+drafted and whether it waits or is posting now, then record `done`.
 
 ### Record the end of the turn
 
@@ -5187,11 +5175,11 @@ Parts are in order; where they disagree, the later part wins.
 - Two sentences at most.
 == end
 == nudge/maintainers
-id: 07dbbb3d8ecb
-prompt: Nudge on acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions nudge --turn 07dbbb3d8ecb https://github.com/acme/api/pull/7` and follow what it prints.
+id: 4424148c2ffb
+prompt: Nudge on acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions nudge --turn 4424148c2ffb https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=nudge.md
-Instructions 07dbbb3d8ecb for nudge in acme/api.
+Instructions 4424148c2ffb for nudge in acme/api.
 
 # Nudge on acme/api#7, asked for by you.
 
@@ -5233,8 +5221,9 @@ Run no other command than the `gh` commands in these instructions and the
 record step's, and call no other tool than `github_post` and the record
 step's. This session posts nothing to GitHub on its own: it refuses every
 command that comments or changes anything there. The comment is a draft you
-write, with `draft` left out; {{name}} posts it once the user, or a rule of
-theirs, approves it.
+write with `github_post`, which waits for the user unless a rule of theirs
+posts it; set `draft: false` only when the user tells you, in this session,
+to post.
 
 The user asked for this nudge by hand. The comment goes out under the user's
 name, to people who will read it as written by the user.
@@ -5327,13 +5316,13 @@ read as "the maintainers".
 
 Call `github_post` with `kind` `comment`, no `target`, and the comment as
 `text`. If this session has no such tool, draft through
-`'/opt/loop/bin/loop' draft propose`, whose help says how.
+`'/opt/loop/bin/loop' draft write`, whose help says how.
 
 Draft exactly one comment. Never review, approve, request changes, edit
 labels or reviewers, push, or touch the checkout. Never draft it twice:
 if the call fails or its outcome is unclear, report what you know without
-drafting again. Reply to the user with the draft's id and the text
-drafted, then record `done`.
+drafting again. Reply to the user with the draft's id, the text
+drafted and whether it waits or is posting now, then record `done`.
 
 ### Record the end of the turn
 
@@ -5375,11 +5364,11 @@ Parts are in order; where they disagree, the later part wins.
 - Two sentences at most.
 == end
 == review/follow-up/automated/re-requested-after-approval
-id: 6f70eb59f014
-prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 6f70eb59f014 https://github.com/acme/api/pull/7` and follow what it prints.
+id: c8e987d6d7af
+prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn c8e987d6d7af https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions 6f70eb59f014 for review in acme/api.
+Instructions c8e987d6d7af for review in acme/api.
 
 # Follow-up review of acme/api#7, started by {{name}}.
 
@@ -5398,8 +5387,8 @@ The guide never relaxes the ambiguity gate (section 5) or drafting (section 6). 
 This session writes nothing to GitHub, and refuses `gh api` calls that
 pass a method or a field flag, GraphQL reads included: read through `gh pr
 view`, `gh pr diff` and `gh api` with a REST path alone. Every post is a
-draft you write with `github_post`; {{name}} posts it once the user, or
-a rule of theirs, approves it.
+draft you write with `github_post`, which waits for the user unless a rule
+of theirs posts it; `draft: false` only when the user says so here.
 
 ## Steps
 
@@ -5540,14 +5529,13 @@ rules allow it, **unless** one of these holds:
   another human reviewer. Automated reviewers never trigger this gate:
   accounts whose `type` is `Bot`, logins ending in `[bot]`. Disagreeing with them is the normal case: write it as usual.
 
-When one holds, or the verdict is `APPROVE`, write the review with
-`"hold": true`. Alone, it is the decision: record `done` with the verdict,
-the counts and the draft in `outcome.draft`, no question. For
-`APPROVE`, also write its `COMMENT` variant (same body and comments, held),
-which posts your findings without approving, and record `asked`
+When one holds, write the review with `"hold": true`. Alone, it ends the
+turn: record `done` with the verdict, counts and `outcome.draft`. For `APPROVE`, which no rule posts, also
+write its `COMMENT` variant (held), which posts your findings without
+approving, and record `asked`
 with a `choice` question: each option carries `draft` with the `id` and
 `rev` its `github_post` answer gave; picking it posts that draft and
-withdraws the other's. A free answer comes back to you.
+withdraws the other's; a free answer comes back to you.
 
 ### 6. Draft
 
@@ -5579,7 +5567,7 @@ one of kind `resolve`; both take `target` `comment:<id>`, the `id` of the
 thread's first comment from `gh api repos/<owner>/<repo>/pulls/<n>/comments`.
 
 Without a `github_post` tool, draft through `'/opt/loop/bin/loop' draft
-propose`, whose help says how. The answer says whether the draft waits for
+write`, whose help says how. The answer says whether the draft waits for
 the user or a rule of theirs sends it. A stale answer means the head moved:
 review what changed and write it again.
 
@@ -5591,8 +5579,8 @@ it names, such as an inline comment outside the diff.
 
 ### 7. Report
 
-Reply to the user with each draft's id and whether it waits for them or a
-rule of theirs sends it, the blocking and non-blocking counts, or the
+Reply to the user with each draft's id and whether it waits for them, a
+rule of theirs sends it or it is posting, the blocking and non-blocking counts, or the
 question.
 
 ### Record the end of the turn

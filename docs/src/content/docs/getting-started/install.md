@@ -29,7 +29,7 @@ It also writes into each Claude Code home it finds:
 
 - the registration of {{name}}'s MCP server at user scope, with the URL from `mcp.port`, the `X-Loop-Key` header, and `{{command}} hook mcp-headers` as the `headersHelper` that names the session in `X-Loop-Session`;
 - the `Stop`, `SessionStart` and `UserPromptSubmit` hooks (`{{command}} hook stop || true`, and so on);
-- the permissions in `settings.json`: `mcp__{{name}}__turn_end` and the write tools the plugins' manifests mark `posts = "now"` (`mcp__{{name}}__github_post`, `mcp__{{name}}__slack_post`) allowed, so an agent writes in your name without a prompt: a draft by default, posted at once with `draft: false` only from a session you drive; `install` also removes those tools from `ask`;
+- the permissions in `settings.json`: `mcp__{{name}}__turn_end` and the write tools the plugins' manifests mark `writes` (`mcp__{{name}}__github_post`, `mcp__{{name}}__slack_post`) allowed, so an agent writes in your name without a prompt: a draft by default, posted at once with `draft: false` only from a session you drive; `install` also removes those tools from `ask`;
 - the permissions of the draft tools: `mcp__{{name}}__draft_read`, `mcp__{{name}}__draft_update` and `mcp__{{name}}__draft_withdraw` allowed, and `Bash({{command}} draft *)` for the same operations from a shell, so a session reads, revises, posts and withdraws its drafts without a prompt;
 - the bundled skills (`{{name}}`, `{{name}}-review`, `{{name}}-address`, `{{name}}-nudge` and `{{name}}-profile`), also into `~/.agents/skills` for Codex.
 

@@ -131,13 +131,6 @@ func (s *hostServer) OpenGate(ctx context.Context, r *pb.OpenGateRequest) (*pb.O
 	})
 }
 
-func (s *hostServer) RecordSent(ctx context.Context, r *pb.RecordSentRequest) (*pb.RecordSentResponse, error) {
-	return hostCall(ctx, s.h.Gates, "gates", func(h Gates) (*pb.RecordSentResponse, error) {
-		g, err := h.RecordSent(ctx, draftGo(r.GetDraft()), r.GetSession(), r.GetTool())
-		return &pb.RecordSentResponse{Gate: gateRefPB(g)}, err
-	})
-}
-
 func (s *hostServer) RehomeDrafts(ctx context.Context, r *pb.RehomeDraftsRequest) (*pb.RehomeDraftsResponse, error) {
 	return hostCall(ctx, s.h.Gates, "gates", func(h Gates) (*pb.RehomeDraftsResponse, error) {
 		n, err := h.RehomeDrafts(ctx, mapSlice(r.GetMoves(), func(m *pb.UnitMove) UnitMove {
@@ -329,13 +322,6 @@ func (h *hostClient) Session(ctx context.Context, handle string) (Session, error
 func (h *hostClient) OpenGate(ctx context.Context, req GateRequest) (GateRef, error) {
 	r, err := viaHost(h, func(c pb.HostServiceClient) (*pb.OpenGateResponse, error) {
 		return c.OpenGate(ctx, &pb.OpenGateRequest{Draft: draftPB(req.Draft), Session: req.Session, Post: req.Post})
-	})
-	return gateRefGo(r.GetGate()), err
-}
-
-func (h *hostClient) RecordSent(ctx context.Context, d Draft, session, tool string) (GateRef, error) {
-	r, err := viaHost(h, func(c pb.HostServiceClient) (*pb.RecordSentResponse, error) {
-		return c.RecordSent(ctx, &pb.RecordSentRequest{Draft: draftPB(d), Session: session, Tool: tool})
 	})
 	return gateRefGo(r.GetGate()), err
 }

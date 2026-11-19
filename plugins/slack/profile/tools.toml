@@ -7,7 +7,7 @@ description = "Write a Slack post in the user's name: a message, a reaction or i
 
 [slack_post.params]
 "text" = "the message, or an edit's new text, in Markdown; empty for a reaction or a deletion"
-"kind" = "what the post is; defaults to reply"
+"kind" = "reply, nudge, close, ask_owner, react, unreact, edit or delete; reply when left out"
 "target" = "where it posts: empty for the unit's thread, or on a direct message the thread of the newest message its items name (a reaction: the newest message an item started at); else a message ref (<conversation>/<ts>) or permalink, #channel, channel id, user id, @handle or email. An edit or a deletion names the user's message it changes, by its ref or permalink"
 "items" = "the unit's items the post answers; none outside the turn's Slack unit"
 "items[]" = "an item id of the unit"
@@ -18,7 +18,7 @@ description = "Write a Slack post in the user's name: a message, a reaction or i
 "payload" = "the kind's fields beside text; Slack's kinds have none, so leave it out or pass {}"
 "basis" = "what the post was written against; Slack's kinds have none, so leave it out"
 "draft" = "true, the default, makes a draft for the user; false posts it at once in the user's name, only when the user told you to"
-"hold" = "with draft true: keep the draft waiting for the user even where one of their approval rules would post it, such as for a draft your question asks about"
+"hold" = "true: no approval rule of the user's posts this draft; use it for a draft your question pins"
 
 [slack_post.answers]
 refused = "slack_post refused: {{.Error}}."
@@ -34,11 +34,11 @@ problem_message_gone = "target: Slack holds no message there; it may already be 
 problem_message_not_yours = "target: the message is not the user's; an edit or a deletion changes only the user's own messages"
 problem_text_required = "text: required, not empty"
 problem_hold = "hold: only with draft true; a post with draft false waits for nobody"
-drafted = "Drafted {{.ID}}{{with .Unit}} on {{.}}{{end}} for {{or .Where \"its conversation\"}}; nothing was posted. It waits for the user{{with .Link}} at {{.}}{{end}}, where they review, edit and post it."
-approved = "Drafted {{.ID}}{{with .Unit}} on {{.}}{{end}}; one of the user's approval rules posts it to {{or .Where \"its conversation\"}} now."
-dry_run = "Drafted {{.ID}}{{with .Unit}} on {{.}}{{end}} as a dry run: the user's approval stores drafts and never posts them, so it will not be posted to {{or .Where \"its conversation\"}}."
-posting = "Posting {{.ID}} to {{or .Where \"its conversation\"}} now, in the user's name; draft_read shows its link once it is posted."
-kept = "Nothing was posted: {{.Name}} posts at once only from a session the user drives, and {{.Name}} typed into this one last, with no prompt of the user's since. It is draft {{.ID}} for {{or .Where \"its conversation\"}}{{with .Link}}, at {{.}}{{end}}. Give the user the link and tell them: \"It is ready in {{.Name}}; post it from there, or tell me here to post it.\""
+drafted = "Drafted {{.ID}} (rev {{.Rev}}){{with .Unit}} on {{.}}{{end}} for {{or .Where \"its conversation\"}}; nothing was posted. It waits for the user{{with .Link}} at {{.}}{{end}}, where they review, edit and post it."
+rule_posts = "Drafted {{.ID}} (rev {{.Rev}}){{with .Unit}} on {{.}}{{end}}; one of the user's approval rules posts it to {{or .Where \"its conversation\"}} now."
+dry_run = "Drafted {{.ID}} (rev {{.Rev}}){{with .Unit}} on {{.}}{{end}} as a dry run: the user's approval stores drafts and never posts them, so it will not be posted to {{or .Where \"its conversation\"}}."
+posting = "Posting {{.ID}} (rev {{.Rev}}) to {{or .Where \"its conversation\"}} now, in the user's name; draft_read shows its link once it is posted."
+waits = "Nothing was posted: {{.Name}} posts at once only from a session the user drives, and {{.Name}} typed into this one last, with no prompt of the user's since. It is draft {{.ID}} (rev {{.Rev}}) for {{or .Where \"its conversation\"}}{{with .Link}}, at {{.}}{{end}}. Give the user the link and tell them: \"It is ready in {{.Name}}; post it from there, or tell me here to post it.\""
 
 [slack_read]
 description = "Read a Slack thread or conversation, rendered: a unit (slack:<key>), or the thread of a message ref (<conversation>/<ts>) or permalink. Stored messages come first; a channel thread not stored is read from Slack and not followed; direct messages only when tracked. Each message prints as [m<N> <conversation>/<ts>]: that ref is a target slack_post takes, and slack_read reads its thread; m<N> only numbers the messages of this read, as in \"reply to m<K>\"."

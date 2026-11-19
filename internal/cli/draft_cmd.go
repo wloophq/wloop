@@ -16,7 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/transport/mcp"
 )
 
-const draftUsage = "usage: draft propose --kind <kind> [--unit <provider>/<key>] [--target <t>] [--text <t> | --text-file <path>] [--payload <json> | --payload-file <path>] [--basis <b>] [--hold] [--draft=false] [--why <w>] [--item <id>]... | " +
+const draftUsage = "usage: draft write --kind <kind> [--unit <provider>/<key>] [--target <t>] [--text <t> | --text-file <path>] [--payload <json> | --payload-file <path>] [--basis <b>] [--hold] [--draft=false] [--why <w>] [--item <id>]... | " +
 	"draft read <id> | draft update <id> --rev <rev> [--text <t> | --text-file <path>] [--payload <json> | --payload-file <path>] [--basis <b>] [--draft=false] | draft withdraw <id> --rev <rev> [--reason <r>]"
 
 // draftAgent is the part of the agent API the draft command calls.
@@ -76,8 +76,8 @@ func draftCall(ctx context.Context, c draftAgent, handle, verb string, args []st
 	unitArg := fs.String("unit", "", "the unit, <provider>/<key>")
 	target := fs.String("target", "", "the target")
 	hold := fs.Bool("hold", false, "keep it waiting for the user")
-	draftFlag := fs.Bool("draft", true, "false posts it at once in the user's name, from a session the user drives")
-	why := fs.String("why", "", "why it is proposed")
+	draftFlag := fs.Bool("draft", true, "false posts it at once in the user's name, from a session the user drives; only when the user told you to")
+	why := fs.String("why", "", "why it is written")
 	var items listFlag
 	fs.Var(&items, "item", "an item it answers")
 	if err := fs.Parse(args); err != nil {
@@ -102,12 +102,12 @@ func draftCall(ctx context.Context, c draftAgent, handle, verb string, args []st
 		raw = json.RawMessage(*p)
 	}
 	switch verb {
-	case "propose":
+	case "write":
 		if id != 0 || *kind == "" {
-			return api.AgentDraft{}, 2, errors.New("propose takes --kind and no id")
+			return api.AgentDraft{}, 2, errors.New("write takes --kind and no id")
 		}
 		req := api.AgentDraftProposal{Unit: *unitArg, Kind: *kind, Target: *target, Payload: raw, Basis: basis.value(), Hold: *hold, Why: *why, Items: items,
-			Draft: postsAtOnce(fs, *draftFlag)}
+			Draft: draftField(fs, *draftFlag)}
 		if t != nil {
 			req.Text = *t
 		}
@@ -123,7 +123,7 @@ func draftCall(ctx context.Context, c draftAgent, handle, verb string, args []st
 		if id <= 0 || *rev <= 0 {
 			return api.AgentDraft{}, 2, errors.New("update takes a draft's id and --rev")
 		}
-		got, err := c.UpdateDraft(ctx, handle, api.AgentDraftUpdate{ID: id, Rev: *rev, Text: t, Payload: raw, Basis: basis.ptr(), Draft: postsAtOnce(fs, *draftFlag)})
+		got, err := c.UpdateDraft(ctx, handle, api.AgentDraftUpdate{ID: id, Rev: *rev, Text: t, Payload: raw, Basis: basis.ptr(), Draft: draftField(fs, *draftFlag)})
 		return got, 0, err
 	case "withdraw":
 		if id <= 0 || *rev <= 0 {
@@ -135,8 +135,8 @@ func draftCall(ctx context.Context, c draftAgent, handle, verb string, args []st
 	return api.AgentDraft{}, 2, fmt.Errorf("no verb %s", verb)
 }
 
-// postsAtOnce is the draft field --draft sets: nil when the flag is left out.
-func postsAtOnce(fs *flag.FlagSet, draft bool) *bool {
+// draftField is the draft field --draft sets: nil when the flag is left out.
+func draftField(fs *flag.FlagSet, draft bool) *bool {
 	if !flagSet(fs, "draft") {
 		return nil
 	}

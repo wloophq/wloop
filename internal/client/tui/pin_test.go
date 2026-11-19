@@ -57,7 +57,7 @@ func TestATasksPinnedOptionShowsItsDraft(t *testing.T) {
 	press(m, Key{Name: KeyEnter})
 	m.SetDetail("e2", task([]api.Draft{shown}), nil)
 	screen := screenOf(m, 140, 60)
-	for _, want := range []string{"approves draft #42", "Approves draft #42 at rev 4", "now at rev 4", "Approve acme/api#7", "Ship it.", "Verdict", "Approve (APPROVE)"} {
+	for _, want := range []string{"posts draft #42", "Picking this option posts draft #42 at rev 4", "now at rev 4", "Approve acme/api#7", "Ship it.", "Verdict", "Approve (APPROVE)"} {
 		if !strings.Contains(screen, want) {
 			t.Errorf("screen lacks %q:\n%s", want, screen)
 		}

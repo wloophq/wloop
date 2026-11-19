@@ -177,14 +177,6 @@ var writes = []writeCase{
 		call:   func(ctx context.Context, e *noteEnv) error { return noteGates(e).End(ctx, 1) },
 	},
 	{
-		method: "GateStore.RecordSent",
-		call: func(ctx context.Context, e *noteEnv) error {
-			_, err := noteGates(e).RecordSent(ctx, gate.Gate{Unit: term1, Kind: gate.KindPost, Name: "post", By: task.ActorAgent})
-			return err
-		},
-		topics: port.TopicGates, units: []unit.Unit{term1},
-	},
-	{
 		method: "DB.PutRecord",
 		call: func(ctx context.Context, e *noteEnv) error {
 			return e.db.PutRecord(ctx, u7, "brief", task.WriterAgent, []byte(`{"goal":"g"}`), noteAt)

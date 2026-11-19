@@ -182,7 +182,7 @@ func TestCallToolAnswersNotLoggedIn(t *testing.T) {
 			t.Errorf("%s: answer %q error %t", c.tool, r.Answer, r.IsError)
 		}
 	}
-	if len(f.srv.Calls("chat.postMessage")) != 0 || len(f.h.Gates()) != 0 || len(f.h.SentDrafts()) != 0 {
+	if len(f.srv.Calls("chat.postMessage")) != 0 || len(f.h.Gates()) != 0 {
 		t.Fatal("a logged-out call posted or recorded")
 	}
 }
@@ -191,7 +191,7 @@ func TestCallToolAnswersNotLoggedIn(t *testing.T) {
 // in: on its way, or kept for the user when the host would not post it from this session.
 func TestCallToolPostDraftFalseAsksTheHostToPost(t *testing.T) {
 	t.Parallel()
-	for _, c := range []struct{ state, want string }{{"queued", "posting"}, {"held", "kept"}} {
+	for _, c := range []struct{ state, want string }{{"queued", "posting"}, {"held", "waits"}} {
 		f := newToolFixture(t, true)
 		f.h.GateState = c.state
 		r := f.call(t, ToolPost, `{"text":"Shipping today","draft":false}`)
@@ -201,7 +201,7 @@ func TestCallToolPostDraftFalseAsksTheHostToPost(t *testing.T) {
 		if gates := f.h.Gates(); len(gates) != 1 || !gates[0].Post || gates[0].Session != toolSession {
 			t.Errorf("host state %s: gates %+v, want one request to post", c.state, gates)
 		}
-		if len(f.srv.Calls("chat.postMessage")) != 0 || len(f.h.SentDrafts()) != 0 {
+		if len(f.srv.Calls("chat.postMessage")) != 0 {
 			t.Errorf("host state %s: the plugin posted itself", c.state)
 		}
 	}

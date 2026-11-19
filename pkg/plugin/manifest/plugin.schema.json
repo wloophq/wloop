@@ -692,19 +692,12 @@
                 "description": "The tool's name; its description lives in the profile's tools.toml. Required.",
                 "type": "string"
               },
-              "posts": {
-                "description": "The tool may post as the user at once, so the user's agent settings allow it without a prompt: a write tool whose draft false the host posts from a session the user drives, or a tool that posts itself and records the post as a sent draft; empty posts nothing.",
-                "enum": [
-                  "now"
-                ],
-                "type": "string"
-              },
-              "proposes": {
-                "description": "The tool only proposes drafts the user approves, so a session policy may allow it without a prompt.",
-                "type": "boolean"
-              },
               "reads": {
                 "description": "The tool only reads the source, writing nothing to it, so a session policy may allow it without a prompt.",
+                "type": "boolean"
+              },
+              "writes": {
+                "description": "The tool writes in the user's name: a draft by default, which the host posts at once with draft false from a session the user drives; a session policy and the user's agent settings allow it without a prompt.",
                 "type": "boolean"
               }
             },

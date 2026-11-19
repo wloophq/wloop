@@ -11,9 +11,9 @@ var Tools = []Value{
 	{Name: "turn_end", Doc: "Records how the session's turn ended."},
 	{Name: "task_post", Doc: "Posts a question or a note on the session's task during a turn, waiting on a gate."},
 	{Name: "task_read", Doc: "Reads the session's task: the task, its brief, its open gates, the chat since the last read, the user's answers and what the task's turns learned, and marks them read."},
-	{Name: "draft_read", Doc: "Reads a draft on the session's turn's unit or proposed from it: its content, delivery state and revisions."},
-	{Name: "draft_update", Doc: "Revises a draft an agent proposed on the session's turn's unit or from it, at the rev it read; the revision waits for the user's approval again, and with draft false is posted at once from a session the user drives."},
-	{Name: "draft_withdraw", Doc: "Withdraws a draft an agent proposed on the session's turn's unit or from it, at the rev it read."},
+	{Name: "draft_read", Doc: "Reads a draft on the session's turn's unit or written from it: its content, delivery state and revisions."},
+	{Name: "draft_update", Doc: "Revises a draft an agent wrote on the session's turn's unit or from it, at the rev it read; the revision waits for the user's approval again, and with draft false is posted at once from a session the user drives."},
+	{Name: "draft_withdraw", Doc: "Withdraws a draft an agent wrote on the session's turn's unit or from it, at the rev it read."},
 }
 
 // ToolData is what every tools.toml text reads.
@@ -115,7 +115,7 @@ var ToolAnswers = func() []ToolAnswer {
 		answer("draft_update", "updated", "The revised draft, as JSON, waiting for the user, its id and the address of its card.", str("Draft"), num("ID"), str("Link")),
 		answer("draft_update", "posting", "With draft false: the draft, revised or not, approved through the session the user drives and being posted, as JSON.",
 			str("Draft"), num("ID"), str("Link")),
-		answer("draft_update", "kept", "With draft false from a session the user does not drive: the draft, revised or not, still waiting for the user, as JSON, its id and the address of its card.",
+		answer("draft_update", "waits", "With draft false from a session the user does not drive: the draft, revised or not, still waiting for the user, as JSON, its id and the address of its card.",
 			str("Draft"), num("ID"), str("Link")),
 		answer("draft_withdraw", "withdrawn", "The withdrawn draft, as JSON, its id and the address of its card.", str("Draft"), num("ID"), str("Link")),
 		answer("draft_update", "rev_conflict", "The draft is at another rev than the one given.", str("Error")),
@@ -125,7 +125,7 @@ var ToolAnswers = func() []ToolAnswer {
 	for _, tool := range []string{"draft_read", "draft_update", "draft_withdraw"} {
 		out = append(out,
 			answer(tool, "not_found", "No such draft.", str("Error")),
-			answer(tool, "out_of_scope", "The draft is neither on the session's turn's unit nor proposed from it, or, to revise, a person's or a workflow's.", str("Error")),
+			answer(tool, "out_of_scope", "The draft is neither on the session's turn's unit nor written from it, or, to revise, a person's or a workflow's.", str("Error")),
 			answer(tool, "failed", "The call failed.", str("Error")),
 		)
 	}

@@ -32,7 +32,6 @@ type Store struct {
 var (
 	_ gates.Store  = (*Store)(nil)
 	_ gates.Reader = (*Store)(nil)
-	_ gates.Sent   = (*Store)(nil)
 	_ gates.Begun  = (*Store)(nil)
 )
 
@@ -168,19 +167,6 @@ func (s *Store) Due(_ context.Context, now time.Time) ([]gate.Gate, error) {
 	}), nil
 }
 
-// RecordSent stores g closed as approved, opened and closed now.
-func (s *Store) RecordSent(_ context.Context, g gate.Gate) (gate.Gate, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	g.ID = int64(len(s.gates) + 1)
-	g.Status = gate.Approved
-	g.OpenedAt, g.ClosedAt = s.Now(), s.Now()
-	g.Intents = slices.Clone(g.Intents)
-	s.gates = append(s.gates, g)
-	s.mark(g.ID)
-	return clone(g), nil
-}
-
 func (s *Store) filter(keep func(gate.Gate) bool) []gate.Gate {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -228,14 +214,14 @@ func (c *Consequences) Decide(_ context.Context, g gate.Gate) error  { return c.
 func (c *Consequences) Unblock(_ context.Context, g gate.Gate) error { return c.record("unblock", g) }
 
 // StoreContract is the suite every gates store passes. open returns the
-// store's three ports over one empty store whose clock reads Epoch.
-func StoreContract(t *testing.T, open func(t *testing.T) (gates.Store, gates.Reader, gates.Sent)) {
+// store's two ports over one empty store whose clock reads Epoch.
+func StoreContract(t *testing.T, open func(t *testing.T) (gates.Store, gates.Reader)) {
 	ctx := context.Background()
 	draft := func(task task.ID) gate.Gate {
 		return gate.Gate{Task: task, Kind: gate.KindDraft, Name: "draft", Subject: "7", Intents: []string{"approve", "discard"}, Default: "approve"}
 	}
 	t.Run("open stores an open gate with an id", func(t *testing.T) {
-		s, r, _ := open(t)
+		s, r := open(t)
 		g, err := s.Open(ctx, draft("t-01"))
 		if err != nil {
 			t.Fatal(err)
@@ -249,7 +235,7 @@ func StoreContract(t *testing.T, open func(t *testing.T) (gates.Store, gates.Rea
 		}
 	})
 	t.Run("a gate with no task keeps none", func(t *testing.T) {
-		s, r, _ := open(t)
+		s, r := open(t)
 		g, err := s.Open(ctx, draft(""))
 		if err != nil {
 			t.Fatal(err)
@@ -259,7 +245,7 @@ func StoreContract(t *testing.T, open func(t *testing.T) (gates.Store, gates.Rea
 		}
 	})
 	t.Run("a gate keeps the session of its subject and the one that resolved it", func(t *testing.T) {
-		s, r, _ := open(t)
+		s, r := open(t)
 		g := draft("t-01")
 		g.Session = "s-worker"
 		opened, err := s.Open(ctx, g)
@@ -274,7 +260,7 @@ func StoreContract(t *testing.T, open func(t *testing.T) (gates.Store, gates.Rea
 		}
 	})
 	t.Run("a gate keeps the words its opener gave it", func(t *testing.T) {
-		s, r, _ := open(t)
+		s, r := open(t)
 		g := draft("t-01")
 		g.Text = "Close the quiet session demo?"
 		opened, err := s.Open(ctx, g)
@@ -286,7 +272,7 @@ func StoreContract(t *testing.T, open func(t *testing.T) (gates.Store, gates.Rea
 		}
 	})
 	t.Run("resolve closes once with the intent", func(t *testing.T) {
-		s, r, _ := open(t)
+		s, r := open(t)
 		g, _ := s.Open(ctx, draft("t-01"))
 		res := gates.Resolution{Status: gate.Approved, Intent: "approve", By: task.ActorPerson}
 		got, err := s.Resolve(ctx, g.ID, res)
@@ -301,7 +287,7 @@ func StoreContract(t *testing.T, open func(t *testing.T) (gates.Store, gates.Rea
 		}
 	})
 	t.Run("resolving to open is refused", func(t *testing.T) {
-		s, r, _ := open(t)
+		s, r := open(t)
 		g, _ := s.Open(ctx, draft("t-01"))
 		if _, err := s.Resolve(ctx, g.ID, gates.Resolution{Status: gate.Open, Intent: "approve"}); err == nil {
 			t.Fatal("resolved to open")
@@ -311,7 +297,7 @@ func StoreContract(t *testing.T, open func(t *testing.T) (gates.Store, gates.Rea
 		}
 	})
 	t.Run("an unknown gate is ErrNoGate", func(t *testing.T) {
-		s, r, _ := open(t)
+		s, r := open(t)
 		if _, err := s.Resolve(ctx, 404, gates.Resolution{Status: gate.Approved}); !errors.Is(err, gates.ErrNoGate) {
 			t.Fatalf("resolve: %v", err)
 		}
@@ -320,7 +306,7 @@ func StoreContract(t *testing.T, open func(t *testing.T) (gates.Store, gates.Rea
 		}
 	})
 	t.Run("where keeps the gates whose subject it lists", func(t *testing.T) {
-		s, r, _ := open(t)
+		s, r := open(t)
 		var want []int64
 		for _, subject := range []string{"7", "8", "9", "7"} {
 			g := draft("t-01")
@@ -349,7 +335,7 @@ func StoreContract(t *testing.T, open func(t *testing.T) (gates.Store, gates.Rea
 		}
 	})
 	t.Run("lists are ordered by id", func(t *testing.T) {
-		s, r, _ := open(t)
+		s, r := open(t)
 		var ids []int64
 		for range 3 {
 			g, _ := s.Open(ctx, draft("t-01"))
@@ -366,7 +352,7 @@ func StoreContract(t *testing.T, open func(t *testing.T) (gates.Store, gates.Rea
 		}
 	})
 	t.Run("due is at exactly now", func(t *testing.T) {
-		s, _, _ := open(t)
+		s, _ := open(t)
 		at := draft("t-01")
 		at.Deadline = Epoch.Add(time.Hour)
 		later := at
@@ -380,7 +366,7 @@ func StoreContract(t *testing.T, open func(t *testing.T) (gates.Store, gates.Rea
 		}
 	})
 	t.Run("a resolved gate is unapplied until marked", func(t *testing.T) {
-		s, _, sent := open(t)
+		s, _ := open(t)
 		open1, _ := s.Open(ctx, draft("t-01"))
 		resolved, _ := s.Open(ctx, draft("t-01"))
 		superseded, _ := s.Open(ctx, draft("t-01"))
@@ -388,9 +374,6 @@ func StoreContract(t *testing.T, open func(t *testing.T) (gates.Store, gates.Rea
 			t.Fatal(err)
 		}
 		if _, err := s.Resolve(ctx, superseded.ID, gates.Resolution{Status: gate.Superseded, By: task.ActorWorkflow}); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := sent.RecordSent(ctx, gate.Gate{Task: "t-01", Kind: gate.KindPost, By: task.ActorAgent}); err != nil {
 			t.Fatal(err)
 		}
 		got, err := s.Unapplied(ctx)
@@ -408,7 +391,7 @@ func StoreContract(t *testing.T, open func(t *testing.T) (gates.Store, gates.Rea
 		}
 	})
 	t.Run("a begun consequence is applied and begun until it ends", func(t *testing.T) {
-		st, _, _ := open(t)
+		st, _ := open(t)
 		s, ok := st.(gates.Begun)
 		if !ok {
 			t.Skip("the store keeps no begun consequence")
@@ -437,24 +420,14 @@ func StoreContract(t *testing.T, open func(t *testing.T) (gates.Store, gates.Rea
 			t.Fatalf("begun after its end %v %v", idsOf(got), err)
 		}
 	})
-	t.Run("a recorded send is approved and never open", func(t *testing.T) {
-		_, r, sent := open(t)
-		g, err := sent.RecordSent(ctx, gate.Gate{Task: "t-01", Kind: gate.KindPost, By: task.ActorAgent})
-		if err != nil || g.Status != gate.Approved {
-			t.Fatalf("recorded %+v %v", g, err)
-		}
-		if opened, _ := r.Where(ctx, gates.Query{}); len(opened) != 0 {
-			t.Fatalf("open %+v", opened)
-		}
-	})
 }
 
 // DraftGateContract is the suite a gates store passes that keeps what the outbox's authority reads on a
 // draft gate: the rev it opened for, which approval keeps, and every session that proposed or revised its
 // draft, which never resolves it. open is as StoreContract's.
-func DraftGateContract(t *testing.T, open func(t *testing.T) (gates.Store, gates.Reader, gates.Sent)) {
+func DraftGateContract(t *testing.T, open func(t *testing.T) (gates.Store, gates.Reader)) {
 	ctx := context.Background()
-	s, r, _ := open(t)
+	s, r := open(t)
 	g := gate.Gate{Task: "t-01", Kind: gate.KindDraft, Name: "draft", Subject: "7", Intents: []string{"approve", "discard"},
 		Session: "s-worker", ApprovedRev: 3, Sessions: []string{"s-reviser", "s-worker"}}
 	opened, err := s.Open(ctx, g)

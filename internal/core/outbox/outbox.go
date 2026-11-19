@@ -50,8 +50,6 @@ type Proposal struct {
 	// RepeatAfter is how long a settled draft of the same origin holds this
 	// proposal from being proposed again; zero keeps Service.RepeatAfter.
 	RepeatAfter time.Duration
-	// Tool is the tool that made a post RecordSent records.
-	Tool string
 	// Why is why the draft is proposed, in the user's language; Language
 	// is the locale Text is written in.
 	Why, Language string
@@ -1055,46 +1053,6 @@ func (s *Service) List(ctx context.Context, f Filter) ([]draft.Draft, error) {
 		ds[i], _ = s.current(ds[i])
 	}
 	return ds, err
-}
-
-// RecordSent stores a post already made outside the outbox (origin
-// session), by p.Tool, as sent, with a gate already approved by the agent
-// that made it. It resolves no gate: no agent resolves an open one.
-func (s *Service) RecordSent(ctx context.Context, p Proposal, ev draft.Evidence) (draft.Draft, error) {
-	if s.Gates == nil {
-		return draft.Draft{}, ErrNoGates
-	}
-	now := s.Clock.Now()
-	if p.Origin.Kind == "" {
-		p.Origin.Kind = draft.OriginSession
-	}
-	if ev.At.IsZero() {
-		ev.At = now
-	}
-	d, spec, _, err := s.shape(draft.Draft{
-		Unit: p.Unit, Items: p.Items, Task: p.Task, Kind: p.Kind, Target: p.Target, Text: p.Text, Reaction: p.Reaction, Replaced: p.Replaced,
-		Original: p.Text, Origin: p.Origin, State: draft.Sent, Evidence: ev, CreatedAt: now, UpdatedAt: now, SendingAt: now,
-		Purpose: p.Purpose, Delivery: p.Delivery, Effects: p.Effects,
-	})
-	if err != nil {
-		return draft.Draft{}, err
-	}
-	if err := checkFields(d, spec); err != nil {
-		return draft.Draft{}, err
-	}
-	d, err = s.Store.Insert(ctx, d)
-	if err != nil {
-		return draft.Draft{}, err
-	}
-	s.logf("draft %d recorded sent: %s on %s by %s", d.ID, d.Purpose, d.Unit, d.Origin.Kind)
-	g := gateOf(d, nil)
-	g.By, g.Rule = task.ActorAgent, p.Tool
-	var errs []error
-	if _, err := s.Gates.RecordSent(ctx, g); err != nil {
-		s.logf("draft %d: its gate was not recorded", d.ID)
-		errs = append(errs, fmt.Errorf("the gate of sent draft %d: %w", d.ID, err))
-	}
-	return d, errors.Join(append(errs, s.afterSent(ctx, d))...)
 }
 
 func (s *Service) afterSent(ctx context.Context, d draft.Draft) error {

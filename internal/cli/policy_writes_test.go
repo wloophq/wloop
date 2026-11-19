@@ -98,10 +98,10 @@ func TestRoundPolicyAllowsTheManifestsDraftTools(t *testing.T) {
 	for _, s := range te.loadedSources() {
 		for _, tool := range s.Tools {
 			name := brand.ToolPrefix() + tool.Name
-			if tool.Proposes != slices.Contains(p.DraftTools, name) {
-				t.Errorf("%s proposes %v, allowed %v", name, tool.Proposes, !tool.Proposes)
+			if tool.Writes != slices.Contains(p.DraftTools, name) {
+				t.Errorf("%s writes %v, allowed %v", name, tool.Writes, !tool.Writes)
 			}
-			if tool.Proposes {
+			if tool.Writes {
 				want = append(want, name)
 			}
 		}
@@ -114,18 +114,18 @@ func TestRoundPolicyAllowsTheManifestsDraftTools(t *testing.T) {
 	}
 }
 
-func TestHomeInstallAllowsTheManifestsAtOnceTools(t *testing.T) {
+func TestHomeInstallAllowsTheManifestsWriteTools(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
-	got := te.specWith(te.cfg, "claude", "").AtOnceTools
+	got := te.specWith(te.cfg, "claude", "").WriteTools
 	var want []string
 	for _, s := range te.loadedSources() {
 		for _, tool := range s.Tools {
-			if tool.Posts == "now" {
+			if tool.Writes {
 				want = append(want, brand.ToolPrefix()+tool.Name)
 			}
 		}
 	}
 	if len(want) == 0 || !slices.Equal(got, want) {
-		t.Fatalf("install allows %q at once, want the manifests' %q", got, want)
+		t.Fatalf("install allows %q, want the manifests' write tools %q", got, want)
 	}
 }

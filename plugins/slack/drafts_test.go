@@ -608,10 +608,9 @@ func TestWithinTheUnitsThread(t *testing.T) {
 	}
 }
 
-// TestTheWriteToolMayPostNow: the manifest marks slack_post, which posts at
-// once with draft false, posts = "now", which a session policy reads instead
-// of naming it.
-func TestTheWriteToolMayPostNow(t *testing.T) {
+// TestTheWriteToolIsMarkedWrites: the manifest marks slack_post writes,
+// which a session policy reads instead of naming it.
+func TestTheWriteToolIsMarkedWrites(t *testing.T) {
 	m, err := manifest.Load(".")
 	if err != nil {
 		t.Fatal(err)
@@ -622,11 +621,11 @@ func TestTheWriteToolMayPostNow(t *testing.T) {
 	}
 	var now []string
 	for _, tool := range s.Tools {
-		if tool.Posts == "now" {
+		if tool.Writes {
 			now = append(now, tool.Name)
 		}
 	}
 	if want := []string{ToolPost}; !slices.Equal(now, want) {
-		t.Fatalf("posts = \"now\" on %v, want %v", now, want)
+		t.Fatalf("writes on %v, want %v", now, want)
 	}
 }

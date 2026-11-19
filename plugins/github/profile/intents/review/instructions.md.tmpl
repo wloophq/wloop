@@ -28,8 +28,8 @@ The guide never relaxes the ambiguity gate (section 5) or drafting (section 6). 
 This session writes nothing to GitHub, and refuses `gh api` calls that
 pass a method or a field flag, GraphQL reads included: read through `gh pr
 view`, `gh pr diff` and `gh api` with a REST path alone.{{if not .Plain}} Every post is a
-draft you write with `github_post`; {{name}} posts it once the user, or
-a rule of theirs, approves it.{{end}}
+draft you write with `github_post`, which waits for the user unless a rule
+of theirs posts it; `draft: false` only when the user says so here.{{end}}
 
 ## Steps
 {{if .Plain}}
@@ -188,14 +188,13 @@ rules allow it, **unless** one of these holds:
   another human reviewer. Automated reviewers never trigger this gate:
   accounts whose `type` is `Bot`, logins ending in `[bot]`{{range .AutomatedReviewers}}, {{.}}{{end}}. Disagreeing with them is the normal case: write it as usual.
 {{if not .Plain}}
-When one holds, or the verdict is `APPROVE`, write the review with
-`"hold": true`. Alone, it is the decision: record `done` with the verdict,
-the counts and the draft in `outcome.draft`, no question. For
-`APPROVE`, also write its `COMMENT` variant (same body and comments, held),
-which posts your findings without approving, and record `asked`
+When one holds, write the review with `"hold": true`. Alone, it ends the
+turn: record `done` with the verdict, counts and `outcome.draft`. For `APPROVE`, which no rule posts, also
+write its `COMMENT` variant (held), which posts your findings without
+approving, and record `asked`
 with a `choice` question: each option carries `draft` with the `id` and
 `rev` its `github_post` answer gave; picking it posts that draft and
-withdraws the other's. A free answer comes back to you.
+withdraws the other's; a free answer comes back to you.
 {{end}}
 ### 6. Draft
 {{if .Plain}}
@@ -232,7 +231,7 @@ thread's first comment from `gh api repos/<owner>/<repo>/pulls/<n>/comments`.{{e
 In a dry run, write the payload to `.loop/dry-run.json` and post nothing.
 {{else}}
 Without a `github_post` tool, draft through `{{.Command}} draft
-propose`, whose help says how. The answer says whether the draft waits for
+write`, whose help says how. The answer says whether the draft waits for
 the user or a rule of theirs sends it. A stale answer means the head moved:
 review what changed and write it again.
 
@@ -244,8 +243,8 @@ it names, such as an inline comment outside the diff.
 
 ### 7. Report
 
-Reply to the user with each draft's id and whether it waits for them or a
-rule of theirs sends it, the blocking and non-blocking counts, or the
+Reply to the user with each draft's id and whether it waits for them, a
+rule of theirs sends it or it is posting, the blocking and non-blocking counts, or the
 question.
 {{template "record" .}}{{end}}
 {{template "brief" .}}{{template "judgment" .}}
