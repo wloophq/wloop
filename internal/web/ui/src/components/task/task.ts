@@ -362,11 +362,14 @@ export interface TaskGates {
 }
 
 // taskGates are the decisions that wait on task e: its open gates and its drafts, each once. A draft an open
-// question pins is that question's to decide: it shows under the option that pins it, never as a card of its own.
+// question of e pins shows under the option that pins it, on that question's card; one pinned by a question of
+// another task is a card of its own, as editable as any.
 export function taskGates(e: J): TaskGates | null {
-  const own = isDraftTask(e) ? draftOf(e) : null;
-  const drafts = (taskState.id === e.id ? taskState.drafts : []).filter((d: J) => (!own || d.id !== own.id) && !d.pinned_by);
-  const gates = (e.gates || []).filter((g: J) => g.status === "open" && !(own && g.subject === own) && !subjectOf(g).pinned_by && !drafts.some((d: J) => d.gate && d.gate === g.id));
+  const pinnedHere = (d: J) => !!d && !!d.pinned_by && (e.gates || []).some((g: J) => g.status === "open" && g.kind === "question" && (subjectOf(g).pinned || []).some((p: J) => p.id === d.id));
+  const draft = isDraftTask(e) ? draftOf(e) : null;
+  const own = draft && !pinnedHere(draft) ? draft : null;
+  const drafts = (taskState.id === e.id ? taskState.drafts : []).filter((d: J) => (!draft || d.id !== draft.id) && !pinnedHere(d));
+  const gates = (e.gates || []).filter((g: J) => g.status === "open" && !(draft && g.subject === draft) && !pinnedHere(subjectOf(g)) && !drafts.some((d: J) => d.gate && d.gate === g.id));
   if (!gates.length && !own && !drafts.length) return null;
   const heading = !gates.length && !drafts.length && own && !["held", "failed"].includes(own.state) ? draftStateWord(own.state) : t("Waiting on you");
   return { heading, gates, own, drafts };

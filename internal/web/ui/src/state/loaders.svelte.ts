@@ -479,7 +479,7 @@ export async function loadUnitTasks(key: string): Promise<void> {
   ]);
   if (detailState.unitKey !== key) return;
   put(detailState, "unitTasks", tasks);
-  put(detailState, "unitDrafts", ((drafts && drafts.drafts) || []).filter((d: J) => !d.pinned_by));
+  put(detailState, "unitDrafts", (drafts && drafts.drafts) || []);
 }
 
 // loadDetailPane reads the task route names, marking an inbox task seen once, or the open tasks of the unit it

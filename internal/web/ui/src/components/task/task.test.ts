@@ -511,6 +511,19 @@ test("a task with a pending draft reads its drafts and shows its card in place o
   expect(g.gates.map((x) => x.id)).toEqual([7, 9]);
 });
 
+test("a draft a question pins shows as its own card unless that question's card is on the task (TestAPinnedDraftShowsWhereItsQuestionIsNot)", async () => {
+  const d = { id: 7, unit: "github/acme/api#8", task: ID, kind: "review", text: "Two findings block the merge.", state: "held", gate: 12, rev: 3, pinned_by: 30, actions: [] };
+  const e = pageTask();
+  e.drafts = [7];
+  e.gates = [...e.gates, { id: 12, task: ID, kind: "draft", name: "draft", status: "open", subject: d, intents: [{ id: "approve", label: "Post" }] }];
+  const answers = pageAnswers(e);
+  answers[`/api/drafts?task=${ID}`] = { drafts: [d] };
+  await page(ID, answers);
+  expect(taskGates(detailState.task)!.drafts.map((x) => x.id)).toEqual([7]);
+  detailState.task.gates = [...detailState.task.gates, { id: 31, task: ID, kind: "question", name: "question", status: "open", subject: { id: 30, pinned: [d], options: [{ id: "post", label: "Post", draft: { id: 7, rev: 3 } }] } }];
+  expect(taskGates(detailState.task)!.drafts.map((x) => x.id)).toEqual([]);
+});
+
 test("a task without drafts asks for none (TestATaskWithoutDraftsAsksForNone)", async () => {
   await page(ID);
   expect(daemon.gets.filter((u) => u.startsWith("/api/drafts"))).toEqual([]);
