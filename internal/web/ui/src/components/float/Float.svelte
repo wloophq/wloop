@@ -5,7 +5,7 @@
   import { FLOAT_HOVER_CLOSE_MS, FLOAT_HOVER_OPEN_MS, floatState, type FloatHide } from "../../state/float.svelte";
   import { notice } from "../../state/store.svelte";
   import Agents from "./Agents.svelte";
-  import { floatSize } from "./float";
+  import { floatSize, hovered } from "./float";
   import Pill from "./Pill.svelte";
   import Queue from "./Queue.svelte";
 
@@ -64,9 +64,7 @@
       f.setMode("pill");
       return;
     }
-    if (!open || e.metaKey || e.ctrlKey || e.altKey) return;
-    const inField = typing(e.target as Element);
-    if (inField && e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    if (!open || e.metaKey || e.ctrlKey || e.altKey || typing(e.target as Element)) return;
     const moves: Record<string, number> = { ArrowUp: -1, ArrowDown: 1, k: -1, j: 1 };
     if (e.key in moves) {
       e.preventDefault();
@@ -116,7 +114,7 @@
           <button type="button" class="fl-quiet" aria-haspopup="menu" aria-expanded={menu ? "true" : "false"} aria-label={t("Hide")} onclick={() => (menu = !menu)}>⋯</button>
           {#if menu}
             <span class="fl-menu-list" role="menu">
-              {#each HIDES as h (h.mode)}<button type="button" role="menuitem" data-hide={h.mode} onclick={() => hide(h.mode)}>{h.label()}</button>{/each}
+              {#each HIDES as h (h.mode)}<button type="button" role="menuitem" data-hide={h.mode} use:hovered onclick={() => hide(h.mode)}>{h.label()}</button>{/each}
             </span>
           {/if}
         </span>
@@ -131,7 +129,7 @@
           <Queue {f} />
         {/if}
       </div>
-      {#if notice.err && notice.text}<p class="fl-err" role="alert">{notice.text}</p>{/if}
+      {#if f.failed || (notice.err && notice.text)}<p class="fl-err" role="alert">{f.failed || notice.text}</p>{/if}
     </section>
   {/if}
 </div>

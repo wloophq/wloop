@@ -257,3 +257,14 @@ test("an open of the stream while the widget is offline reads everything", async
   expect(daemon.urls.slice(0, 2)).toEqual(["/api/queue", "/api/turns/live"]);
   expect(floatState().online).toBe(true);
 });
+
+test("act after a gate event waits for the read it queued and sends nothing against a gate closed elsewhere", async () => {
+  served = queue(gateItem(1, "Ana's retry change"), gateItem(2, "Bo's export fix"));
+  await floatLoad();
+  const f = floatState();
+  served = queue(gateItem(2, "Bo's export fix"));
+  floatChange({ data: JSON.stringify({ type: "changed", gates: true }) });
+  await f.act();
+  expect(posts()).toEqual([]);
+  expect(f.items[f.current].task.id).toBe("t-2");
+});

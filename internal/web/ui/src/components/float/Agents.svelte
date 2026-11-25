@@ -18,13 +18,14 @@
 
   const running: J[] = $derived((turns && turns.running) || []);
   const done: J[] = $derived((turns && turns.done) || []);
+  const doneToday = $derived((turns && turns.done_today) || 0);
   const asked = $derived((turns && turns.asked) || 0);
   const usual = $derived((turns && turns.usual) || {});
   const summary = $derived(
     [
       running.length ? tn("{n} running", running.length) : "",
       asked ? tn("{n} waiting on you", asked) : "",
-      done.length ? tn("{n} done today", done.length) : "",
+      doneToday ? tn("{n} done today", doneToday) : "",
     ].filter(Boolean).join(" · "),
   );
   const shownDone = $derived(more ? done : done.slice(0, SHOWN_DONE));

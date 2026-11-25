@@ -57,6 +57,7 @@ const fresh = () => ({
   turnsFailed: false,
   loaded: false,
   busy: false,
+  failed: { key: "", text: "" },
   picked: {} as Record<string, string>,
 });
 
@@ -142,6 +143,7 @@ function applyQueue(q: J): void {
   marks.seen = new Set(keys);
   if (marks.focus && !marks.seen.has(marks.focus)) marks.focus = "";
   if (fl.peeked && !marks.seen.has(itemKey(fl.peeked))) endPeek();
+  if (fl.failed.key && !marks.seen.has(fl.failed.key)) fl.failed = { key: "", text: "" };
   if (arrivals.length) arrived(arrivals[0], fl.mode !== "panel");
 }
 
@@ -186,11 +188,15 @@ function schedule(what: Reads): void {
   const q = marks.queued || { queue: false, turns: false };
   marks.queued = { queue: q.queue || what.queue, turns: q.turns || what.turns };
   timer.clear(marks.timers.sync);
-  marks.timers.sync = timer.set(() => {
-    const next = marks.queued as Reads;
-    marks.queued = null;
-    void floatLoad(next);
-  }, DEBOUNCE_MS);
+  marks.timers.sync = timer.set(() => void flush(), DEBOUNCE_MS);
+}
+
+// flush starts the read an event queued now, instead of after the debounce.
+function flush(): Promise<void> {
+  timer.clear(marks.timers.sync);
+  const next = marks.queued;
+  marks.queued = null;
+  return next ? floatLoad(next) : marks.chain;
 }
 
 // floatChange reads one event of the stream: the queue moves with a gate or a task, the turns only when they say so;
@@ -263,21 +269,26 @@ function pick(item: J, option: string): void {
 }
 
 // act runs the current item's primary: its gate's intent, with the selected option when it offers options, or any
-// other primary; then the queue reads again, so the item leaves. It waits for the reads under way first and sends
-// nothing when the item is no longer served.
+// other primary; then the queue reads again, so the item leaves. It waits for the reads under way, and for one an
+// event queued, first and sends nothing when the item is no longer served. A primary that fails says so in failed
+// until the item leaves or the next act.
 async function act(intent?: string): Promise<void> {
   const at = fl.items[fl.current];
   if (!at || fl.busy) return;
   const key = itemKey(at);
   fl.busy = true;
+  fl.failed = { key: "", text: "" };
   try {
-    await marks.chain;
+    await flush();
     const item = fl.items.find((it) => itemKey(it) === key);
     if (!item) return;
     const p = item.primary || {};
     if (item.gate && (p.kind === "gate" || intent)) await floatDeps.resolve(item, intent || p.id, (item.options || []).length ? optionOf(item) : undefined);
     else await floatDeps.run(item);
     if (!item.gate && p.kind !== "action" && p.kind !== "verb") return;
+  } catch (err) {
+    fl.failed = { key, text: (err as Error).message };
+    return;
   } finally {
     fl.busy = false;
   }
@@ -344,6 +355,10 @@ export function floatState() {
     },
     get busy(): boolean {
       return fl.busy;
+    },
+    // failed is how the last primary run from the widget failed, "" when it did not.
+    get failed(): string {
+      return fl.failed.text;
     },
     get loaded(): boolean {
       return fl.loaded;

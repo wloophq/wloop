@@ -1095,7 +1095,7 @@ html.float-page body { display: block; overflow: hidden; }
 .fl-menu { position: relative; }
 .fl-menu-list { position: absolute; right: 0; top: 100%; z-index: 1; display: flex; flex-direction: column; min-width: 200px; padding: var(--space-4); background: var(--panel); border: 1px solid var(--rule); border-radius: var(--radius-md); }
 .fl-menu-list button { padding: var(--space-4) var(--space-8); background: none; border: 0; border-radius: var(--radius-sm); text-align: left; font-size: var(--text-meta); cursor: pointer; }
-.fl-menu-list button:hover { background: var(--hover); }
+.fl-menu-list button:hover, .fl-menu-list button[data-hover] { background: var(--hover); }
 .fl-link { display: block; margin: var(--space-2) 0; padding: 0; color: var(--me-text); }
 .fl-body { overflow-y: auto; min-height: 0; padding-bottom: var(--space-8); }
 .fl-off { margin: var(--space-16) var(--space-12); color: var(--muted); }
@@ -1114,7 +1114,7 @@ html.float-page body { display: block; overflow: hidden; }
 .fl-bar i { display: block; height: 100%; background: var(--loop); }
 .fl-queue { list-style: none; margin: 0; padding: var(--space-4) 0; }
 .fl-line { display: grid; grid-template-columns: 8px 64px minmax(0, 1fr) auto; gap: var(--space-8); align-items: center; width: 100%; padding: var(--space-6) var(--space-12); background: none; border: 0; text-align: left; cursor: pointer; }
-.fl-line:hover { background: var(--hover); }
+.fl-line:hover, .fl-line[data-hover] { background: var(--hover); }
 .fl-kind { color: var(--tone-text, var(--me-text)); font-size: var(--text-meta); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fl-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-meta); }
 .fl-hand { margin: var(--space-4) var(--space-8); padding: var(--space-10) var(--space-12) var(--space-12); background: var(--raise); border: 1px solid var(--rule); border-radius: var(--radius-lg); box-shadow: inset var(--strip-card) 0 0 var(--tone, var(--me)); }

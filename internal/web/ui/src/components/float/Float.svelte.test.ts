@@ -3,14 +3,15 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { J } from "../../lib/util";
 import { nav } from "../../state/route.svelte";
 import { floatDeps, floatLoad, floatState, resetFloat } from "../../state/float.svelte";
-import { tasksState } from "../../state/store.svelte";
+import { notice, tasksState } from "../../state/store.svelte";
 import { draftGate, pendingDraft, reviewDraft, taskCatalog } from "../../testing/gates";
 import { FakeDaemon } from "../../testing/fakedaemon";
 import { resetStore } from "../../testing/reset.svelte";
 import { settle } from "../../testing/settle";
+import Agents from "./Agents.svelte";
 import Card from "./Card.svelte";
 import Float from "./Float.svelte";
-import { keepRoutes, resetFloatSize } from "./float";
+import { floatRun, keepRoutes, resetFloatSize } from "./float";
 import ReviewCard from "./ReviewCard.svelte";
 
 const saved = { ...floatDeps };
@@ -113,8 +114,7 @@ test("a link a card draws opens in the cockpit and leaves the float window on it
 });
 
 test("items and the verdict draw in the tones the daemon serves", async () => {
-  const d = reviewDraft();
-  d.fields[0].tone = "err";
+  const d = { ...reviewDraft(), verdict: "Request changes", verdict_tone: "err" };
   const it = { ...item(3, { kind: "answer", tone: "late" }), options: [{ id: "a", label: "Request changes", recommended: true, draft: { id: 12, kind: "draft", subject: d } }] };
   const c = render(ReviewCard, { props: { f: floatState(), item: it, age: "", late: false } }).container;
   expect(c.querySelector(".fl-hand")!.classList.contains("tone-late")).toBe(true);
@@ -168,4 +168,63 @@ test("agents the daemon cannot read say so, and the queue stays as read", async 
   expect([floatState().read, floatState().items.length]).toEqual(["ok", 1]);
   expect(c.querySelector(".fl-agents-off")).not.toBeNull();
   expect(c.querySelector(".fl-off")).toBeNull();
+});
+
+test("arrow keys typed in a text field of the open panel stay in the field", async () => {
+  served = { title: "Needs you", items: [item(1), item(2)] };
+  await floatLoad();
+  const c = render(Float).container;
+  floatState().setPinned(true);
+  await settle();
+  const field = document.createElement("textarea");
+  c.querySelector(".fl-panel")!.appendChild(field);
+  field.focus();
+  for (const key of ["ArrowDown", "ArrowUp", "j"]) {
+    const e = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+    field.dispatchEvent(e);
+    expect([key, e.defaultPrevented]).toEqual([key, false]);
+  }
+  expect(floatState().current).toBe(0);
+});
+
+test("a queue line and a hide choice mark the pointer over them, as the host's pointer events reach a float that is not key", async () => {
+  served = { title: "Needs you", items: [item(1), item(2)] };
+  await floatLoad();
+  const c = render(Float).container;
+  floatState().setPinned(true);
+  await settle();
+  await fireEvent.click(c.querySelector('[aria-haspopup="menu"]') as HTMLElement);
+  for (const el of [c.querySelector(".fl-line"), c.querySelector("[data-hide]")] as HTMLElement[]) {
+    await fireEvent.pointerEnter(el);
+    expect(el.hasAttribute("data-hover")).toBe(true);
+    await fireEvent.pointerLeave(el);
+    expect(el.hasAttribute("data-hover")).toBe(false);
+  }
+});
+
+test("a retry the daemon refuses says so on the float, and the refusal goes no further", async () => {
+  floatDeps.run = floatRun;
+  served = { title: "Needs you", items: [item(5, {
+    kind: "send-draft", gate: undefined,
+    primary: { kind: "verb", id: "retry", task: "draft:5", args: { rev: "3" }, label: "Retry" },
+  })] };
+  await floatLoad();
+  const c = render(Float).container;
+  floatState().setPinned(true);
+  await settle();
+  await expect(floatState().act()).resolves.toBeUndefined();
+  notice.err = false;
+  notice.text = "";
+  await settle();
+  expect(c.querySelector(".fl-err")!.textContent).toBe("Retry failed");
+  served = { title: "Needs you", items: [item(6)] };
+  await floatLoad();
+  await settle();
+  expect(c.querySelector(".fl-err")).toBeNull();
+});
+
+test("the agents count every turn done today, beyond the ones listed", async () => {
+  const done = [1, 2, 3].map((seq) => ({ seq, intent: "review", label: "Review", unit: "acme/widgets#" + seq, ended: "2026-11-07T11:00:00Z", duration_ms: 60000 }));
+  const c = render(Agents, { props: { turns: { running: [], done, done_today: 25, asked: 0, usual: {} } } }).container;
+  expect(c.querySelector(".fl-sum")!.textContent).toBe("25 done today");
 });

@@ -50,17 +50,43 @@ export function resetFloatSize(): void {
   Object.assign(sent, { w: -1, h: -1, mode: "" });
 }
 
+let dragging: (() => void) | null = null;
+
 // floatDrag hands a drag of the pill to the host, which moves the window as Wails moves any window it drags, and
-// tells it the size again once the pointer is released, so it snaps and keeps the place where it dropped.
+// tells it the size again once the pointer is released, so it snaps and keeps the place where it dropped. The window
+// server may keep the release from the page, so the host's next place, or the next drag, ends the drag as well.
 export function floatDrag(dropped: () => void, win: J = window): void {
   const h = handlerOf(win);
   if (!h) return;
+  floatDragEnd();
   h.postMessage("wails:drag");
   const done = () => {
     for (const type of ["pointerup", "mouseup"]) win.removeEventListener(type, done, true);
+    if (dragging === done) dragging = null;
     dropped();
   };
+  dragging = done;
   for (const type of ["pointerup", "mouseup"]) win.addEventListener(type, done, true);
+}
+
+// floatDragEnd ends a drag still waiting for its release.
+export function floatDragEnd(): void {
+  if (dragging) dragging();
+}
+
+// hovered marks node with data-hover while the pointer is over it: the host's synthetic pointer events reach a float
+// that is not key, and they never trigger :hover.
+export function hovered(node: HTMLElement): { destroy: () => void } {
+  const on = () => node.setAttribute("data-hover", "");
+  const off = () => node.removeAttribute("data-hover");
+  node.addEventListener("pointerenter", on);
+  node.addEventListener("pointerleave", off);
+  return {
+    destroy: () => {
+      node.removeEventListener("pointerenter", on);
+      node.removeEventListener("pointerleave", off);
+    },
+  };
 }
 
 // keepRoutes hands every same-origin route a plain click on a link would follow to the cockpit's main window, so
@@ -85,7 +111,12 @@ export function keepRoutes(doc: J): void {
 // installFloat exposes the bridge the host calls and wires the widget's ends.
 export function installFloat(win: J = window): FloatBridge {
   const f = floatState();
-  const bridge: FloatBridge = { setMode: (m, place) => f.setMode(m, place) };
+  const bridge: FloatBridge = {
+    setMode: (m, place) => {
+      if (place) floatDragEnd();
+      f.setMode(m, place);
+    },
+  };
   win[FLOAT_BRIDGE] = bridge;
   floatDeps.resolve = floatResolve;
   floatDeps.run = floatRun;
@@ -175,13 +206,21 @@ export interface DraftSummary {
   tally: LabelCount[];
 }
 
-// draftSummary reads a draft's payload as its card shows it, by shape alone: the first field a person picks
-// among values is its verdict, the first list of records its comments, each with its Markdown value (else its
-// last) as the body and its first two other values as where it sits.
+// fieldAt is the field of fields, at any depth, at pointer.
+function fieldAt(fields: J[], pointer: string): J {
+  for (const f of fields || []) {
+    if (f.pointer === pointer) return f;
+    const g = fieldAt(f.fields, pointer);
+    if (g) return g;
+  }
+  return null;
+}
+
+// draftSummary reads a draft as its card shows it: the verdict and its tone the daemon serves, and the comments of
+// the list its plugin names, each with its Markdown value (else its last) as the body and its first two other
+// values as where it sits.
 export function draftSummary(d: J): DraftSummary {
-  const fields: J[] = (d && d.fields) || [];
-  const verdict = fields.find((f) => (f.options || []).length && !(f.fields || []).length);
-  const list = fields.find((f) => (f.fields || []).length && f.fields.every((x: J) => (x.fields || []).length));
+  const list = d && d.comments_at ? fieldAt(d.fields, d.comments_at) : null;
   const comments: DraftComment[] = ((list && list.fields) || []).map((c: J) => {
     const leaves: J[] = (c.fields || []).filter((x: J) => !(x.fields || []).length);
     const body = leaves.find((x) => x.markdown) || leaves[leaves.length - 1];
@@ -190,5 +229,5 @@ export function draftSummary(d: J): DraftSummary {
     const at = line ? t("{file}:{line}", { file, line }) : file || "";
     return { at, body: text, ...(conventionalLabel(text) || {}) };
   });
-  return { verdict: verdict ? verdict.shown || verdict.value : "", tone: (verdict && verdict.tone) || "", comments, tally: tally(comments) };
+  return { verdict: (d && d.verdict) || "", tone: (d && d.verdict_tone) || "", comments, tally: tally(comments) };
 }
