@@ -12,6 +12,8 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/wailsapp/wails/v3/pkg/application"
+
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/window"
 )
@@ -302,5 +304,23 @@ func TestAKeyFloatOnlyResetsThePointerOnExit(t *testing.T) {
 	}
 	if js := floatPointerJS(pointerReset, 0, 0); !strings.Contains(js, `kind === "reset"`) {
 		t.Errorf("the script ignores a reset:\n%s", js)
+	}
+}
+
+// Wails re-applies AlwaysOnTop as the level of a window created hidden when
+// it first becomes key, so the floating panels ask for it too: false would
+// drop them to the normal level, under other apps' windows.
+func TestThePanelsStayFloatingOnceTheyBecomeKey(t *testing.T) {
+	for _, o := range []application.WebviewWindowOptions{panelOptions("App"), floatOptions("App")} {
+		if !o.Hidden || !o.AlwaysOnTop || o.Mac.WindowLevel != application.MacWindowLevelFloating || o.Mac.WindowClass != application.MacWindowClassPanel {
+			t.Errorf("%s: hidden %v, always on top %v, level %q, class %v; want a hidden floating panel kept on top",
+				o.Name, o.Hidden, o.AlwaysOnTop, o.Mac.WindowLevel, o.Mac.WindowClass)
+		}
+		if o.Mac.CollectionBehavior&application.MacWindowCollectionBehaviorCanJoinAllSpaces == 0 {
+			t.Errorf("%s: collection behavior %b, want it on every space", o.Name, o.Mac.CollectionBehavior)
+		}
+	}
+	if panelOptions("App").Mac.CollectionBehavior&application.MacWindowCollectionBehaviorFullScreenAuxiliary == 0 {
+		t.Errorf("the panel does not show over a full-screen app")
 	}
 }

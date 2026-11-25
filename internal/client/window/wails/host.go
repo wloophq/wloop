@@ -184,30 +184,8 @@ func newHost(app *application.App, name string) *host {
 		Name: "main", Title: name, URL: "about:blank", Width: 1280, Height: 820, Hidden: true,
 		Mac: insetTitleBar,
 	})
-	h.panel = app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name: "panel", Title: name, URL: "about:blank", Width: 680, Height: 420, Hidden: true, Frameless: true,
-		InitialPosition: application.WindowCentered,
-		Mac: application.MacWindow{
-			WindowClass:      application.MacWindowClassPanel,
-			PanelPreferences: application.MacPanelPreferences{NonActivating: true, FloatingPanel: true},
-			WindowLevel:      application.MacWindowLevelFloating,
-			CollectionBehavior: application.MacWindowCollectionBehaviorCanJoinAllSpaces |
-				application.MacWindowCollectionBehaviorFullScreenAuxiliary,
-		},
-	})
-	h.float = app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name: floatName, Title: name, URL: "about:blank", Width: 112, Height: 32, Hidden: true, Frameless: true,
-		DisableResize: true, BackgroundType: application.BackgroundTypeTransparent,
-		Mac: application.MacWindow{
-			WindowClass:      application.MacWindowClassPanel,
-			PanelPreferences: application.MacPanelPreferences{NonActivating: true, FloatingPanel: true},
-			WindowLevel:      application.MacWindowLevelFloating,
-			CollectionBehavior: application.MacWindowCollectionBehaviorCanJoinAllSpaces |
-				application.MacWindowCollectionBehaviorStationary | application.MacWindowCollectionBehaviorIgnoresCycle,
-			Backdrop:      application.MacBackdropTransparent,
-			DisableShadow: true,
-		},
-	})
+	h.panel = app.Window.NewWithOptions(panelOptions(name))
+	h.float = app.Window.NewWithOptions(floatOptions(name))
 	h.native = appKitFloat(h.float)
 	h.float.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) { e.Cancel() })
 	h.float.OnWindowEvent(events.Mac.WindowDidMove, func(*application.WindowEvent) { h.do(h.floatMoved) })
@@ -227,6 +205,40 @@ func newHost(app *application.App, name string) *host {
 	})
 	h.start()
 	return h
+}
+
+// panelOptions are the omnibox panel's. AlwaysOnTop keeps its level:
+// Wails sets the level of a window created hidden from AlwaysOnTop as it
+// first becomes key.
+func panelOptions(name string) application.WebviewWindowOptions {
+	return application.WebviewWindowOptions{
+		Name: "panel", Title: name, URL: "about:blank", Width: 680, Height: 420, Hidden: true, Frameless: true,
+		InitialPosition: application.WindowCentered, AlwaysOnTop: true,
+		Mac: application.MacWindow{
+			WindowClass:      application.MacWindowClassPanel,
+			PanelPreferences: application.MacPanelPreferences{NonActivating: true, FloatingPanel: true},
+			WindowLevel:      application.MacWindowLevelFloating,
+			CollectionBehavior: application.MacWindowCollectionBehaviorCanJoinAllSpaces |
+				application.MacWindowCollectionBehaviorFullScreenAuxiliary,
+		},
+	}
+}
+
+// floatOptions are the floating widget's, kept on top as panelOptions are.
+func floatOptions(name string) application.WebviewWindowOptions {
+	return application.WebviewWindowOptions{
+		Name: floatName, Title: name, URL: "about:blank", Width: 112, Height: 32, Hidden: true, Frameless: true,
+		DisableResize: true, BackgroundType: application.BackgroundTypeTransparent, AlwaysOnTop: true,
+		Mac: application.MacWindow{
+			WindowClass:      application.MacWindowClassPanel,
+			PanelPreferences: application.MacPanelPreferences{NonActivating: true, FloatingPanel: true},
+			WindowLevel:      application.MacWindowLevelFloating,
+			CollectionBehavior: application.MacWindowCollectionBehaviorCanJoinAllSpaces |
+				application.MacWindowCollectionBehaviorStationary | application.MacWindowCollectionBehaviorIgnoresCycle,
+			Backdrop:      application.MacBackdropTransparent,
+			DisableShadow: true,
+		},
+	}
 }
 
 // start runs the worker until stop.
