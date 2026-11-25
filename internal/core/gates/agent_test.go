@@ -302,3 +302,35 @@ func TestAnAnswerDoesNotClaimADraftAnotherResolverApproved(t *testing.T) {
 		t.Fatal("the question was answered with a draft another resolver approved")
 	}
 }
+
+// A session that revised a draft asks the question whose option points to it: picking the option approves the
+// draft, as for the session that proposed it, and a session that neither proposed nor revised it does not.
+func TestAnOptionPointsToADraftItsQuestionsSessionRevised(t *testing.T) {
+	ctx := context.Background()
+	for _, r := range []gates.Resolution{answer(task.ActorPerson, ""), answer(task.ActorAgent, "s-reviser")} {
+		t.Run(string(r.By), func(t *testing.T) {
+			f := newFixture(t, nil, bundled)
+			f.drive("s-reviser")
+			d := f.draftGate(t)
+			q := f.question(t, "s-reviser")
+			if err := f.svc.ApproveOption(ctx, q, r, d, 3); err != nil {
+				t.Fatal(err)
+			}
+			if gq, gd := f.get(t, q.ID), f.get(t, d.ID); gq.Status != gate.Answered || gd.Status != gate.Approved || gd.By != r.By {
+				t.Fatalf("question %+v, draft %+v", gq, gd)
+			}
+		})
+	}
+	t.Run("a session that only asked", func(t *testing.T) {
+		f := newFixture(t, nil, bundled)
+		f.drive("s-asker")
+		d := f.draftGate(t)
+		q := f.question(t, "s-asker")
+		if err := f.svc.ApproveOption(ctx, q, answer(task.ActorPerson, ""), d, 3); !errors.Is(err, gates.ErrRefused) {
+			t.Fatalf("ApproveOption = %v, want ErrRefused", err)
+		}
+		if f.get(t, q.ID).Status != gate.Open || f.get(t, d.ID).Status != gate.Open || len(f.cons.Calls) != 0 {
+			t.Fatalf("a refused option resolved something: %+v %+v %v", f.get(t, q.ID), f.get(t, d.ID), f.cons.Calls)
+		}
+	})
+}
