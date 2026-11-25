@@ -267,7 +267,8 @@ type Env struct {
 	// reads them.
 	gates      *gates.Service
 	gateReader gates.Reader
-	// gatesMu guards gates and gateReader, which newGates builds on first use from more than one goroutine.
+	// gatesMu guards gates, gateReader and messages, which serve builds on first use from more than one
+	// goroutine; gatesLock reads it, the package's one lock for an Env not built through owning.
 	gatesMu *sync.Mutex
 	// consequences apply the resolved plan and trust gates: the daemon
 	// serve built, nil before it.

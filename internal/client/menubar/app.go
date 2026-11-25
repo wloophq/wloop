@@ -121,7 +121,7 @@ type Controller struct {
 	// plugins are the served plugins, read with the sections.
 	plugins []api.Plugin
 	tasks   map[string][]api.TaskView
-	// taskViews are the views whose tasks notify: those the profile's badge counts.
+	// taskViews are the views whose tasks notify: those the profile's badge names.
 	taskViews []api.TaskViewSpec
 	// needs is what waits on the user, the queue of every decision kind, which the menu lists first.
 	needs    api.Queue

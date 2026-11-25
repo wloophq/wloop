@@ -13,7 +13,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// pullTasks reads the catalog, each view the profile's badge counts, whole, whose tasks notify, and the queue
+// pullTasks reads the catalog, each view the profile's badge names, whole, whose tasks notify, and the queue
 // of every decision kind, which the menu lists first. A task's attention also moves with its row's notice and
 // its proposed draft, which no task write marks, so a delta would miss it. The counters come with the first
 // view's page, or on their own when no view is badged.

@@ -113,7 +113,7 @@ func viewTasks() map[string][]api.TaskView {
 
 func viewCounters() api.Counters {
 	return api.Counters{Views: map[string]int{"focus": 1, "inbox": 2, "outbox": 1, "next": 4, "waiting": 4, "projects": 0, "someday": 0, "logbook": 12},
-		Areas: map[string]int{}, Contexts: map[string]int{}, Badge: 3}
+		Areas: map[string]int{}, Contexts: map[string]int{}}
 }
 
 func TestTUIListsOnlyRailViews(t *testing.T) {

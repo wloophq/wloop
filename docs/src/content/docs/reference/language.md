@@ -363,7 +363,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `views.<name>.remove_clean` (bool, default `false`): The view offers to remove at once the workspaces its tasks' links hold whose checkouts hold nothing that is not published, as each link's remove action does; the rest are kept, with why.
 - `views.<name>.layout` (one of `list`, `board`, `outbox`, `queue`, default `list`): How the cockpit draws the view: list, its rows; board, a lane per group, which a person may switch back to the list; outbox, the Outbox's drafts, which the lens filters, groups and sorts over the `draft_facets` and the view's own `group` and `sort` (draft facts), read from the Outbox's own route whatever the view lists; queue, what waits on you one decision at a time, the queue of every decision kind in decisions.toml's order, read from its own route whatever the view lists, which the home's section and counter of the view and the menu bar open; with no `when` of its own, such a view lists the tasks of the views decisions.toml's kinds name.
 - `badge` (table): The views whose tasks the menu bar notifies, the daily digest counts and `status` prints; the menu bar's title counts Needs you, the queue of every decision kind, instead.
-- `badge.views` (list of strings): Those views, each a view of views: the tasks of the ones on the rail post the menu bar's banners, the digest counts what moved in them, `status` prints their tasks, and their counts add up to the counters' badge, which no client title reads.
+- `badge.views` (list of strings): Those views, each a view of views: the tasks of the ones on the rail post the menu bar's banners, the digest counts what moved in them and `status` prints their tasks.
 - `review` (table): The review's steps, in the order the review walks them.
 - `review.<name>` (table): A step of the review, by the view it walks, which views declares. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones, and comes after the steps below it.
 - `review.<name>.label` (string, localized): What the step asks of you, as the review lists it. Required.
@@ -879,8 +879,8 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `answer_placeholder`: The placeholder of a notification's input that answers an agent.
   - `answer_button`: The button of a notification's input that answers an agent.
   - `digest_title`: The title of the daily digest notification.
-  - `digest_new`: The digest's first line: Count, the tasks of the badge's views that moved since the last digest.
-  - `digest_view`: The digest's line for one view the badge counts: View, its label, and Count, its tasks.
+  - `digest_new`: The digest's first line: Count, the tasks of the views the badge names that moved since the last digest.
+  - `digest_view`: The digest's line for one view the badge names: View, its label, and Count, its tasks.
   - `notify_inbox`: The title of the notification of a task in the Inbox that says what it is itself.
   - `notify_draft_for_me`: The button of an Inbox task's notification that delegates it to an agent headless.
   - `notify_reply`: The button of a notification whose text input saves a reply for approval, or answers an agent.

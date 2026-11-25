@@ -364,7 +364,7 @@ func TestCaptureLandsInInbox(t *testing.T) {
 	if v.State != "inbox" || v.Title != "call the bank" {
 		t.Fatalf("%+v", v)
 	}
-	if p := r.page(t, "view=inbox"); !slices.Equal(taskIDs(p.Tasks), []string{v.ID}) || p.Counters.Badge != 1 {
+	if p := r.page(t, "view=inbox"); !slices.Equal(taskIDs(p.Tasks), []string{v.ID}) || p.Counters.Views["inbox"] != 1 {
 		t.Fatalf("%+v", p)
 	}
 	var detail api.TaskView
@@ -1426,10 +1426,10 @@ func TestARowsChangeAndATasksChangeMergeForASubscriber(t *testing.T) {
 	sub := h.subscribe("test")
 	other := unit.Unit{Provider: unit.GitHub, Key: "acme/api#13"}
 	h.publish(api.Change{Type: "changed", Epoch: "e", Rev: 2, Units: []unit.Unit{other}})
-	h.publish(api.Change{Type: "changed", Epoch: "e", Rev: 2, Units: []unit.Unit{apiPR}, Counters: &api.Counters{Badge: 1}})
+	h.publish(api.Change{Type: "changed", Epoch: "e", Rev: 2, Units: []unit.Unit{apiPR}, Counters: &api.Counters{Views: map[string]int{"inbox": 1}}})
 	h.publish(api.Change{Type: "changed", Epoch: "e", Rev: 3, Units: []unit.Unit{apiPR}})
 	c, ok := sub.take()
-	if !ok || !slices.Equal(c.Units, []unit.Unit{apiPR, other}) || c.Counters == nil || c.Counters.Badge != 1 || c.Rev != 3 {
+	if !ok || !slices.Equal(c.Units, []unit.Unit{apiPR, other}) || c.Counters == nil || c.Counters.Views["inbox"] != 1 || c.Rev != 3 {
 		t.Fatalf("merged %+v (%v), want both units, the counters and rev 3", c, ok)
 	}
 }

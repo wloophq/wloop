@@ -119,14 +119,14 @@ func TestAQuestionGateOnADoneTaskShowsInNeedsMe(t *testing.T) {
 }
 
 // TestEveryOpenGateShowsInABundledView checks that an open gate of every kind, on a task of every category, is
-// in a bundled view the badge counts, through its task, and a draft also in a view over gates.
+// in a bundled view the badge names, through its task, and a draft also in a view over gates.
 func TestEveryOpenGateShowsInABundledView(t *testing.T) {
 	l := bundled(t)
 	for _, k := range gate.Kinds {
 		for _, c := range task.Categories {
 			f := lensFacts(t, l, c, workflow.Facts{"task.gates_open": 1})
 			if !slices.ContainsFunc(inViews(t, l, f), l.Views.Badged) {
-				t.Errorf("an open %s gate on a %s task is in no view the badge counts: %v", k, c, inViews(t, l, f))
+				t.Errorf("an open %s gate on a %s task is in no view the badge names: %v", k, c, inViews(t, l, f))
 			}
 		}
 		g := gate.Gate{Kind: k, Status: gate.Open}

@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/core/gates"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
+	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
@@ -23,8 +25,9 @@ import (
 // gates of db, worded and decided by the profile as it loads now, each on
 // the task of its unit, which the daemon's tasks service opens when none is.
 func (e *Env) newGates(db *sqlite.DB, logf func(string, ...any)) *gates.Service {
-	e.gatesMu.Lock()
-	defer e.gatesMu.Unlock()
+	mu := e.gatesLock()
+	mu.Lock()
+	defer mu.Unlock()
 	if e.gates == nil {
 		st := db.Gates(e.Now)
 		e.gateReader = st
@@ -38,9 +41,36 @@ func (e *Env) newGates(db *sqlite.DB, logf func(string, ...any)) *gates.Service 
 
 // builtGates are the daemon's gates service and reader once newGates built them; nil before.
 func (e *Env) builtGates() (*gates.Service, gates.Reader) {
-	e.gatesMu.Lock()
-	defer e.gatesMu.Unlock()
+	mu := e.gatesLock()
+	mu.Lock()
+	defer mu.Unlock()
 	return e.gates, e.gateReader
+}
+
+// zeroGatesMu is the lock of an Env built without owning.
+var zeroGatesMu sync.Mutex
+
+func (e *Env) gatesLock() *sync.Mutex {
+	if e.gatesMu == nil {
+		return &zeroGatesMu
+	}
+	return e.gatesMu
+}
+
+// inbox is the daemon's messages service once serve built it; nil before.
+func (e *Env) inbox() *messages.Service {
+	mu := e.gatesLock()
+	mu.Lock()
+	defer mu.Unlock()
+	return e.messages
+}
+
+// setInbox keeps svc as the daemon's messages service.
+func (e *Env) setInbox(svc *messages.Service) {
+	mu := e.gatesLock()
+	mu.Lock()
+	defer mu.Unlock()
+	e.messages = svc
 }
 
 // messageOptions are the messages service's option drafts, read at each resolution: a daemon without one
@@ -48,24 +78,27 @@ func (e *Env) builtGates() (*gates.Service, gates.Reader) {
 type messageOptions struct{ e *Env }
 
 func (m messageOptions) OptionDraft(ctx context.Context, question gate.Gate, r gates.Resolution) (gate.Gate, int64, bool, error) {
-	if m.e.messages == nil {
+	svc := m.e.inbox()
+	if svc == nil {
 		return gate.Gate{}, 0, false, nil
 	}
-	return m.e.messages.OptionDraft(ctx, question, r)
+	return svc.OptionDraft(ctx, question, r)
 }
 
 func (m messageOptions) Pinning(ctx context.Context, drafted gate.Gate) (gate.Gate, string, int64, bool, error) {
-	if m.e.messages == nil {
+	svc := m.e.inbox()
+	if svc == nil {
 		return gate.Gate{}, "", 0, false, nil
 	}
-	return m.e.messages.Pinning(ctx, drafted)
+	return svc.Pinning(ctx, drafted)
 }
 
 func (m messageOptions) PinnedDrafts(ctx context.Context) (map[int64]int64, error) {
-	if m.e.messages == nil {
+	svc := m.e.inbox()
+	if svc == nil {
 		return nil, nil
 	}
-	return m.e.messages.PinnedDrafts(ctx)
+	return svc.PinnedDrafts(ctx)
 }
 
 // drivenSessions are the turns service's sessions, read at each resolution: a daemon without one drives none.

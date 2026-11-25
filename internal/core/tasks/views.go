@@ -478,9 +478,6 @@ func (s *Service) counts(ctx context.Context, area string, all []task.Task, keep
 			}
 		}
 	}
-	for _, v := range vs.Badge {
-		c.Badge += c.Views[v]
-	}
 	return c, nil
 }
 

@@ -27,7 +27,7 @@ func index(items []string, prefix string) int {
 func TestTitleFollowsNeedsYou(t *testing.T) {
 	r := newRig(t)
 	r.d.queue = needsYou(plainTask(1), plainTask(2))
-	r.d.counters = api.Counters{Views: map[string]int{"inbox": 0, "outbox": 0}, Badge: 4}
+	r.d.counters = api.Counters{Views: map[string]int{"inbox": 0, "outbox": 0}}
 	r.c.Refresh(context.Background())
 	if got := r.title(); got != brand.Name+" 2" {
 		t.Fatalf("title %q, want the Needs you total", got)
@@ -35,7 +35,7 @@ func TestTitleFollowsNeedsYou(t *testing.T) {
 	r.d.mu.Lock()
 	r.d.queue = needsYou(plainTask(1), plainTask(2), plainTask(3))
 	r.d.mu.Unlock()
-	r.c.apply(context.Background(), api.Change{Type: "changed", Epoch: "e1", Rev: 1, Units: []unit.Unit{uref(1)}, Counters: &api.Counters{Badge: 6}})
+	r.c.apply(context.Background(), api.Change{Type: "changed", Epoch: "e1", Rev: 1, Units: []unit.Unit{uref(1)}, Counters: &api.Counters{Views: map[string]int{"inbox": 3}}})
 	if got := r.title(); got != brand.Name+" 3" {
 		t.Fatalf("title %q after a change", got)
 	}
@@ -44,7 +44,7 @@ func TestTitleFollowsNeedsYou(t *testing.T) {
 func TestTitleReadsEachViewsCount(t *testing.T) {
 	r := newRig(t)
 	r.d.strings = &api.Strings{Locale: "en", Strings: map[string]api.Text{"{name} {n}": {"other": "{needs-me}/{inbox} of {n}"}}}
-	r.d.counters = api.Counters{Views: map[string]int{"inbox": 3, "needs-me": 2}, Badge: 5}
+	r.d.counters = api.Counters{Views: map[string]int{"inbox": 3, "needs-me": 2}}
 	r.d.queue = needsYou(plainTask(1), plainTask(2), plainTask(3), plainTask(4))
 	r.c.Refresh(context.Background())
 	if got := r.title(); got != "2/3 of 4" {
@@ -56,7 +56,7 @@ func TestTitleReadsTheCountsWithNoBadgeViewInTheRail(t *testing.T) {
 	r := newRig(t)
 	r.d.views = []api.TaskViewSpec{{ID: "inbox", Label: "Inbox", Rail: true}, {ID: "home-blocked", Label: "Blocked by you", Badge: true}}
 	r.d.strings = &api.Strings{Locale: "en", Strings: map[string]api.Text{"{name} {n}": {"other": "{inbox} of {n}"}}}
-	r.d.counters = api.Counters{Views: map[string]int{"inbox": 3, "home-blocked": 1}, Badge: 1}
+	r.d.counters = api.Counters{Views: map[string]int{"inbox": 3, "home-blocked": 1}}
 	r.d.queue = needsYou(plainTask(1))
 	r.c.Refresh(context.Background())
 	if got := r.title(); got != "3 of 1" {
@@ -67,7 +67,7 @@ func TestTitleReadsTheCountsWithNoBadgeViewInTheRail(t *testing.T) {
 func TestTitleSaysPausedWhileAutomaticRoundsAre(t *testing.T) {
 	r := newRig(t)
 	r.d.health.Paused = true
-	r.d.counters = api.Counters{Views: map[string]int{"inbox": 3}, Badge: 3}
+	r.d.counters = api.Counters{Views: map[string]int{"inbox": 3}}
 	r.d.queue = needsYou(plainTask(1), plainTask(2), plainTask(3))
 	r.c.Refresh(context.Background())
 	if got := r.title(); got != brand.Name+" 3 paused" {
@@ -261,7 +261,7 @@ func TestMenuShowsNeedsYouCount(t *testing.T) {
 func TestTitleIsTheNeedsYouTotal(t *testing.T) {
 	r := newRig(t)
 	r.d.queue = needsYou(plainTask(1), plainTask(1), plainTask(2))
-	r.d.counters = api.Counters{Views: map[string]int{"inbox": 7}, Badge: 9}
+	r.d.counters = api.Counters{Views: map[string]int{"inbox": 7}}
 	r.c.Refresh(context.Background())
 	if got, menu := r.title(), titles(r.tray.menu); got != brand.Name+" 3" || index(menu, "Needs you (3)") < 0 {
 		t.Fatalf("title %q, menu %q: want both to read the queue's 3 items", got, menu)

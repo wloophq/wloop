@@ -32,7 +32,7 @@ type ViewsDef struct {
 	Views []ViewDef
 	// Review are the review's steps in order, each a view.
 	Review []ReviewStepDef
-	// Badge are the views whose counts the badge adds up.
+	// Badge are the views whose tasks notify, the daily digest counts and status lists.
 	Badge []string
 	// Empty is what a view without its own empty shows when it lists nothing.
 	Empty *template.Template
@@ -152,7 +152,7 @@ func (d ViewsDef) IDs() []string {
 	return out
 }
 
-// Badged says whether the badge counts view id.
+// Badged says whether the badge names view id.
 func (d ViewsDef) Badged(id string) bool { return slices.Contains(d.Badge, id) }
 
 // QueueView is the first view drawn as the queue of every decision kind; "" when none is.

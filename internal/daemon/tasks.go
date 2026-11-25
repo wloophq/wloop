@@ -915,7 +915,7 @@ func (s *Server) queueCounted(ctx context.Context, g *coretasks.Service, c *task
 }
 
 func wireCounters(c task.Counters) api.Counters {
-	out := api.Counters{Area: c.Area, Views: map[string]int{}, Areas: map[string]int{}, Contexts: map[string]int{}, Badge: c.Badge}
+	out := api.Counters{Area: c.Area, Views: map[string]int{}, Areas: map[string]int{}, Contexts: map[string]int{}}
 	for v, n := range c.Views {
 		out.Views[string(v)] = n
 	}

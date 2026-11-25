@@ -265,7 +265,7 @@ func TestSyncRunsUnderNoJobs(t *testing.T) {
 		page, err = c.TasksSince(ctx, client.TaskQuery{View: "inbox"}, api.Since{})
 		return err == nil && len(page.Tasks) == 1
 	})
-	if e := page.Tasks[0]; !slices.Equal(e.Units, []unit.Unit{u}) || page.Counters.Badge != 1 {
+	if e := page.Tasks[0]; !slices.Equal(e.Units, []unit.Unit{u}) || page.Counters.Views["inbox"] != 1 {
 		t.Fatalf("%+v", page)
 	}
 	res, err := c.TaskDo(ctx, page.Tasks[0].ID, "next", api.TaskRequest{Source: "cli"})
@@ -327,7 +327,7 @@ func TestDisabledPluginTasksRefuseOnARealServe(t *testing.T) {
 	}()
 	waitHealth(t, te.Env, "the daemon", func(api.Health) bool { return true })
 	code, body := socketDo(t, te.Socket, http.MethodGet, api.TasksPath+"?view=inbox", "")
-	if code != 200 || strings.Contains(body, string(e.ID)) || !strings.Contains(body, `"badge":0`) {
+	if code != 200 || strings.Contains(body, string(e.ID)) || !strings.Contains(body, `"inbox":0`) {
 		t.Fatalf("the disabled plugin's task is listed: %d %s", code, body)
 	}
 	if code, body := socketDo(t, te.Socket, http.MethodGet, api.TaskPath(string(e.ID)), ""); code != 200 || strings.Count(body, `"enabled":true`) != 1 {

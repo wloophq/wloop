@@ -48,7 +48,7 @@ func TestDisabledPluginTasksAreHidden(t *testing.T) {
 		}
 		return c
 	}
-	if c := counts(); c.Badge != 3 || c.Views["ready"] != 1 {
+	if c := counts(); c.Views["ready"] != 1 {
 		t.Fatalf("enabled: %+v", c)
 	}
 	off, r.facts.off[unit.GitHub] = []unit.ProviderID{unit.GitHub}, true
@@ -62,11 +62,11 @@ func TestDisabledPluginTasksAreHidden(t *testing.T) {
 		t.Fatalf("waiting keeps it read-only: %v", got)
 	}
 	c := counts()
-	if c.Badge != 2 || c.Views["inbox"] != 2 || c.Views["ready"] != 0 || c.Views["waiting"] != 1 {
+	if c.Views["inbox"] != 2 || c.Views["ready"] != 0 || c.Views["waiting"] != 1 {
 		t.Fatalf("counts %+v", c)
 	}
 	p, err := r.svc.TasksSince(ctx, task.Query{View: "inbox"}, coretasks.Since{}, nil)
-	if err != nil || len(p.Tasks) != 2 || p.Counters.Badge != 2 {
+	if err != nil || len(p.Tasks) != 2 || p.Counters.Views["inbox"] != 2 {
 		t.Fatalf("page %+v %v", p, err)
 	}
 	if _, err := r.svc.Do(ctx, "t-gh", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbNext}); !errors.Is(err, coretasks.ErrPluginDisabled) {

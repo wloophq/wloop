@@ -13,7 +13,7 @@ import (
 )
 
 // handleDigest serves the daily digest of the query parameter day: the counters, and the tasks of the views the
-// profile's badge counts that moved since the previous digest, at notifications.digest_at local time (midnight
+// profile's badge names that moved since the previous digest, at notifications.digest_at local time (midnight
 // when off).
 func (s *Server) handleDigest(w http.ResponseWriter, r *http.Request) {
 	g, ok := s.tasks(w)

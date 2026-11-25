@@ -181,7 +181,7 @@ const DraftTaskPrefix = "draft:"
 
 // TaskViewSpec is a view of views.toml: Summary is one line on what it lists, Empty what it shows when it lists
 // nothing, Over what it lists (tasks or gates), When and Sort its rule as the profile writes it, Group the fact it
-// groups by, Key the key that jumps to it, Badge whether the badge counts it, HideDisabled whether it hides the
+// groups by, Key the key that jumps to it, Badge whether the badge names it, HideDisabled whether it hides the
 // tasks of a disabled plugin, RemoveClean whether it offers to remove its tasks' clean workspaces.
 type TaskViewSpec struct {
 	ID           string `json:"id"`
@@ -538,7 +538,6 @@ type Counters struct {
 	Views    map[string]int `json:"views"`
 	Areas    map[string]int `json:"areas"`
 	Contexts map[string]int `json:"contexts"`
-	Badge    int            `json:"badge"`
 }
 
 // Message is the subject of a question, post or proposal gate, as GateView.Subject serves it: what was asked,

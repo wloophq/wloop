@@ -156,5 +156,4 @@ type Counters struct {
 	Views    map[View]int   // every view that lists something, narrowed to Area
 	Areas    map[string]int // the open tasks per area
 	Contexts map[string]int // the open tasks per context, within Area
-	Badge    int            // the sum of the views the profile's badge names
 }
