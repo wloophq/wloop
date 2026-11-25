@@ -4,6 +4,7 @@ package wails
 
 import (
 	"encoding/json"
+	"errors"
 	"math"
 	"net/url"
 	"os"
@@ -547,8 +548,8 @@ func (h *host) HidePanel() {
 }
 
 // Listen binds the reopen, the float's messages and the screens and, unless
-// h.Hotkey is empty, the hotkey; call it after the app launched, off the main
-// thread, so a refused chord comes back as the error.
+// empty, the hotkey and the float's hotkey; call it after the app launched,
+// off the main thread, so a refused chord comes back as the error.
 func (h *host) Listen(hs window.Handlers) error {
 	h.links.Lock()
 	h.mu.Lock()
@@ -567,10 +568,14 @@ func (h *host) Listen(hs window.Handlers) error {
 		h.pending = nil
 	}
 	h.links.Unlock()
-	if hs.Hotkey == "" || hs.OnHotkey == nil {
-		return nil
+	var errs []error
+	if hs.Hotkey != "" && hs.OnHotkey != nil {
+		errs = append(errs, h.app.GlobalShortcut.Register(hs.Hotkey, hs.OnHotkey))
 	}
-	return h.app.GlobalShortcut.Register(hs.Hotkey, hs.OnHotkey)
+	if hs.FloatHotkey != "" && hs.OnFloatHotkey != nil {
+		errs = append(errs, h.app.GlobalShortcut.Register(hs.FloatHotkey, hs.OnFloatHotkey))
+	}
+	return errors.Join(errs...)
 }
 
 // openURL hands a deep link to the controller, or keeps it until the

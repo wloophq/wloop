@@ -74,7 +74,8 @@ type fakeDaemon struct {
 	digests     map[string]api.Digest
 	digestDays  []string
 	digestErr   error
-	strings     *api.Strings // nil: English
+	digestHeld  chan struct{} // Digest waits on it when set
+	strings     *api.Strings  // nil: English
 	stringsErr  error
 	stringsN    int
 	queue       *api.Queue // nil: Needs you with no item
@@ -178,6 +179,12 @@ func (f *fakeDaemon) TaskDo(_ context.Context, id, verb string, req api.TaskRequ
 }
 
 func (f *fakeDaemon) Digest(_ context.Context, day string) (api.Digest, error) {
+	f.mu.Lock()
+	held := f.digestHeld
+	f.mu.Unlock()
+	if held != nil {
+		<-held
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.digestDays = append(f.digestDays, day)

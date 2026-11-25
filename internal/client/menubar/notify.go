@@ -47,7 +47,11 @@ func (c *Controller) notify() {
 	live := map[string]bool{}
 	notes := map[string]posted{}
 	buttons := c.draftButtons()
+	mute := c.muteNeeds()
 	for _, e := range c.notifying() {
+		if mute && Category(e.Attention.Category) == api.CategoryNeeds {
+			continue
+		}
 		n, p := notification(e, buttons)
 		if _, dup := notes[n.ID]; dup {
 			continue

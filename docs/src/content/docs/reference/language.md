@@ -1562,6 +1562,9 @@ The fields each notice reads besides `Name` and `Command`:
 - `window` (table): The app's own window on macOS, which the app reads when it starts.
 - `window.enabled` (bool, default `true`): Show the cockpit in the app's own window on macOS; false opens it in the browser.
 - `window.hotkey` (string, default `ctrl+option+space`): The global shortcut that opens the omnibox panel, such as cmd+shift+space; empty for none.
+- `window.float` (one of `on`, `off`, default `off`): on shows the floating widget, which carries what waits on you; Needs you banners do not post unless it is turned off from the menu bar. Needs the app's own window.
+- `window.float_hotkey` (string, default `cmd+option+.`): The global shortcut that hides the floating widget until something new arrives, and shows it again, such as cmd+shift+j; empty for none. Bound only while window.float is on. The default leaves out ctrl+option, VoiceOver's modifier.
+- `window.float_morning` (string, default `09:00`): The local HH:MM at which Hide until tomorrow shows the floating widget again.
 
 ### Units and tasks
 

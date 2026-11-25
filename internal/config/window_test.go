@@ -7,14 +7,19 @@ import (
 )
 
 func TestConfigWindowDefaults(t *testing.T) {
-	if got := Defaults().Window; got != (Window{Enabled: true, Hotkey: "ctrl+option+space"}) {
+	def := Window{Enabled: true, Hotkey: "ctrl+option+space", Float: FloatOff, FloatHotkey: "cmd+option+.", FloatMorning: "09:00"}
+	if got := Defaults().Window; got != def {
 		t.Fatalf("default %+v", got)
 	}
+	with := func(f func(*Window)) Window { w := def; f(&w); return w }
 	for raw, want := range map[string]Window{
-		``:                            {Enabled: true, Hotkey: "ctrl+option+space"},
-		`window = {hotkey = ""}`:      {Enabled: true, Hotkey: ""},
-		`window = {enabled = false}`:  {Enabled: false, Hotkey: "ctrl+option+space"},
-		`window = {hotkey = "cmd+k"}`: {Enabled: true, Hotkey: "cmd+k"},
+		``:                                   def,
+		`window = {hotkey = ""}`:             with(func(w *Window) { w.Hotkey = "" }),
+		`window = {enabled = false}`:         with(func(w *Window) { w.Enabled = false }),
+		`window = {hotkey = "cmd+k"}`:        with(func(w *Window) { w.Hotkey = "cmd+k" }),
+		`window = {float = "on"}`:            with(func(w *Window) { w.Float = FloatOn }),
+		`window = {float_hotkey = "cmd+j"}`:  with(func(w *Window) { w.FloatHotkey = "cmd+j" }),
+		`window = {float_morning = "07:30"}`: with(func(w *Window) { w.FloatMorning = "07:30" }),
 	} {
 		path := filepath.Join(t.TempDir(), "config.toml")
 		if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
@@ -23,6 +28,18 @@ func TestConfigWindowDefaults(t *testing.T) {
 		c, err := LoadFile(path, tools())
 		if err != nil || c.Window != want {
 			t.Errorf("%s: %+v %v, want %+v", raw, c.Window, err, want)
+		}
+	}
+}
+
+func TestConfigWindowFloatRefusesBadValues(t *testing.T) {
+	for _, raw := range []string{`window = {float = "yes"}`, `window = {float_morning = "9am"}`, `window = {float_morning = ""}`} {
+		path := filepath.Join(t.TempDir(), "config.toml")
+		if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := LoadFile(path, tools()); err == nil {
+			t.Errorf("%s loaded", raw)
 		}
 	}
 }

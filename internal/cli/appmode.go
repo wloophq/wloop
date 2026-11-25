@@ -69,15 +69,13 @@ func runAppClient(ctx context.Context, e *Env) error {
 	e.RunNative(win, appWords(ctx, client.New(e.Socket)), func(tray menubar.Tray, notes menubar.Notifier, host window.Host) {
 		dc := client.New(e.Socket)
 		cockpit := func(route string) (string, error) { return cockpitURL(e.StateDir, route) }
-		show, showFloat := windowShow(ctx, &wg, host, dc, cockpit, win, logf)
-		c := menubar.New(menubar.Config{
+		ctl := windowShow(ctx, &wg, host, dc, cockpit, win, logf)
+		c := menubar.New(withWindow(menubar.Config{
 			Daemon:     dc,
 			Tray:       tray,
 			Notifier:   notes,
 			OpenURL:    func(u string) error { return e.openInBrowser(context.Background(), u) },
 			CockpitURL: cockpit,
-			Window:     show,
-			ShowFloat:  showFloat,
 			Reword:     rewordOf(host),
 			Quit:       cancel,
 			Copy:       copyToClipboard,
@@ -85,7 +83,8 @@ func runAppClient(ctx context.Context, e *Env) error {
 			Log:        logf,
 			SentPath:   filepath.Join(e.StateDir, "notified.json"),
 			DigestAt:   digestAt,
-		})
+		}, ctl, host, win))
+		hookFloat(ctl, c)
 		wg.Go(func() {
 			<-ctx.Done()
 			e.QuitNative()
@@ -98,14 +97,17 @@ func runAppClient(ctx context.Context, e *Env) error {
 }
 
 type menubarApp interface {
+	StartFloat()
 	Refresh(ctx context.Context)
 	Run(ctx context.Context) error
 }
 
-// bootMenubar paints the daemon-down menu first only when the daemon does
-// not answer, then runs the app, whose first refresh is the boot load.
+// bootMenubar shows the floating widget and paints the daemon-down menu
+// first only when the daemon does not answer, then runs the app, whose first
+// refresh is the boot load.
 func bootMenubar(ctx context.Context, ping, wait func(context.Context) error, app menubarApp) error {
 	if ping(ctx) != nil {
+		app.StartFloat()
 		app.Refresh(ctx)
 		if err := wait(ctx); err != nil {
 			return err

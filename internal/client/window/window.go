@@ -75,6 +75,10 @@ type Handlers struct {
 	OnScreens func(screens []Screen)
 	// FloatOverFullScreen lets the float show over a full-screen app.
 	FloatOverFullScreen bool
+	// FloatHotkey is the accelerator that shows and hides the float; ""
+	// binds none.
+	FloatHotkey   string
+	OnFloatHotkey func()
 }
 
 // Events is the daemon's events stream.
@@ -95,6 +99,7 @@ type Config struct {
 	// for this run only.
 	Defaults            Defaults
 	FloatOverFullScreen bool
+	FloatHotkey         string
 }
 
 // Controller keeps one main window, one panel and the floating widget.
@@ -106,10 +111,11 @@ type Controller struct {
 	floatShown bool
 	// placement is where the float goes once placed, its saved placement or
 	// the default one on the first screens known.
-	placement FloatPlacement
-	placed    bool
-	screens   []Screen
-	floatHide func(mode string)
+	placement   FloatPlacement
+	placed      bool
+	screens     []Screen
+	floatHide   func(mode string)
+	floatHotkey func()
 	// dragging holds the frame still while the person drags it; tellPlace
 	// says the page is due its place, which it gets once it has loaded
 	// (pageReady) and the frame is set.
@@ -147,9 +153,11 @@ func (c *Controller) Run(ctx context.Context) error {
 		OnScreens:      c.setScreens,
 
 		FloatOverFullScreen: c.cfg.FloatOverFullScreen,
+		FloatHotkey:         c.cfg.FloatHotkey,
+		OnFloatHotkey:       c.pressFloatHotkey,
 	})
 	if err != nil {
-		c.cfg.Log("window.hotkey %q: %v", c.cfg.Hotkey, err)
+		c.cfg.Log("window.hotkey %q, window.float_hotkey %q: %v", c.cfg.Hotkey, c.cfg.FloatHotkey, err)
 	}
 	for {
 		if changes, err := c.cfg.Daemon.Events(ctx, api.WindowClient, api.Since{}); err == nil {
