@@ -1512,13 +1512,18 @@ func (s *Server) publishTasks(ctx context.Context, c, flags port.Change) {
 	var held []unit.Unit
 	var snap coretasks.Snapshot
 	err := errTasksUnavailable
-	if s.deps.Tasks == nil {
+	switch {
+	case s.deps.Tasks == nil:
 		all = false
-	} else if snap, err = s.deps.Tasks.Snapshot(ctx); err != nil {
-		s.logf("tasks feed: %v", err)
-		held = rows
-	} else {
-		held = snap.Held(rows)
+	case c.Empty() && !all && len(rows) == 0:
+		// only flags moved: nothing to list, so no pass over the tasks
+	default:
+		if snap, err = s.deps.Tasks.Snapshot(ctx); err != nil {
+			s.logf("tasks feed: %v", err)
+			held = rows
+		} else {
+			held = snap.Held(rows)
+		}
 	}
 	pos := s.hub.position()
 	ch := api.Change{Type: "changed", Epoch: pos.Epoch, Rev: pos.Rev,

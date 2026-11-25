@@ -9,12 +9,16 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/turns"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 // handleTurnsLive serves the turns the floating widget shows: the running ones, those that ended since the
-// local midnight, how many ask the user, and each intent's usual duration.
+// local midnight, how many ask the user, and each intent's usual duration. The turns of an intent whose manifest
+// says it reports nothing are left out of all of them. A dismissed turn counts toward the usual duration, as the
+// timings report counts it, but is not listed as done.
 func (s *Server) handleTurnsLive(w http.ResponseWriter, r *http.Request) {
 	var tl turns.Timeline
 	if s.deps.Turns != nil {
@@ -39,8 +43,12 @@ func (s *Server) liveTurns(ctx context.Context, byUnit map[unit.Unit][]turn.Turn
 	out := api.LiveTurns{Running: []api.LiveTurn{}, Done: []api.LiveTurn{}, Usual: map[string]int64{}}
 	spans := map[string][]time.Duration{}
 	unitOf := map[int64]unit.Unit{}
+	reg := s.loaded().Registry
 	for u, ts := range byUnit {
 		for _, t := range ts {
+			if d, ok := reg.Get(dintent.Name(t.Intent)); ok && !d.Reports {
+				continue
+			}
 			unitOf[t.Seq] = u
 			from := cmp.Or(t.StartedAt, t.SentAt)
 			switch {
@@ -78,21 +86,25 @@ func liveTurnOf(u unit.Unit, t turn.Turn, from time.Time) api.LiveTurn {
 	return lt
 }
 
-// titleTurns names each turn's task and title: the first task holding its unit, else the unit's row.
+// titleTurns names each turn's task and title: the task holding its unit, an open one first, else the unit's row.
 func (s *Server) titleTurns(ctx context.Context, list []api.LiveTurn, unitOf map[int64]unit.Unit) {
 	units := make([]unit.Unit, len(list))
 	for i, lt := range list {
 		units[i] = unitOf[lt.Seq]
 	}
 	pres := s.presentations(units)
+	var held map[unit.Unit][]task.Task
+	if s.deps.Tasks != nil {
+		var err error
+		if held, err = s.deps.Tasks.HoldersOfUnits(ctx, slices.Compact(slices.SortedFunc(slices.Values(units), api.CompareUnits))); err != nil {
+			s.logf("live turns: %v", err)
+		}
+	}
 	for i := range list {
 		u := units[i]
 		list[i].Title = pres[u].Title
-		if s.deps.Tasks == nil {
-			continue
-		}
-		if held, err := s.deps.Tasks.TasksOf(ctx, u); err == nil && len(held) > 0 {
-			list[i].Task, list[i].Title = string(held[0].ID), cmp.Or(held[0].Title, list[i].Title)
+		if tk := held[u]; len(tk) > 0 {
+			list[i].Task, list[i].Title = string(tk[0].ID), cmp.Or(tk[0].Title, list[i].Title)
 		}
 	}
 }

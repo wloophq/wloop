@@ -179,6 +179,7 @@ var Operations = []Operation{
 	{"DELETE", UnitSkip},
 	{"POST", DraftCloseSilently},
 	{"GET", OutboxPath},
+	{"GET", TurnsLivePath},
 
 	{"POST", AgentTurnsStart},
 	{"POST", AgentTurnsByHand},
@@ -197,7 +198,6 @@ var Operations = []Operation{
 	{"GET", AdminTurn},
 	{"POST", AdminProbe},
 	{"POST", AdminGitAccess},
-	{"GET", TurnsLivePath},
 	{"GET", AdminTimings},
 	{"GET", AdminFacts},
 	{"GET", AdminMeter},

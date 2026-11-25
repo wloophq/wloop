@@ -141,6 +141,7 @@ func (s *Server) routes() []route {
 		{"DELETE " + api.UnitSkip, s.handleUnitUnskip},
 		{"POST " + api.DraftCloseSilently, s.handleDraftCloseSilently},
 		{"GET " + api.OutboxPath, s.handleOutbox},
+		{"GET " + api.TurnsLivePath, s.handleTurnsLive},
 
 		{"POST " + api.AgentTurnsStart, s.handleTurnStart},
 		{"POST " + api.AgentTurnsByHand, s.handleTurnByHand},
@@ -159,7 +160,6 @@ func (s *Server) routes() []route {
 		{"GET " + api.AdminTurn, s.handleTurnShow},
 		{"POST " + api.AdminProbe, s.handleProbe},
 		{"POST " + api.AdminGitAccess, s.handleGitAccess},
-		{"GET " + api.TurnsLivePath, s.handleTurnsLive},
 		{"GET " + api.AdminTimings, s.handleTimings},
 		{"GET " + api.AdminFacts, s.handleFacts},
 		{"GET " + api.AdminMeter, s.handleMeter},

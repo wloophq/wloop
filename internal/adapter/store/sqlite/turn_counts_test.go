@@ -69,7 +69,7 @@ func TestOpenTurnsAreTheBooksOpenTurns(t *testing.T) {
 	}
 }
 
-func TestTimelineIsTheBooksTurnsWithTheirTimes(t *testing.T) {
+func TestTimelineIsTheBooksOpenAndEndedTurnsWithTheirTimes(t *testing.T) {
 	t.Parallel()
 	f := storetest.Seeded(t, storetest.Live)
 	ctx := context.Background()
@@ -83,13 +83,20 @@ func TestTimelineIsTheBooksTurnsWithTheirTimes(t *testing.T) {
 	}
 	want := 0
 	for u, b := range books {
-		for i, tr := range b.Turns {
+		bySeq := map[int64]turn.Turn{}
+		for _, g := range got[u] {
+			bySeq[g.Seq] = g
+		}
+		for _, tr := range b.Turns {
+			if !tr.State.Open() && tr.EndedAt.IsZero() {
+				continue
+			}
 			want++
-			if i >= len(got[u]) {
+			g, ok := bySeq[tr.Seq]
+			if !ok {
 				t.Fatalf("%s: turn %d missing from the timeline", u, tr.Seq)
 			}
-			g := got[u][i]
-			if g.Seq != tr.Seq || g.State != tr.State || !g.SentAt.Equal(tr.SentAt) || !g.StartedAt.Equal(tr.StartedAt) || !g.EndedAt.Equal(tr.EndedAt) {
+			if g.State != tr.State || !g.SentAt.Equal(tr.SentAt) || !g.StartedAt.Equal(tr.StartedAt) || !g.EndedAt.Equal(tr.EndedAt) {
 				t.Errorf("%s: timeline turn %+v, the book has %+v", u, g, tr)
 			}
 		}
