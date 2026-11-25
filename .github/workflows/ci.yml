@@ -19,19 +19,10 @@ jobs:
         with:
           cache: macos
       - run: go test -c -o /tmp/web.test ./internal/web && go test -c -o /tmp/cli.test ./internal/cli && go test -c -o /tmp/e2e.test ./internal/e2e
-      - name: Chrome alone, idle runner
-        run: N=40 OUT=out-idle diag/chrome.sh | tail -12
-      - name: Chrome under load
+      - run: go build -o /tmp/dumptime ./diag/dumptime
+      - name: Dump time under load
         run: |
           (while true; do (cd internal/cli && /tmp/cli.test >/dev/null 2>&1); done) &
           (while true; do (cd internal/e2e && /tmp/e2e.test >/dev/null 2>&1); done) &
-          N=60 OUT=out-load diag/chrome.sh | tail -12
+          /tmp/dumptime
           kill %1 %2 || true
-      - name: Layout tests under load
-        run: |
-          (while true; do (cd internal/cli && /tmp/cli.test >/dev/null 2>&1); done) &
-          (while true; do (cd internal/e2e && /tmp/e2e.test >/dev/null 2>&1); done) &
-          cd internal/web && /tmp/web.test -test.run 'Narrow|UsersRow|FocusOrder|FloatingPanel|Omnibox|PlanGate|HomeSpans' -test.count=15 -test.v 2>&1 | grep -E '^(--- FAIL|    |FAIL|ok|PASS)' | tail -40
-          kill %1 %2 || true
-      - if: always()
-        run: ls out-*; for f in out-*/slow-*.log; do echo "== $f"; tail -60 "$f"; done
