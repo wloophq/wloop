@@ -6,14 +6,17 @@
   import { notice } from "../../state/store.svelte";
   import Agents from "./Agents.svelte";
   import { floatSize, hovered } from "./float";
+  import Peek from "./Peek.svelte";
   import Pill from "./Pill.svelte";
   import Queue from "./Queue.svelte";
 
-  // The floating widget's page: the pill, and beside it the panel with the agents and the queue. The page is
-  // transparent and reports its size, so the window that hosts it fits what it draws.
+  // The floating widget's page: the pill, and beside it the panel with the agents and the queue, or, while a peek
+  // shows on the tab of a docked pill, what arrived. The page is transparent and reports its size, so the window that
+  // hosts it fits what it draws.
   const f = floatState();
   const open = $derived(f.mode === "panel");
   const n = $derived(f.items.length);
+  const flyout = $derived(!open && f.place.edge && f.peeked);
   const maxW = $derived(f.place.maxW || window.screen.availWidth);
   const maxH = $derived(f.place.maxH || window.screen.availHeight);
 
@@ -114,6 +117,9 @@
   onpointerleave={leave}
 >
   <Pill {f} onenter={enterPill} ontoggle={toggle} ondrop={() => report(true)} />
+  {#if flyout}
+    <button type="button" class="fl-flyout" use:hovered onclick={() => f.setMode("panel")}><span class="fl-flyout-text"><Peek item={flyout} /></span></button>
+  {/if}
   {#if open}
     <section class="fl-panel" aria-label={f.title || undefined} onpointerenter={enterPanel}>
       <header class="fl-head">

@@ -990,11 +990,21 @@ html.float-page body { display: block; overflow: hidden; }
 .fl-age { color: var(--faint); font: var(--text-meta) var(--mono); font-feature-settings: "tnum"; white-space: nowrap; }
 .fl-age.late { color: var(--late); background: var(--late-bg); padding: 0 var(--space-4); border-radius: var(--radius-sm); }
 .fl-peek { overflow: hidden; text-overflow: ellipsis; max-width: 300px; font-family: var(--sans); color: var(--ink); }
-.fl-peek b { color: var(--tone-text, var(--me-text)); font-weight: 600; }
+.fl-peek b, .fl-flyout b { color: var(--tone-text, var(--me-text)); font-weight: 600; }
 .fl[data-edge] .fl-pill { flex-direction: column; justify-content: center; width: 34px; height: auto; min-height: 84px; padding: var(--space-8) 0; gap: var(--space-6); }
 .fl[data-edge] .fl-pill .fl-mark { width: 14px; height: 3px; }
 .fl[data-edge] .fl-pill .fl-count, .fl[data-edge] .fl-pill .fl-running { flex-direction: column; }
-.fl[data-edge] .fl-pill :is(.fl-age, .fl-peek) { display: none; }
+.fl[data-edge] .fl-pill .fl-age { display: none; }
+/* A docked tab has no room for a peek, so it shows as a card beside the tab, where the panel opens. */
+.fl-flyout {
+  display: block; max-width: min(340px, calc(var(--fl-max-w) - 60px)); padding: var(--space-8) var(--space-12); text-align: left;
+  border-radius: var(--radius-lg); border: 1px solid var(--rule); background: color-mix(in srgb, var(--panel) 88%, transparent);
+  box-shadow: 0 6px 24px #0000002e; backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  font: var(--text-meta)/1.4 var(--sans); color: var(--ink); cursor: pointer;
+}
+.fl-flyout:hover, .fl-flyout[data-hover] { border-color: var(--rule-strong); }
+.fl.up .fl-flyout { align-self: flex-end; }
+.fl-flyout-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
 .fl-ring { flex: none; }
 .fl-ring circle { fill: none; stroke-width: 2; }
 .fl-ring .track { stroke: var(--rule); }

@@ -3,11 +3,12 @@
   import { age } from "../../lib/lens";
   import { clock } from "../../state/clock.svelte";
   import type { FloatState } from "../../state/float.svelte";
-  import { floatDrag, itemRef, itemText, LATE_MS, oldest, progress, toneClass } from "./float";
+  import { floatDrag, LATE_MS, oldest, progress } from "./float";
+  import Peek from "./Peek.svelte";
   import Ring from "./Ring.svelte";
 
   // The collapsed widget: how many decisions wait on the user, how many turns run, how old the oldest decision is
-  // and, while a peek shows, what just arrived; a dot when nothing waits and nothing runs. A drag moves the window,
+  // and, while a peek shows on a pill that is not docked, what just arrived; a dot when nothing waits and nothing runs. A drag moves the window,
   // a click toggles the panel, an Option-click hides the widget until something new.
   let { f, onenter, ontoggle, ondrop }: { f: FloatState; onenter: () => void; ontoggle: () => void; ondrop: () => void } = $props();
 
@@ -81,8 +82,8 @@
       {#if n && !Number.isNaN(first)}
         <span class={["fl-age", late && "late"]}>{age(new Date(first).toISOString(), clock.now)}</span>
       {/if}
-      {#if peeked}
-        <span class="fl-peek"><b class={toneClass(peeked.tone)}>{peeked.word || peeked.kind}</b>{[itemRef(peeked), itemText(peeked)].filter(Boolean).map((s) => " · " + s).join("")}</span>
+      {#if peeked && !f.place.edge}
+        <span class="fl-peek"><Peek item={peeked} /></span>
       {/if}
     {/if}
   {/if}

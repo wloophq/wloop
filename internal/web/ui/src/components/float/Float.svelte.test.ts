@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render } from "@testing-library/svelte";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { J } from "../../lib/util";
 import { nav } from "../../state/route.svelte";
-import { FLOAT_HOVER_CLOSE_MS, floatDeps, floatLoad, floatState, resetFloat } from "../../state/float.svelte";
+import { FLOAT_HOVER_CLOSE_MS, FLOAT_PEEK_MS, floatDeps, floatLoad, floatState, resetFloat } from "../../state/float.svelte";
 import { flushSync } from "svelte";
 import { notice, tasksState } from "../../state/store.svelte";
 import { draftGate, pendingDraft, reviewDraft, taskCatalog } from "../../testing/gates";
@@ -402,4 +402,64 @@ test("u typed in a text field stays in the field", async () => {
   field.focus();
   field.dispatchEvent(new KeyboardEvent("keydown", { key: "u", bubbles: true, cancelable: true }));
   expect(opened).toEqual([]);
+});
+
+// drawsWide makes the float report a wide size while it draws the docked peek's card, as a browser would.
+const drawsWide = () =>
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    const w = this.querySelector(".fl-flyout") ? 380 : 50;
+    return { width: w, height: 100, x: 0, y: 0, top: 0, left: 0, right: w, bottom: 100, toJSON: () => ({}) } as DOMRect;
+  });
+const flyout = (c: Element) => c.querySelector(".fl-flyout") as HTMLElement | null;
+const tick = async () => {
+  await vi.advanceTimersByTimeAsync(0);
+  flushSync();
+};
+
+test.each(["left", "right"] as const)("docked %s, a peek shows beside the tab what arrived, and the window grows for it until the peek ends", async (edge) => {
+  drawsWide();
+  served = { title: "Needs you", items: [linked()] };
+  await floatLoad();
+  const c = render(Float).container;
+  await settle();
+  vi.useFakeTimers();
+  floatState().setMode("peek", { edge, up: false, maxW: 1400, maxH: 900 });
+  await tick();
+  const card = flyout(c)!;
+  expect(card).not.toBeNull();
+  expect(pill(c).nextElementSibling).toBe(card);
+  expect(card.querySelector("b.tone-me")!.textContent).toBe("step");
+  expect(card.textContent).toBe("step · acme/widgets#7 · Review it");
+  expect(pill(c).querySelector(".fl-peek")).toBeNull();
+  expect(sizes().at(-1)).toMatchObject({ w: 380, mode: "peek" });
+  await vi.advanceTimersByTimeAsync(FLOAT_PEEK_MS);
+  await tick();
+  expect(flyout(c)).toBeNull();
+  expect(sizes().at(-1)).toMatchObject({ w: 50, mode: "pill" });
+});
+
+test("a click on the docked peek opens the panel on what arrived", async () => {
+  await floatLoad();
+  const c = render(Float).container;
+  floatState().setMode("pill", { edge: "right", up: false, maxW: 1400, maxH: 900 });
+  await settle();
+  served = { title: "Needs you", items: [item(1), item(2)] };
+  await floatLoad();
+  await settle();
+  expect(floatState().mode).toBe("peek");
+  const card = flyout(c)!;
+  await fireEvent.pointerEnter(card);
+  expect(card.hasAttribute("data-hover")).toBe(true);
+  await fireEvent.click(card);
+  expect([floatState().mode, floatState().current, floatState().pinned]).toEqual(["panel", 1, false]);
+  expect(flyout(c)).toBeNull();
+});
+
+test("undocked, a peek shows in the pill and draws no card beside it", async () => {
+  await floatLoad();
+  const c = render(Float).container;
+  floatState().setMode("peek");
+  await settle();
+  expect(pill(c).querySelector(".fl-peek")!.textContent).toBe("step · Review it");
+  expect(flyout(c)).toBeNull();
 });

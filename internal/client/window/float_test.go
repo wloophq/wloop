@@ -256,6 +256,19 @@ func TestTheFloatStartsDockedRight(t *testing.T) {
 	})
 }
 
+// A peek beside a tab docked on the right grows the frame leftward, keeping
+// the tab flush with the screen's edge, and its end shrinks it back.
+func TestAPeekBesideARightTabGrowsTheFrameLeftward(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := memDefaults{}
+		SavePlacement(d, FloatPlacement{Edge: EdgeRight, Corner: CornerTopRight, X: 1512, Y: 200, W: 34, H: 84})
+		r := shownRig(t, d, laptop)
+		r.host.handlers().OnFloat(FloatMessage{Kind: FloatSize, W: 400, H: 84, Mode: ModePeek})
+		r.host.handlers().OnFloat(size(34, 84))
+		want(t, r.host.taken(), "float-frame {1112 200 400 84}", "float-frame {1478 200 34 84}")
+	})
+}
+
 // Unplugging the screen the pill sits on brings it back on the main screen;
 // plugging it back returns the pill where the person left it. Each time the
 // page learns where it sits and the size of the screen that now holds it.
