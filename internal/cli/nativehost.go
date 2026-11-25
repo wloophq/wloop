@@ -69,12 +69,15 @@ func rewordOf(host window.Host) func(*texts.Catalog) {
 }
 
 // windowShow starts the window controller on host until ctx ends, in wg, and
-// returns how the menu bar shows a route in the window; nil without a host.
-func windowShow(ctx context.Context, wg *sync.WaitGroup, host window.Host, daemon window.Events, cockpit func(string) (string, error), win config.Window, logf func(string, ...any)) func(string) error {
+// returns how the menu bar shows a route in the window and shows the floating
+// widget; nil without a host. A host that keeps user defaults keeps the
+// widget's placement in them.
+func windowShow(ctx context.Context, wg *sync.WaitGroup, host window.Host, daemon window.Events, cockpit func(string) (string, error), win config.Window, logf func(string, ...any)) (show func(string) error, showFloat func() error) {
 	if host == nil {
-		return nil
+		return nil, nil
 	}
-	ctl := window.New(window.Config{Host: host, Daemon: daemon, CockpitURL: cockpit, Hotkey: win.Hotkey, Log: logf})
+	defaults, _ := host.(window.Defaults)
+	ctl := window.New(window.Config{Host: host, Daemon: daemon, CockpitURL: cockpit, Hotkey: win.Hotkey, Log: logf, Defaults: defaults})
 	wg.Go(func() { _ = ctl.Run(ctx) })
-	return ctl.Show
+	return ctl.Show, ctl.ShowFloat
 }

@@ -1,5 +1,5 @@
-// Package window decides when and where the cockpit's native window and its
-// omnibox panel show; a Host draws them.
+// Package window decides when and where the cockpit's native window, its
+// omnibox panel and the floating widget show; a Host draws them.
 package window
 
 import (
@@ -38,6 +38,12 @@ type Host interface {
 	ShowDetached(id, url string)
 	// OpenExternal opens url, a web address, in the default browser.
 	OpenExternal(url string)
+	// ShowFloat shows the floating widget at url on every space, without
+	// activating the app or taking the keyboard.
+	ShowFloat(url string)
+	HideFloat()
+	// SetFloatFrame moves and sizes the floating widget to r.
+	SetFloatFrame(r Rect)
 	// Listen binds the hotkey, the reopen and opened links; an error leaves
 	// the reopen and the links bound.
 	Listen(h Handlers) error
@@ -56,6 +62,15 @@ type Handlers struct {
 	OnPanelHidden func()
 	// OnOpenURL runs for each deep link the system hands the app.
 	OnOpenURL func(link string)
+	// OnFloat runs for each message the float's page sends.
+	OnFloat func(m FloatMessage)
+	// OnFloatMoved runs with the float's frame once the person moved it.
+	OnFloatMoved func(frame Rect)
+	// OnScreens runs with the screens' visible frames, the main screen
+	// first, when the host starts listening and whenever they change.
+	OnScreens func(screens []Rect)
+	// FloatOverFullScreen lets the float show over a full-screen app.
+	FloatOverFullScreen bool
 }
 
 // Events is the daemon's events stream.
@@ -72,13 +87,25 @@ type Config struct {
 	Log        func(format string, args ...any)
 	// After is time.After unless a test supplies its own.
 	After func(time.Duration) <-chan time.Time
+	// Defaults keeps the float's placement across launches; nil keeps it
+	// for this run only.
+	Defaults            Defaults
+	FloatOverFullScreen bool
 }
 
-// Controller keeps one main window and one panel.
+// Controller keeps one main window, one panel and the floating widget.
 type Controller struct {
 	cfg        Config
 	mu         sync.Mutex
 	panelShown bool
+
+	floatShown bool
+	// placement is where the float goes once placed, its saved placement or
+	// the default one on the first screens known.
+	placement FloatPlacement
+	placed    bool
+	screens   []Rect
+	floatHide func(mode string)
 }
 
 // New returns a controller of cfg.Host.
@@ -89,7 +116,11 @@ func New(cfg Config) *Controller {
 	if cfg.After == nil {
 		cfg.After = time.After
 	}
-	return &Controller{cfg: cfg}
+	c := &Controller{cfg: cfg}
+	if cfg.Defaults != nil {
+		c.placement, c.placed = LoadPlacement(cfg.Defaults)
+	}
+	return c
 }
 
 // Run binds the host's handlers, then follows the window requests the daemon
@@ -102,6 +133,11 @@ func (c *Controller) Run(ctx context.Context) error {
 		OnReopen:      func() { _ = c.Show("") },
 		OnPanelHidden: func() { c.setPanel(false) },
 		OnOpenURL:     c.OpenLink,
+		OnFloat:       c.floatMessage,
+		OnFloatMoved:  c.floatMoved,
+		OnScreens:     c.setScreens,
+
+		FloatOverFullScreen: c.cfg.FloatOverFullScreen,
 	})
 	if err != nil {
 		c.cfg.Log("window.hotkey %q: %v", c.cfg.Hotkey, err)
