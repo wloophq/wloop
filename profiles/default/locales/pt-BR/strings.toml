@@ -810,7 +810,12 @@
 "All clear" = "Tudo em dia"
 "The loop brings the next thing here." = "O loop traz a próxima coisa para cá."
 "Open in the cockpit" = "Abrir no cockpit"
-"Post {what}" = "Publicar {what}"
+"Could not read the queue." = "Não foi possível ler a fila."
+"Queue unavailable" = "Fila indisponível"
+"Hide until something new" = "Ocultar até chegar algo novo"
+"Hide for 1 hour" = "Ocultar por 1 hora"
+"Hide until tomorrow" = "Ocultar até amanhã"
+"{file}:{line}" = "{file}:{line}"
 "More" = "Mais"
 "Less" = "Menos"
 

@@ -132,12 +132,15 @@ type DraftField struct {
 	Options  []DraftOption `json:"options,omitempty"`
 	// Markdown says Value is Markdown, which the card renders as it renders the draft's text.
 	Markdown bool `json:"markdown,omitempty"`
+	// Tone is the design token the plugin draws Value in, "" for none.
+	Tone string `json:"tone,omitempty"`
 }
 
 // DraftOption is a value an editable field takes, with its word.
 type DraftOption struct {
 	Value string `json:"value"`
 	Label string `json:"label"`
+	Tone  string `json:"tone,omitempty"`
 }
 
 // OutboxPage is the Outbox's drafts, in the order of its view's sort, with the draft facets a lens over them reads.

@@ -46,23 +46,25 @@ func (s *Server) liveTurns(ctx context.Context, byUnit map[unit.Unit][]turn.Turn
 	reg := s.loaded().Registry
 	for u, ts := range byUnit {
 		for _, t := range ts {
-			if d, ok := reg.Get(dintent.Name(t.Intent)); ok && !d.Reports {
+			d, ok := reg.Get(dintent.Name(t.Intent))
+			if ok && !d.Reports {
 				continue
 			}
+			label := cmp.Or(d.Label, string(t.Intent))
 			unitOf[t.Seq] = u
 			from := cmp.Or(t.StartedAt, t.SentAt)
 			switch {
 			case t.State == turn.Asked:
 				out.Asked++
 			case t.State == turn.Sent || t.State == turn.Started:
-				out.Running = append(out.Running, liveTurnOf(u, t, from))
+				out.Running = append(out.Running, liveTurnOf(u, t, from, label))
 			case t.State == turn.Withdrawn || t.State == turn.Replaced || t.EndedAt.IsZero():
 			default:
 				if !t.EndedAt.Before(usualSince) {
 					spans[string(t.Intent)] = append(spans[string(t.Intent)], t.EndedAt.Sub(from))
 				}
 				if t.State != turn.Dismissed && !t.EndedAt.Before(midnight) {
-					out.Done = append(out.Done, liveTurnOf(u, t, from))
+					out.Done = append(out.Done, liveTurnOf(u, t, from, label))
 				}
 			}
 		}
@@ -78,8 +80,8 @@ func (s *Server) liveTurns(ctx context.Context, byUnit map[unit.Unit][]turn.Turn
 	return out
 }
 
-func liveTurnOf(u unit.Unit, t turn.Turn, from time.Time) api.LiveTurn {
-	lt := api.LiveTurn{Seq: t.Seq, Intent: string(t.Intent), Unit: u.String(), Started: from, Ended: t.EndedAt}
+func liveTurnOf(u unit.Unit, t turn.Turn, from time.Time, label string) api.LiveTurn {
+	lt := api.LiveTurn{Seq: t.Seq, Intent: string(t.Intent), Label: label, Unit: u.String(), Started: from, Ended: t.EndedAt}
 	if !t.EndedAt.IsZero() {
 		lt.DurationMS = t.EndedAt.Sub(from).Milliseconds()
 	}

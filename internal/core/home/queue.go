@@ -26,12 +26,15 @@ type Queue struct {
 }
 
 // Item is one decision: a task's open gate (Found.Gate), or a state of one of its units (Found.Unit, with
-// Situation how the unit's situation reads).
+// Situation how the unit's situation reads). Word is what one such decision is, as the counters word it, and
+// Tone its kind's.
 type Item struct {
 	Task      task.Task
 	Found     decision.Found
 	Situation string
 	Primary   Action
+	Word      string
+	Tone      string
 }
 
 // Action is an item's primary action.
@@ -101,7 +104,7 @@ func (s Service) decisions(ctx context.Context, k decision.Kind, ts []task.Task)
 }
 
 func (s Service) item(kw KindWords, e task.Task, f decision.Found) Item {
-	it := Item{Task: e, Found: f}
+	it := Item{Task: e, Found: f, Word: s.noun(f.Unit.Provider, kw.Noun).For(s.Words.Form(1)), Tone: kw.Tone}
 	if f.Gate != nil {
 		it.Primary = Action{Kind: ActionGate, ID: primaryIntent(kw.Primary, f.Gate.Intents)}
 		return it

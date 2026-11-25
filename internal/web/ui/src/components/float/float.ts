@@ -13,6 +13,9 @@ import { queueDeps, queueDraft, queueDraftOf, queueUnit } from "../screens/queue
 // FLOAT_BRIDGE is the window property the host calls: the brand's command followed by Float.
 export const FLOAT_BRIDGE = brand.command + "Float";
 
+// toneClass is the class that draws a thing in tone, a design token the daemon serves; "" for none.
+export const toneClass = (tone: unknown): string => (typeof tone === "string" && /^[a-z]+$/.test(tone) ? "tone-" + tone : "");
+
 export interface FloatBridge {
   setMode: (m: FloatMode, place?: Partial<FloatPlace>) => void;
 }
@@ -29,10 +32,53 @@ export function floatPost(message: J, win: J = window): void {
   if (h) h.postMessage(JSON.stringify(message));
 }
 
-// floatDrag hands a drag of the pill to the host, which moves the window as Wails moves any window it drags.
-export function floatDrag(win: J = window): void {
+const sent = { w: -1, h: -1, mode: "" };
+
+// floatSize tells the host the size of what the page draws, el, in mode; again only when it changed, unless force.
+export function floatSize(el: Element | undefined | null, mode: FloatMode, force = false): void {
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  const w = Math.ceil(r.width);
+  const h = Math.ceil(r.height);
+  if (!force && w === sent.w && h === sent.h && mode === sent.mode) return;
+  Object.assign(sent, { w, h, mode });
+  floatDeps.post({ type: "float:size", w, h, mode });
+}
+
+// resetFloatSize forgets the size last told; tests call it between cases.
+export function resetFloatSize(): void {
+  Object.assign(sent, { w: -1, h: -1, mode: "" });
+}
+
+// floatDrag hands a drag of the pill to the host, which moves the window as Wails moves any window it drags, and
+// tells it the size again once the pointer is released, so it snaps and keeps the place where it dropped.
+export function floatDrag(dropped: () => void, win: J = window): void {
   const h = handlerOf(win);
-  if (h) h.postMessage("wails:drag");
+  if (!h) return;
+  h.postMessage("wails:drag");
+  const done = () => {
+    for (const type of ["pointerup", "mouseup"]) win.removeEventListener(type, done, true);
+    dropped();
+  };
+  for (const type of ["pointerup", "mouseup"]) win.addEventListener(type, done, true);
+}
+
+// keepRoutes hands every same-origin route a link in the page would follow to the cockpit's main window, so the
+// float window never leaves its own route.
+export function keepRoutes(doc: J): void {
+  doc.addEventListener(
+    "click",
+    (e: MouseEvent) => {
+      const t = e.target as Element | null;
+      const a = t && t.closest ? t.closest('a[href^="#"]') : null;
+      const href = a ? a.getAttribute("href") || "" : "";
+      if (!href) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      openRoute(href.replace(/^#/, ""));
+    },
+    true,
+  );
 }
 
 // installFloat exposes the bridge the host calls and wires the widget's ends.
@@ -119,6 +165,7 @@ export interface DraftComment extends Partial<Label> {
 
 export interface DraftSummary {
   verdict: string;
+  tone: string;
   comments: DraftComment[];
   tally: LabelCount[];
 }
@@ -134,8 +181,9 @@ export function draftSummary(d: J): DraftSummary {
     const leaves: J[] = (c.fields || []).filter((x: J) => !(x.fields || []).length);
     const body = leaves.find((x) => x.markdown) || leaves[leaves.length - 1];
     const text = body ? String(body.value || "") : "";
-    const at = leaves.filter((x) => x !== body).slice(0, 2).map((x) => x.shown || x.value).join(":");
+    const [file, line] = leaves.filter((x) => x !== body).map((x) => x.shown || x.value);
+    const at = line ? t("{file}:{line}", { file, line }) : file || "";
     return { at, body: text, ...(conventionalLabel(text) || {}) };
   });
-  return { verdict: verdict ? verdict.shown || verdict.value : "", comments, tally: tally(comments) };
+  return { verdict: verdict ? verdict.shown || verdict.value : "", tone: (verdict && verdict.tone) || "", comments, tally: tally(comments) };
 }

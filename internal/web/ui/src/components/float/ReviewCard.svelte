@@ -3,7 +3,7 @@
   import type { J } from "../../lib/util";
   import { optionOf, type FloatState } from "../../state/float.svelte";
   import { subjectOf } from "../gates/gates";
-  import { draftSummary, itemRef, itemTitle } from "./float";
+  import { draftSummary, itemRef, itemTitle, toneClass } from "./float";
 
   // A question whose options pin held drafts, drawn as one card: a tab per option, the recommended one selected
   // until the person picks another, the question, then the selected option's draft: its verdict, its comments
@@ -21,7 +21,6 @@
   const question = $derived(subjectOf(item.gate).text || item.gate.text || "");
   const p = $derived(item.primary || {});
   const others: J[] = $derived((item.gate.intents || []).filter((x: J) => x.id !== p.id && !x.answer));
-  const primaryLabel = $derived(summary && summary.verdict ? t("Post {what}", { what: summary.verdict }) : p.label || p.id);
 
   function choose(id: string): void {
     f.pick(item, id);
@@ -30,7 +29,7 @@
   }
 </script>
 
-<article class="fl-hand fl-review" aria-label={itemTitle(item)}>
+<article class={["fl-hand", "fl-review", toneClass(item.tone)]} aria-label={itemTitle(item)}>
   <header class="fl-card-head">
     <span class="fl-kind">{item.word || item.kind}</span>
     <span class="fl-ref">{itemRef(item)}</span>
@@ -49,7 +48,7 @@
   {#if draft && summary}
     {#if summary.verdict || summary.tally.length}
       <div class="fl-chips">
-        {#if summary.verdict}<span class="fl-chip">{summary.verdict}</span>{/if}
+        {#if summary.verdict}<span class={["fl-chip", "fl-verdict", toneClass(summary.tone)]}>{summary.verdict}</span>{/if}
         {#each summary.tally as g (g.label + g.blocking)}
           <span class={["fl-count-label", g.blocking && "blocking"]}>{fmtNumber(g.n)} {g.label}</span>
         {/each}
@@ -74,7 +73,7 @@
     {/if}
   {/if}
   <div class="fl-acts">
-    <button type="button" class="act primary" disabled={f.busy || undefined} onclick={() => f.act()}><kbd>↵</kbd> {primaryLabel}</button>
+    <button type="button" class="act primary" disabled={f.busy || undefined} onclick={() => f.act()}><kbd>↵</kbd> {p.label || p.id}</button>
     <button type="button" class="act" onclick={() => f.open()}>{t("Edit")}</button>
     {#each others as x (x.id)}<button type="button" class="act quiet" disabled={f.busy || undefined} onclick={() => f.act(x.id)}>{x.label}</button>{/each}
   </div>

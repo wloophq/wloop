@@ -66,5 +66,6 @@ var decisionsGrammar = slices.Concat([]Key{
 	{Path: "kinds.*.primary", In: SurfaceDecisions, Kind: KindText, Doc: "The gate intent a queue offers first on a gate of the kind; empty offers the gate's first."},
 	{Path: "kinds.*.queue", In: SurfaceDecisions, Kind: KindText, Localized: true, Required: true, Doc: "The title of the kind's queue. Required."},
 	{Path: "kinds.*.empty", In: SurfaceDecisions, Kind: KindText, Localized: true, Required: true, Doc: "What the kind's queue says when it holds nothing. Required."},
+	{Path: "kinds.*.tone", In: SurfaceDecisions, Kind: KindEnum, Values: tokenTones, Default: DefaultTone, Doc: "The design token the floating widget draws the kind's items in, such as \"late\" for plans."},
 }, pluralText(SurfaceDecisions, "kinds.*.noun", "What one of the kind's tasks is, which the briefing counts, such as \"question\"."),
 	pluralText(SurfaceDecisions, "kinds.*.clause", "The briefing's clause on the kind, `{counter}` where its count goes, such as \"the agent has {counter} for you\"."))

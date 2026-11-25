@@ -820,7 +820,12 @@
 "All clear" = "All clear"
 "The loop brings the next thing here." = "The loop brings the next thing here."
 "Open in the cockpit" = "Open in the cockpit"
-"Post {what}" = "Post {what}"
+"Could not read the queue." = "Could not read the queue."
+"Queue unavailable" = "Queue unavailable"
+"Hide until something new" = "Hide until something new"
+"Hide for 1 hour" = "Hide for 1 hour"
+"Hide until tomorrow" = "Hide until tomorrow"
+"{file}:{line}" = "{file}:{line}"
 "More" = "More"
 "Less" = "Less"
 

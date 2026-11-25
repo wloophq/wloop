@@ -965,21 +965,27 @@ html.float-page body { display: block; overflow: hidden; }
 .fl[data-edge="right"] { flex-direction: row-reverse; align-items: flex-start; }
 .fl-sp { flex: 1; }
 .fl-mark { display: inline-block; width: 3px; height: 14px; border-radius: var(--radius-xs); background: var(--me); flex: none; }
-.fl-dot { display: inline-block; width: 7px; height: 7px; border-radius: var(--radius-pill); background: var(--me); flex: none; }
+.fl .tone-me { --tone: var(--me); --tone-text: var(--me-text); }
+.fl .tone-loop { --tone: var(--loop); --tone-text: var(--loop-text); }
+.fl .tone-late { --tone: var(--late); --tone-text: var(--late); }
+.fl .tone-err { --tone: var(--err); --tone-text: var(--err); }
+.fl .tone-muted { --tone: var(--muted); --tone-text: var(--muted); }
+.fl-dot { display: inline-block; width: 7px; height: 7px; border-radius: var(--radius-pill); background: var(--tone, var(--me)); flex: none; }
 .fl-pill {
   display: inline-flex; align-items: center; gap: var(--space-10); height: 32px; padding: 0 var(--space-12); max-width: 420px;
   border-radius: 16px; border: 1px solid var(--rule); background: color-mix(in srgb, var(--panel) 88%, transparent);
   box-shadow: 0 6px 24px #0000002e; backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4);
   font: var(--text-meta) var(--mono); font-feature-settings: "tnum"; white-space: nowrap; cursor: pointer; user-select: none; touch-action: none;
 }
-.fl-pill.idle { opacity: 0.45; }
+.fl-pill.dot { height: auto; padding: var(--space-6); gap: 0; }
+.fl-pill.dot .fl-dot { width: 8px; height: 8px; }
 .fl-pill.offline { color: var(--muted); }
 .fl-count { display: inline-flex; align-items: center; gap: var(--space-6); font-weight: 700; color: var(--me-text); }
 .fl-running { display: inline-flex; align-items: center; gap: var(--space-4); color: var(--loop-text); }
 .fl-age { color: var(--faint); font: var(--text-meta) var(--mono); font-feature-settings: "tnum"; white-space: nowrap; }
 .fl-age.late { color: var(--late); background: var(--late-bg); padding: 0 var(--space-4); border-radius: var(--radius-sm); }
 .fl-peek { overflow: hidden; text-overflow: ellipsis; max-width: 300px; font-family: var(--sans); color: var(--ink); }
-.fl-peek b { color: var(--me-text); font-weight: 600; }
+.fl-peek b { color: var(--tone-text, var(--me-text)); font-weight: 600; }
 .fl[data-edge] .fl-pill { flex-direction: column; justify-content: center; width: 34px; height: auto; min-height: 84px; padding: var(--space-8) 0; gap: var(--space-6); }
 .fl[data-edge] .fl-pill .fl-mark { width: 14px; height: 3px; }
 .fl[data-edge] .fl-pill .fl-count, .fl[data-edge] .fl-pill .fl-running { flex-direction: column; }
@@ -998,6 +1004,10 @@ html.float-page body { display: block; overflow: hidden; }
 .fl-meta { font: var(--text-meta) var(--mono); color: var(--faint); font-feature-settings: "tnum"; }
 .fl-quiet, .fl-link { background: none; border: 0; padding: 0 var(--space-4); color: var(--muted); font-size: var(--text-overline); cursor: pointer; }
 .fl-quiet[aria-pressed="true"] { color: var(--me-text); }
+.fl-menu { position: relative; }
+.fl-menu-list { position: absolute; right: 0; top: 100%; z-index: 1; display: flex; flex-direction: column; min-width: 200px; padding: var(--space-4); background: var(--panel); border: 1px solid var(--rule); border-radius: var(--radius-md); }
+.fl-menu-list button { padding: var(--space-4) var(--space-8); background: none; border: 0; border-radius: var(--radius-sm); text-align: left; font-size: var(--text-meta); cursor: pointer; }
+.fl-menu-list button:hover { background: var(--hover); }
 .fl-link { display: block; margin: var(--space-2) 0; padding: 0; color: var(--me-text); }
 .fl-body { overflow-y: auto; min-height: 0; padding-bottom: var(--space-8); }
 .fl-off { margin: var(--space-16) var(--space-12); color: var(--muted); }
@@ -1016,9 +1026,9 @@ html.float-page body { display: block; overflow: hidden; }
 .fl-queue { list-style: none; margin: 0; padding: var(--space-4) 0; }
 .fl-line { display: grid; grid-template-columns: 8px 64px minmax(0, 1fr) auto; gap: var(--space-8); align-items: center; width: 100%; padding: var(--space-6) var(--space-12); background: none; border: 0; text-align: left; cursor: pointer; }
 .fl-line:hover { background: var(--hover); }
-.fl-kind { color: var(--me-text); font-size: var(--text-meta); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fl-kind { color: var(--tone-text, var(--me-text)); font-size: var(--text-meta); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fl-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-meta); }
-.fl-hand { margin: var(--space-4) var(--space-8); padding: var(--space-10) var(--space-12) var(--space-12); background: var(--raise); border: 1px solid var(--rule); border-radius: var(--radius-lg); box-shadow: inset var(--strip-card) 0 0 var(--me); }
+.fl-hand { margin: var(--space-4) var(--space-8); padding: var(--space-10) var(--space-12) var(--space-12); background: var(--raise); border: 1px solid var(--rule); border-radius: var(--radius-lg); box-shadow: inset var(--strip-card) 0 0 var(--tone, var(--me)); }
 .fl-card-head { display: flex; align-items: center; gap: var(--space-8); }
 .fl-ref { font: var(--text-meta) var(--mono); color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .fl-card-title { margin: var(--space-4) 0 var(--space-8); font-size: 14px; font-weight: 500; }
@@ -1037,7 +1047,10 @@ html.float-page body { display: block; overflow: hidden; }
 .fl-quote { margin: 0 0 var(--space-8); padding: 0 0 0 var(--space-8); border-left: 2px solid var(--rule); color: var(--muted); white-space: pre-wrap; }
 .fl-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-6); margin-bottom: var(--space-6); }
 .fl-chip { display: inline-block; padding: 0 var(--space-6); border-radius: var(--radius-pill); background: var(--hover); color: var(--muted); font-size: var(--text-overline); }
-.fl-chip.blocking { background: var(--err-bg); color: var(--err); }
+.fl-chip.blocking, .fl-verdict.tone-err { background: var(--err-bg); color: var(--err); }
+.fl-verdict.tone-loop { color: var(--loop-text); }
+.fl-verdict.tone-late { background: var(--late-bg); color: var(--late); }
+.fl-verdict.tone-me { background: var(--sel); color: var(--me-text); }
 .fl-count-label { font: var(--text-meta) var(--mono); color: var(--muted); font-feature-settings: "tnum"; }
 .fl-count-label.blocking { color: var(--err); }
 .fl-comments { list-style: none; margin: var(--space-6) 0 0; padding: 0; max-height: 200px; overflow-y: auto; border: 1px solid var(--rule); border-radius: var(--radius-md); }

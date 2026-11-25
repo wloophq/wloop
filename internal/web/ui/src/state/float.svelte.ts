@@ -1,5 +1,5 @@
 import type { J } from "../lib/util";
-import { getJSON } from "./api";
+import { APIError, getJSON } from "./api";
 import { state } from "./store.svelte";
 import { CONN_CLOSED, DEBOUNCE_MS, timer, type Follow } from "./sync.svelte";
 
@@ -8,15 +8,22 @@ import { CONN_CLOSED, DEBOUNCE_MS, timer, type Follow } from "./sync.svelte";
 
 export const FLOAT_QUEUE = "/api/queue";
 export const FLOAT_TURNS = "/api/turns/live";
-// FLOAT_PEEK_MS is how long a peek shows; FLOAT_FOCUS_MS how long the peeked item stays the one the panel opens
-// on, and how long after a peek no arrival peeks again, so a burst peeks once.
+// FLOAT_PEEK_MS is how long a peek shows; FLOAT_FOCUS_MS how long the peeked item stays the one the panel opens on.
 export const FLOAT_PEEK_MS = 4500;
 export const FLOAT_FOCUS_MS = 12000;
+// FLOAT_QUIET_MS is how long arrivals must stop before the next one peeks again, so a burst peeks once.
+export const FLOAT_QUIET_MS = 10000;
+// FLOAT_RETRY_MS is the first wait before a failed read is retried, doubling up to FLOAT_RETRY_MAX_MS.
+export const FLOAT_RETRY_MS = 2000;
+export const FLOAT_RETRY_MAX_MS = 60000;
 export const FLOAT_HOVER_OPEN_MS = 120;
 export const FLOAT_HOVER_CLOSE_MS = 400;
 
 export type FloatMode = "pill" | "panel" | "peek";
 export const FLOAT_MODES: readonly FloatMode[] = ["pill", "panel", "peek"];
+
+// FloatHide is how long the host hides the widget: until something new arrives, for an hour, or until tomorrow.
+export type FloatHide = "quiet" | "hour" | "tomorrow";
 
 // FloatPlace is where the host keeps the pill: docked on a side edge, which stands it upright and opens the panel
 // away from that edge, and whether the panel opens upward, as it does from the screen's bottom half.
@@ -33,6 +40,9 @@ export const floatDeps = {
   post: (_message: J): void => {},
 };
 
+// FloatRead is how the last read went: answered, the daemon unreachable, or the queue refused by a daemon that answers.
+export type FloatRead = "ok" | "offline" | "failed";
+
 const fresh = () => ({
   items: [] as J[],
   current: 0,
@@ -43,7 +53,7 @@ const fresh = () => ({
   peeked: null as J,
   pinned: false,
   place: { edge: "", up: false } as FloatPlace,
-  online: true,
+  read: "ok" as FloatRead,
   loaded: false,
   busy: false,
   picked: {} as Record<string, string>,
@@ -60,8 +70,9 @@ interface Reads {
 const marks = {
   seen: new Set<string>(),
   focus: "",
-  cooling: false,
-  timers: { peek: undefined as Timer, focus: undefined as Timer, cool: undefined as Timer, sync: undefined as Timer },
+  burst: false,
+  retries: 0,
+  timers: { peek: undefined as Timer, focus: undefined as Timer, quiet: undefined as Timer, sync: undefined as Timer, retry: undefined as Timer },
   queued: null as Reads | null,
   chain: Promise.resolve(),
 };
@@ -107,13 +118,15 @@ function peek(item: J): void {
   }, FLOAT_FOCUS_MS);
 }
 
-function peekArrival(item: J): void {
-  if (marks.cooling) return;
-  marks.cooling = true;
-  marks.timers.cool = timer.set(() => {
-    marks.cooling = false;
-  }, FLOAT_FOCUS_MS);
-  peek(item);
+// arrived peeks at item unless a burst is on; every arrival keeps the burst on until FLOAT_QUIET_MS pass without one.
+function arrived(item: J, collapsed: boolean): void {
+  const quiet = !marks.burst;
+  marks.burst = true;
+  timer.clear(marks.timers.quiet);
+  marks.timers.quiet = timer.set(() => {
+    marks.burst = false;
+  }, FLOAT_QUIET_MS);
+  if (quiet && collapsed) peek(item);
 }
 
 function applyQueue(q: J): void {
@@ -128,27 +141,40 @@ function applyQueue(q: J): void {
   marks.seen = new Set(keys);
   if (marks.focus && !marks.seen.has(marks.focus)) marks.focus = "";
   if (fl.peeked && !marks.seen.has(itemKey(fl.peeked))) endPeek();
-  if (arrivals.length && fl.mode !== "panel") peekArrival(arrivals[0]);
+  if (arrivals.length) arrived(arrivals[0], fl.mode !== "panel");
 }
 
-// offline forgets what the daemon served, so no count outlives it; what was seen stays, so a recovery peeks only
-// at what is new.
-function offline(): void {
-  Object.assign(fl, { online: false, items: [], current: 0, turns: null });
+// lose forgets what the daemon served, so no count outlives it; what was seen stays, so a recovery peeks only at
+// what is new.
+function lose(read: FloatRead): void {
+  Object.assign(fl, { read, items: [], current: 0, turns: null });
   endPeek();
 }
 
-async function read(what: Reads): Promise<void> {
+function retry(): void {
+  timer.clear(marks.timers.retry);
+  const wait = Math.min(FLOAT_RETRY_MAX_MS, FLOAT_RETRY_MS * 2 ** marks.retries++);
+  marks.timers.retry = timer.set(() => void floatLoad(), wait);
+}
+
+async function read(asked: Reads): Promise<void> {
+  const what = fl.read === "ok" ? asked : { queue: true, turns: true };
   const [q, tr] = await Promise.allSettled([what.queue ? getJSON(FLOAT_QUEUE) : null, what.turns ? getJSON(FLOAT_TURNS) : null]);
-  if (q.status === "rejected" || tr.status === "rejected") return offline();
-  fl.online = true;
+  if (q.status === "rejected" || tr.status === "rejected") {
+    const reason = q.status === "rejected" ? q.reason : (tr as PromiseRejectedResult).reason;
+    lose(reason instanceof APIError && reason.status > 0 ? "failed" : "offline");
+    return retry();
+  }
+  timer.clear(marks.timers.retry);
+  marks.retries = 0;
+  fl.read = "ok";
   if (what.queue) applyQueue(q.value);
   if (what.turns) fl.turns = tr.value;
 }
 
 // floatLoad reads what reads names, after every read already started.
 export function floatLoad(what: Reads = { queue: true, turns: true }): Promise<void> {
-  marks.chain = marks.chain.then(() => read(what)).catch(() => offline());
+  marks.chain = marks.chain.then(() => read(what)).catch(() => lose("offline"));
   return marks.chain;
 }
 
@@ -163,7 +189,8 @@ function schedule(what: Reads): void {
   }, DEBOUNCE_MS);
 }
 
-// floatChange reads one event of the stream: the queue moves with a gate or a task, the turns only when they say so.
+// floatChange reads one event of the stream: the queue moves with a gate or a task, the turns only when they say so;
+// after a failed read any event reads everything again.
 export function floatChange(e: { data: string }): void {
   let c: J;
   try {
@@ -171,15 +198,21 @@ export function floatChange(e: { data: string }): void {
   } catch {
     return schedule({ queue: true, turns: true });
   }
+  if (fl.read !== "ok") return schedule({ queue: true, turns: true });
   const what = { queue: !!(c.all || c.gates || c.counters), turns: !!(c.all || c.turns) };
   if (what.queue || what.turns) schedule(what);
 }
 
-// floatFollow is how the widget follows the event stream: a lost stream shows offline, a reopened one reads all.
+// floatFollow is how the widget follows the event stream: a stream that drops shows offline at once, and every
+// open while offline reads everything, which alone brings the widget back.
 export const floatFollow: Follow = {
   change: floatChange,
+  opened: () => {
+    if (fl.read !== "ok") schedule({ queue: true, turns: true });
+  },
   reopened: () => schedule({ queue: true, turns: true }),
-  lost: offline,
+  reconnecting: () => lose("offline"),
+  lost: () => lose("offline"),
 };
 
 function setPlace(p: Partial<FloatPlace> | undefined): void {
@@ -226,20 +259,25 @@ function pick(item: J, option: string): void {
 }
 
 // act runs the current item's primary: its gate's intent, with the selected option when it offers options, or any
-// other primary; then the queue reads again, so the item leaves. An item no longer served is never acted on.
+// other primary; then the queue reads again, so the item leaves. It waits for the reads under way first and sends
+// nothing when the item is no longer served.
 async function act(intent?: string): Promise<void> {
-  const item = fl.items[fl.current];
-  if (!item || fl.busy) return;
-  const p = item.primary || {};
-  const id = intent || p.id;
+  const at = fl.items[fl.current];
+  if (!at || fl.busy) return;
+  const key = itemKey(at);
   fl.busy = true;
   try {
-    if (item.gate && (p.kind === "gate" || intent)) await floatDeps.resolve(item, id, (item.options || []).length ? optionOf(item) : undefined);
+    await marks.chain;
+    const item = fl.items.find((it) => itemKey(it) === key);
+    if (!item) return;
+    const p = item.primary || {};
+    if (item.gate && (p.kind === "gate" || intent)) await floatDeps.resolve(item, intent || p.id, (item.options || []).length ? optionOf(item) : undefined);
     else await floatDeps.run(item);
+    if (!item.gate && p.kind !== "action") return;
   } finally {
     fl.busy = false;
   }
-  if (item.gate || p.kind === "action") await floatLoad({ queue: true, turns: false });
+  await floatLoad({ queue: true, turns: false });
 }
 
 // openRoute asks the host to show route in the cockpit's main window.
@@ -253,6 +291,12 @@ export const taskRoute = (id: string): string => (id ? "task=" + encodeURICompon
 function open(): void {
   const item = fl.items[fl.current];
   if (item && item.task) openRoute(taskRoute(item.task.id));
+}
+
+// hide asks the host to hide the widget for mode; the page collapses to the pill it comes back as.
+function hide(mode: FloatHide): void {
+  setMode("pill");
+  floatDeps.post({ type: "float:hide", mode });
 }
 
 function setPinned(on: boolean): void {
@@ -296,9 +340,12 @@ export function floatState() {
     get loaded(): boolean {
       return fl.loaded;
     },
-    // online is false once a read failed or the stream is lost, until the next read answers.
+    // read is "offline" while the daemon or its stream is down, "failed" while it answers but refuses a read.
+    get read(): FloatRead {
+      return fl.read === "ok" && (state.conn === "reconnecting" || state.conn === CONN_CLOSED) ? "offline" : fl.read;
+    },
     get online(): boolean {
-      return fl.online && state.conn !== "reconnecting" && state.conn !== CONN_CLOSED;
+      return this.read === "ok";
     },
     peek,
     setMode,
@@ -310,6 +357,7 @@ export function floatState() {
     pick,
     act,
     open,
+    hide,
   };
 }
 
@@ -318,7 +366,7 @@ export type FloatState = ReturnType<typeof floatState>;
 // resetFloat puts the widget back as the page starts; tests call it between cases.
 export function resetFloat(): void {
   for (const id of Object.values(marks.timers)) timer.clear(id);
-  Object.assign(marks, { seen: new Set<string>(), focus: "", cooling: false, queued: null, chain: Promise.resolve() });
-  marks.timers = { peek: undefined, focus: undefined, cool: undefined, sync: undefined };
+  Object.assign(marks, { seen: new Set<string>(), focus: "", burst: false, retries: 0, queued: null, chain: Promise.resolve() });
+  marks.timers = { peek: undefined, focus: undefined, quiet: undefined, sync: undefined, retry: undefined };
   Object.assign(fl, fresh());
 }

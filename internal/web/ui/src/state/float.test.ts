@@ -3,8 +3,10 @@ import type { J } from "../lib/util";
 import { floatResolve } from "../components/float/float";
 import { FakeDaemon } from "../testing/fakedaemon";
 import { resetStore } from "../testing/reset.svelte";
-import { FLOAT_PEEK_MS, floatChange, floatDeps, floatLoad, floatState, resetFloat } from "./float.svelte";
-import { DEBOUNCE_MS } from "./sync.svelte";
+import { Reply } from "../testing/fakedaemon";
+import { state } from "./store.svelte";
+import { FLOAT_PEEK_MS, FLOAT_QUIET_MS, FLOAT_RETRY_MS, floatChange, floatDeps, floatFollow, floatLoad, floatState, resetFloat } from "./float.svelte";
+import { connect, DEBOUNCE_MS, stream, type EventSourceLike } from "./sync.svelte";
 
 function gateItem(id: number, title: string): J {
   return {
@@ -141,4 +143,100 @@ test("a daemon that stops answering leaves no stale count", async () => {
   };
   await floatLoad();
   expect([f.online, f.items.length]).toEqual([false, 0]);
+});
+
+test("a trickle of arrivals for 30 s peeks once, and the next arrival after a quiet spell peeks again", async () => {
+  served = queue(gateItem(1, "Ana's retry change"));
+  await floatLoad();
+  const f = floatState();
+  const peeks: string[] = [];
+  let last = "";
+  for (let i = 2; i <= 16; i++) {
+    served = queue(...served.items, gateItem(i, "Arrival " + i));
+    await floatLoad();
+    const now = f.peeked ? f.peeked.task.id : "";
+    if (now && now !== last) peeks.push(now);
+    last = now;
+    await vi.advanceTimersByTimeAsync(2000);
+  }
+  expect(peeks).toEqual(["t-2"]);
+  await vi.advanceTimersByTimeAsync(FLOAT_QUIET_MS);
+  served = queue(...served.items, gateItem(40, "After the quiet"));
+  await floatLoad();
+  expect(f.peeked.task.id).toBe("t-40");
+});
+
+test("act waits for the read under way and sends nothing when it took the item away", async () => {
+  await floatLoad();
+  const f = floatState();
+  let answer: (v: J) => void = () => {};
+  daemon.pages["/api/queue"] = () => new Promise((r) => (answer = r));
+  const reading = floatLoad();
+  const acting = f.act();
+  await vi.waitFor(() => expect(daemon.urls.filter((u) => u === "/api/queue")).toHaveLength(2));
+  answer(queue(gateItem(2, "Bo's export fix"), gateItem(3, "Cy's docs pass")));
+  await reading;
+  await acting;
+  expect(posts()).toEqual([]);
+});
+
+test("a stream that drops shows offline at once, and only a read after it reopens brings the counts back", async () => {
+  const opened: EventSourceLike[] = [];
+  const saved = stream.open;
+  stream.open = () => {
+    const es = { onmessage: null, onopen: null, onerror: null, readyState: 1, close: () => {} } as EventSourceLike;
+    opened.push(es);
+    return es;
+  };
+  try {
+    await floatLoad();
+    connect(floatFollow);
+    const es = opened[0];
+    es.onopen!();
+    const f = floatState();
+    expect([f.online, f.items.length]).toEqual([true, 3]);
+    es.readyState = 0;
+    es.onerror!();
+    expect([f.online, f.read, f.items.length]).toEqual([false, "offline", 0]);
+    es.readyState = 1;
+    es.onopen!();
+    expect(state.conn).toBe("open");
+    expect(f.online).toBe(false);
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+    expect([f.online, f.items.length]).toEqual([true, 3]);
+  } finally {
+    stream.open = saved;
+  }
+});
+
+test("a queue the daemon refuses shows its own state and is read again on a backoff and on the next event", async () => {
+  await floatLoad();
+  const f = floatState();
+  daemon.pages["/api/queue"] = () => new Reply(503, { error: "busy" });
+  await floatLoad();
+  expect([f.read, f.items.length]).toEqual(["failed", 0]);
+  daemon.clear();
+  await vi.advanceTimersByTimeAsync(FLOAT_RETRY_MS);
+  expect(daemon.urls).toEqual(["/api/queue", "/api/turns/live"]);
+  expect(f.read).toBe("failed");
+  daemon.clear();
+  floatChange({ data: JSON.stringify({ type: "changed", health: true }) });
+  await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+  expect(daemon.urls).toEqual(["/api/queue", "/api/turns/live"]);
+  daemon.pages["/api/queue"] = () => structuredClone(served);
+  await vi.advanceTimersByTimeAsync(8 * FLOAT_RETRY_MS);
+  expect([f.read, f.items.length]).toEqual(["ok", 3]);
+});
+
+test("an open of the stream while the widget is offline reads everything", async () => {
+  daemon.pages["/api/queue"] = () => {
+    throw new Error("down");
+  };
+  await floatLoad();
+  daemon.pages["/api/queue"] = () => structuredClone(served);
+  daemon.clear();
+  floatFollow.opened!();
+  await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+  expect(daemon.urls.slice(0, 2)).toEqual(["/api/queue", "/api/turns/live"]);
+  expect(floatState().online).toBe(true);
 });

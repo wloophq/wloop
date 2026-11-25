@@ -13,13 +13,13 @@ test("a review draft reads as its verdict, its comments where they sit, and thei
   const d = reviewDraft();
   d.fields[1].fields[0].fields[3].value = "issue (blocking): return the error.";
   const s = draftSummary(d);
-  expect(s.verdict).toBe("Request changes");
+  expect([s.verdict, s.tone]).toEqual(["Request changes", ""]);
   expect(s.comments.map((c) => [c.at, c.label || "", !!c.blocking])).toEqual([["api/handler.go:42", "issue", true], ["api/retry.go:50", "", false]]);
   expect(s.tally).toEqual([{ label: "issue", blocking: true, n: 1 }]);
 });
 
 test("a draft with no payload reads as no verdict and no comments", () => {
-  expect(draftSummary({ text: "Thanks!" })).toEqual({ verdict: "", comments: [], tally: [] });
+  expect(draftSummary({ text: "Thanks!" })).toEqual({ verdict: "", tone: "", comments: [], tally: [] });
 });
 
 test("durations read in the figure's compact words, and progress stops at the usual", () => {

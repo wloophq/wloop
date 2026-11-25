@@ -2,9 +2,10 @@
   import { onMount } from "svelte";
   import { fmtNumber, t, tn } from "../../lib/i18n.svelte";
   import { typing } from "../../lib/util";
-  import { FLOAT_HOVER_CLOSE_MS, FLOAT_HOVER_OPEN_MS, floatDeps, floatState } from "../../state/float.svelte";
+  import { FLOAT_HOVER_CLOSE_MS, FLOAT_HOVER_OPEN_MS, floatState, type FloatHide } from "../../state/float.svelte";
   import { notice } from "../../state/store.svelte";
   import Agents from "./Agents.svelte";
+  import { floatSize } from "./float";
   import Pill from "./Pill.svelte";
   import Queue from "./Queue.svelte";
 
@@ -16,16 +17,24 @@
 
   let root: HTMLElement | undefined = $state();
   let hover: ReturnType<typeof setTimeout> | undefined;
-  const sent = { w: 0, h: 0 };
+  let menu = $state(false);
 
-  function report(): void {
-    if (!root) return;
-    const r = root.getBoundingClientRect();
-    const w = Math.ceil(r.width);
-    const h = Math.ceil(r.height);
-    if (w === sent.w && h === sent.h) return;
-    Object.assign(sent, { w, h });
-    floatDeps.post({ type: "float:size", w, h });
+  const HIDES: { mode: FloatHide; label: () => string }[] = [
+    { mode: "quiet", label: () => t("Hide until something new") },
+    { mode: "hour", label: () => t("Hide for 1 hour") },
+    { mode: "tomorrow", label: () => t("Hide until tomorrow") },
+  ];
+
+  const report = (force = false) => floatSize(root, f.mode, force);
+
+  $effect(() => {
+    void [f.mode, f.items.length, f.peeked, f.read, f.place.edge, f.place.up, menu, f.turns];
+    queueMicrotask(() => report());
+  });
+
+  function hide(mode: FloatHide): void {
+    menu = false;
+    f.hide(mode);
   }
 
   function later(fn: () => void, ms: number): void {
@@ -73,11 +82,11 @@
 
   onMount(() => {
     document.documentElement.classList.add("float-page");
-    const ro = new ResizeObserver(report);
-    if (root) ro.observe(root);
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => report());
+    if (ro && root) ro.observe(root);
     report();
     return () => {
-      ro.disconnect();
+      if (ro) ro.disconnect();
       clearTimeout(hover);
       document.documentElement.classList.remove("float-page");
     };
@@ -88,12 +97,13 @@
 
 <div
   class={["fl", open && "open", !f.online && "offline", f.place.up && "up"]}
+  data-mode={f.mode}
   data-edge={f.place.edge || undefined}
   bind:this={root}
   role="presentation"
   onpointerleave={leave}
 >
-  <Pill {f} onenter={enterPill} ontoggle={toggle} />
+  <Pill {f} onenter={enterPill} ontoggle={toggle} ondrop={() => report(true)} />
   {#if open}
     <section class="fl-panel" aria-label={f.title || undefined} onpointerenter={enterPanel}>
       <header class="fl-head">
@@ -102,10 +112,20 @@
         <span class="fl-sp"></span>
         {#if n}<span class="fl-meta">{t("{n} of {total}", { n: fmtNumber(f.current + 1), total: fmtNumber(n) })}</span>{/if}
         <button type="button" class="fl-quiet" aria-pressed={f.pinned ? "true" : "false"} onclick={() => f.setPinned(!f.pinned)}>{t("Pin")}</button>
+        <span class="fl-menu">
+          <button type="button" class="fl-quiet" aria-haspopup="menu" aria-expanded={menu ? "true" : "false"} aria-label={t("Hide")} onclick={() => (menu = !menu)}>⋯</button>
+          {#if menu}
+            <span class="fl-menu-list" role="menu">
+              {#each HIDES as h (h.mode)}<button type="button" role="menuitem" data-hide={h.mode} onclick={() => hide(h.mode)}>{h.label()}</button>{/each}
+            </span>
+          {/if}
+        </span>
       </header>
       <div class="fl-body">
-        {#if !f.online}
+        {#if f.read === "offline"}
           <p class="fl-off">{t("The daemon is not answering.")}</p>
+        {:else if f.read === "failed"}
+          <p class="fl-off">{t("Could not read the queue.")}</p>
         {:else}
           <Agents turns={f.turns} />
           <Queue {f} />

@@ -79,6 +79,8 @@ var uiGrammar = []Key{
 	{Path: "drafts.*.fields.*.markdown", In: SurfaceUI, Kind: KindBool, Default: "false", Doc: "The field's value is Markdown, such as an inline comment's body: the card renders it as it renders the draft's text."},
 	{Path: "drafts.*.fields.*.values", In: SurfaceUI, Kind: KindMap, Doc: "The words of the field's values, by value, such as an enum's; the card keeps the value itself in its tooltip."},
 	{Path: "drafts.*.fields.*.values.*", In: SurfaceUI, Localized: true, Kind: KindText, Doc: "The value's word."},
+	{Path: "drafts.*.fields.*.tones", In: SurfaceUI, Kind: KindMap, Doc: "The design token each of the field's values is drawn in, by value, such as a review verdict's chip."},
+	{Path: "drafts.*.fields.*.tones.*", In: SurfaceUI, Kind: KindEnum, Values: tokenTones, Doc: "The value's tone."},
 	{Path: "detail", In: SurfaceUI, Kind: KindTable, Doc: "How a field of the plugin's unit detail shows, by field."},
 	{Path: "detail.*", In: SurfaceUI, Kind: KindTable, Doc: "One field's words."},
 	{Path: "detail.*.label", In: SurfaceUI, Localized: true, Kind: KindText, Required: true, Doc: "The field's name. Required."},

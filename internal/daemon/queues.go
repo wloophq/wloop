@@ -102,7 +102,7 @@ func (s *Server) queueItems(ctx context.Context, g *coretasks.Service, its []hom
 		if err != nil {
 			return nil, err
 		}
-		qi := api.QueueItem{Kind: string(it.Found.Kind), Word: l.Decisions.Kinds[it.Found.Kind].Noun.For(l.Locale, 1), Since: it.Found.Since, Task: v, Primary: api.QueueAction{Kind: it.Primary.Kind, ID: it.Primary.ID, Label: primaryLabel(l, it)}}
+		qi := api.QueueItem{Kind: string(it.Found.Kind), Word: it.Word, Tone: it.Tone, Since: it.Found.Since, Task: v, Primary: api.QueueAction{Kind: it.Primary.Kind, ID: it.Primary.ID, Label: primaryLabel(l, it)}}
 		if g := it.Found.Gate; g != nil {
 			gv := s.gateView(ctx, *g, byUnit)
 			qi.Gate = &gv

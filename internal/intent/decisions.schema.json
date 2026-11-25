@@ -117,6 +117,18 @@
             "description": "The title of the kind's queue. Required.",
             "type": "string"
           },
+          "tone": {
+            "default": "me",
+            "description": "The design token the floating widget draws the kind's items in, such as \"late\" for plans.",
+            "enum": [
+              "me",
+              "loop",
+              "late",
+              "err",
+              "muted"
+            ],
+            "type": "string"
+          },
           "view": {
             "description": "The view of views.toml that lists the kind's tasks, which its queue walks. Required.",
             "type": "string"

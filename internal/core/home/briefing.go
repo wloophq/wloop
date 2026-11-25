@@ -127,11 +127,7 @@ func (s Service) count(ctx context.Context, p Profile, c Counter, ts []task.Task
 		kw := s.Words.Kind(c.Kind)
 		noun, clause = noun.Or(kw.Noun), clause.Or(kw.Clause)
 		for _, sh := range shares {
-			pn := noun
-			if sh.Plugin != "" {
-				pn = s.Words.Plugin(sh.Plugin).Noun.Or(noun)
-			}
-			out.Nouns = append(out.Nouns, PluginNoun{Plugin: sh.Plugin, N: sh.N, Noun: pn.For(s.Words.Form(sh.N))})
+			out.Nouns = append(out.Nouns, PluginNoun{Plugin: sh.Plugin, N: sh.N, Noun: s.noun(sh.Plugin, noun).For(s.Words.Form(sh.N))})
 		}
 		switch {
 		case len(shares) == 1 && shares[0].Plugin != "":
@@ -149,6 +145,14 @@ func (s Service) count(ctx context.Context, p Profile, c Counter, ts []task.Task
 		out.Label = p.countText(n, noun.For(form))
 	}
 	return out, clause.For(form), nil
+}
+
+// noun is plugin's noun for its units, else noun; noun for decisions of no unit.
+func (s Service) noun(plugin unit.ProviderID, noun Forms) Forms {
+	if plugin == "" {
+		return noun
+	}
+	return s.Words.Plugin(plugin).Noun.Or(noun)
 }
 
 // share is a plugin's decisions among a kind's; "" holds those of no unit.

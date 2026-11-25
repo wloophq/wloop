@@ -2,7 +2,7 @@ import { mount } from "svelte";
 import App from "./App.svelte";
 import { pluginKeyDown } from "./components/chrome/plugins.svelte";
 import Float from "./components/float/Float.svelte";
-import { installFloat } from "./components/float/float";
+import { installFloat, keepRoutes } from "./components/float/float";
 import { explore } from "./components/chrome/explore";
 import { keyHooks } from "./components/keys/appEnv";
 import PanelOmnibox from "./components/overlay/PanelOmnibox.svelte";
@@ -58,6 +58,7 @@ function followRoute(win: Window): void {
 function startFloat(win: Window, doc: Document): void {
   installFloat(win);
   installExternalLinks(doc, win, postWindow);
+  keepRoutes(doc);
   scheduler.load = () => void floatLoad({ queue: true, turns: false });
   startClock();
   wire();

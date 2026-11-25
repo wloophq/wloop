@@ -33,7 +33,7 @@
 </script>
 
 {#snippet what(r: J)}
-  <span class="fl-what"><b>{r.intent}</b>{[r.unit, r.title].filter(Boolean).map((s) => " · " + s).join("")}</span>
+  <span class="fl-what"><b>{r.label || r.intent}</b>{[r.unit, r.title].filter(Boolean).map((s) => " · " + s).join("")}</span>
 {/snippet}
 
 {#if running.length || done.length || asked}

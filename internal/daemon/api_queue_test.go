@@ -352,7 +352,7 @@ func TestQueueItemCarriesItsKindWordAndSince(t *testing.T) {
 	if len(got.Items) != 1 {
 		t.Fatalf("items %+v, want the plan", got.Items)
 	}
-	if it := got.Items[0]; it.Word != "plan" || !it.Since.Equal(g.OpenedAt) {
-		t.Fatalf("item word %q since %v, want the kind's noun %q and the gate's opening %v", it.Word, it.Since, "plan", g.OpenedAt)
+	if it := got.Items[0]; it.Word != "plan" || !it.Since.Equal(g.OpenedAt) || it.Tone != "late" {
+		t.Fatalf("item word %q since %v tone %q, want the kind's noun %q, the gate's opening %v and the kind's tone late", it.Word, it.Since, it.Tone, "plan", g.OpenedAt)
 	}
 }

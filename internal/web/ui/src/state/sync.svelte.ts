@@ -158,11 +158,13 @@ const conn = { retries: 0, opened: false };
 // CONN_CLOSED is the stream's state once it is lost, until a reconnect opens it.
 export const CONN_CLOSED = "closed";
 
-// Follow is what a page does with the stream: read a change, catch up after a reconnect, and read everything
-// once the stream is lost.
+// Follow is what a page does with the stream: read a change, see it open (again, after a reconnect), see it
+// drop while the browser retries, and see it lost.
 export interface Follow {
   change: (e: { data: string }) => void;
+  opened?: () => void;
   reopened: () => void;
+  reconnecting?: () => void;
   lost: () => void;
 }
 
@@ -184,12 +186,14 @@ export function connect(follow: Follow = page): void {
     conn.retries = 0;
     state.conn = "open";
     state.authLost = false;
+    if (follow.opened) follow.opened();
     if (conn.opened) follow.reopened();
     conn.opened = true;
   };
   es.onerror = () => {
     if (es.readyState !== stream.CLOSED) {
       state.conn = "reconnecting";
+      if (follow.reconnecting) follow.reconnecting();
       return;
     }
     es.close();

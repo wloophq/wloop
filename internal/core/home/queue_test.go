@@ -126,3 +126,24 @@ func TestHomeCounterCountsTheDecisionsItsQueueLists(t *testing.T) {
 		t.Fatalf("label %q: each plugin's share counts its decisions", c.Label)
 	}
 }
+
+func TestQueueItemWordsItsNounAsTheCountersDoAndCarriesItsKindsTone(t *testing.T) {
+	w := words()
+	lw := w.kinds[decision.LastStep]
+	lw.Tone = "late"
+	w.kinds[decision.LastStep] = lw
+	d := fakeDecisions{
+		"t-a": {{Kind: decision.LastStep, Unit: unit.Unit{Provider: "alpha", Key: "x"}, Since: t0}},
+		"t-b": {{Kind: decision.LastStep, Unit: unit.Unit{Provider: "gamma", Key: "y"}, Since: t0.Add(time.Hour)}},
+		"t-c": {{Kind: decision.LastStep, Gate: &gate.Gate{ID: 4, Intents: []string{"done"}}, Since: t0.Add(2 * time.Hour)}},
+	}
+	s := home.Service{Lists: &fakeLists{sets: map[task.View][]task.Task{"decide-last-step": {{ID: "t-a"}, {ID: "t-b"}, {ID: "t-c"}}}}, Decisions: d, Words: w}
+	q, _ := s.Queue(context.Background(), decision.LastStep, nil)
+	var got []string
+	for _, it := range q.Items {
+		got = append(got, it.Word+"/"+it.Tone)
+	}
+	if want := []string{"alpha item/late", "item/late", "item/late"}; !slices.Equal(got, want) {
+		t.Fatalf("words %v, want %v: a plugin's noun for its units, the kind's for the rest", got, want)
+	}
+}

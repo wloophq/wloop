@@ -5,7 +5,7 @@
   import DraftCard from "../gates/DraftCard.svelte";
   import GateCard from "../gates/GateCard.svelte";
   import { queueDraft, queueDraftOf } from "../screens/queue";
-  import { itemRef, itemTitle } from "./float";
+  import { itemRef, itemTitle, toneClass } from "./float";
 
   // The current item drawn whole: its kind, unit and age, its title, then its gate's own card, which offers the
   // gate's intents, or, for a unit's situation, what it is and the item's primary action.
@@ -14,7 +14,7 @@
   const p = $derived(item.primary || {});
 </script>
 
-<article class="fl-hand" aria-label={itemTitle(item)}>
+<article class={["fl-hand", toneClass(item.tone)]} aria-label={itemTitle(item)}>
   <header class="fl-card-head">
     <span class="fl-kind">{item.word || item.kind}</span>
     <span class="fl-ref">{itemRef(item)}</span>

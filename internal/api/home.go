@@ -82,8 +82,10 @@ type Queue struct {
 // QueueItem is one decision of kind Kind: a task's open gate, or a situation of one of its units.
 type QueueItem struct {
 	Kind string `json:"kind"`
-	// Word is the kind's noun for one item, as decisions.toml words it; Since is when the decision began.
+	// Word is what one such decision is, as the home's counters word it (a plugin's noun for its units); Tone is
+	// the design token decisions.toml draws the kind in; Since is when the decision began.
 	Word      string          `json:"word,omitempty"`
+	Tone      string          `json:"tone,omitempty"`
 	Since     time.Time       `json:"since,omitzero"`
 	Task      TaskView        `json:"task"`
 	Gate      *GateView       `json:"gate,omitempty"`

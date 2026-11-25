@@ -2,7 +2,8 @@
 # decision kind its gate kind maps to; each plugin's layer maps the
 # situations and link signals of its units the same way in its own
 # decisions.toml. Each kind names the view that lists its tasks, which its
-# queue walks, and the words the home's briefing and the queue use. A user
+# queue walks, the words the home's briefing and the queue use, and the
+# design token its items are drawn in (tone, "me" when unset). A user
 # profile's decisions.toml replaces the keys it sets.
 
 # What a queue's button that opens a unit at its source says.
@@ -36,6 +37,7 @@ noun   = { one = "plan", other = "plans" }
 clause = { one = "{counter} waits for your approval", other = "{counter} wait for your approval" }
 queue  = "Plans to approve"
 empty  = "No plan waits for your approval."
+tone   = "late"
 
 [kinds.send-draft]
 view   = "decide-send-draft"

@@ -6,7 +6,7 @@
   import { clock } from "../../state/clock.svelte";
   import { itemKey, type FloatState } from "../../state/float.svelte";
   import Card from "./Card.svelte";
-  import { itemRef, itemTitle, LATE_MS, sinceMS } from "./float";
+  import { itemRef, itemTitle, LATE_MS, sinceMS, toneClass } from "./float";
   import ReviewCard from "./ReviewCard.svelte";
 
   // The queue in the daemon's order: the current item drawn whole in place, every other one a line. Moving keeps
@@ -51,7 +51,7 @@
         {#if i === f.current}
           {#if (it.options || []).length}<ReviewCard {f} item={it} age={ageOf(it)} late={late(it)} />{:else}<Card {f} item={it} age={ageOf(it)} late={late(it)} />{/if}
         {:else}
-          <button type="button" class="fl-line" onclick={() => f.select(i)}>
+          <button type="button" class={["fl-line", toneClass(it.tone)]} onclick={() => f.select(i)}>
             <i class="fl-dot" aria-hidden="true"></i>
             <span class="fl-kind">{it.word || it.kind}</span>
             <span class="fl-title">{[itemRef(it), itemTitle(it)].filter(Boolean).join(" · ")}</span>
