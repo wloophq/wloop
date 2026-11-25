@@ -281,3 +281,24 @@ func TestTheHostListensWithTheFullScreenSetting(t *testing.T) {
 		}
 	})
 }
+
+func TestTheFloatHotkeyReachesItsHook(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := &rig{host: &fakeHost{}, events: &fakeEvents{streams: []chan api.Change{make(chan api.Change)}, stop: make(chan struct{})}, logs: &logs{}}
+		r.ctl = New(Config{Host: r.host, Daemon: r.events, CockpitURL: cockpitURL, FloatHotkey: "ctrl+option+f"})
+		r.run(t)
+		synctest.Wait()
+		hs := r.host.handlers()
+		if hs.FloatHotkey != "ctrl+option+f" || hs.OnFloatHotkey == nil {
+			t.Fatalf("listened with float hotkey %q, handler set %v", hs.FloatHotkey, hs.OnFloatHotkey != nil)
+		}
+		hs.OnFloatHotkey()
+		pressed := 0
+		r.ctl.OnFloatHotkey(func() { pressed++ })
+		hs.OnFloatHotkey()
+		if pressed != 1 {
+			t.Fatalf("hook ran %d times, want 1", pressed)
+		}
+		want(t, r.host.taken())
+	})
+}

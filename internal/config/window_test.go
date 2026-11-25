@@ -7,14 +7,18 @@ import (
 )
 
 func TestConfigWindowDefaults(t *testing.T) {
-	if got := Defaults().Window; got != (Window{Enabled: true, Hotkey: "ctrl+option+space"}) {
+	def := Window{Enabled: true, Hotkey: "ctrl+option+space", Float: FloatOff, FloatHotkey: "ctrl+option+f"}
+	if got := Defaults().Window; got != def {
 		t.Fatalf("default %+v", got)
 	}
+	with := func(f func(*Window)) Window { w := def; f(&w); return w }
 	for raw, want := range map[string]Window{
-		``:                            {Enabled: true, Hotkey: "ctrl+option+space"},
-		`window = {hotkey = ""}`:      {Enabled: true, Hotkey: ""},
-		`window = {enabled = false}`:  {Enabled: false, Hotkey: "ctrl+option+space"},
-		`window = {hotkey = "cmd+k"}`: {Enabled: true, Hotkey: "cmd+k"},
+		``:                                  def,
+		`window = {hotkey = ""}`:            with(func(w *Window) { w.Hotkey = "" }),
+		`window = {enabled = false}`:        with(func(w *Window) { w.Enabled = false }),
+		`window = {hotkey = "cmd+k"}`:       with(func(w *Window) { w.Hotkey = "cmd+k" }),
+		`window = {float = "on"}`:           with(func(w *Window) { w.Float = FloatOn }),
+		`window = {float_hotkey = "cmd+j"}`: with(func(w *Window) { w.FloatHotkey = "cmd+j" }),
 	} {
 		path := filepath.Join(t.TempDir(), "config.toml")
 		if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
@@ -24,5 +28,15 @@ func TestConfigWindowDefaults(t *testing.T) {
 		if err != nil || c.Window != want {
 			t.Errorf("%s: %+v %v, want %+v", raw, c.Window, err, want)
 		}
+	}
+}
+
+func TestConfigWindowFloatIsOnOrOff(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(`window = {float = "yes"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadFile(path, tools()); err == nil {
+		t.Fatal("window.float = \"yes\" loaded")
 	}
 }

@@ -68,10 +68,14 @@ type Config struct {
 	// Window shows the cockpit's own window at a route; nil opens the
 	// browser at CockpitURL instead.
 	Window func(route string) error
-	// Float shows the floating widget at launch through ShowFloat; off
-	// unless the configuration turns it on.
+	// Float turns the floating widget on, shown and hidden through
+	// ShowFloat and HideFloat; off unless the configuration turns it on.
 	Float     bool
 	ShowFloat func() error
+	HideFloat func()
+	// Defaults keeps the float's visibility across launches; nil keeps it
+	// for this run only.
+	Defaults window.Defaults
 	// Reword gets each catalog of client strings the daemon serves, as the
 	// strings change; nil rewords nothing.
 	Reword func(*texts.Catalog)
@@ -124,6 +128,19 @@ type Controller struct {
 	catalog atomic.Pointer[texts.Catalog]
 	// stringsStamp is the health's stamp of the strings catalog holds, under refreshMu.
 	stringsStamp string
+
+	// drawn says the last refresh drew the menu, under refreshMu.
+	drawn bool
+	// seen are the keys of the queue's items on its last read, nil before
+	// the first, under refreshMu.
+	seen map[string]bool
+
+	floatMu sync.Mutex
+	vis     Visibility
+	// wake stops the timer of the snooze, under floatMu.
+	wake chan struct{}
+	// bg are the goroutines the float starts, which Run waits on.
+	bg sync.WaitGroup
 }
 
 // words is the client strings the menu and the notes read.
@@ -199,13 +216,10 @@ func (c *Controller) Run(ctx context.Context) error {
 	c.mu.Lock()
 	c.ctx = ctx
 	c.mu.Unlock()
+	defer c.bg.Wait()
 	c.cfg.Notifier.WithdrawAll()
 	c.forgetSent()
-	if c.cfg.Float && c.cfg.ShowFloat != nil {
-		if err := c.cfg.ShowFloat(); err != nil {
-			c.cfg.Log("float: %v", err)
-		}
-	}
+	c.startFloat()
 	if c.cfg.DigestAt != "" {
 		go c.digests(ctx)
 	}
@@ -349,6 +363,7 @@ func (c *Controller) refresh(ctx context.Context, health, rows bool) {
 	if err == nil {
 		err = c.loadSpecs(ctx, shown)
 	}
+	c.drawn = err == nil
 	if err != nil {
 		if h, herr := c.cfg.Daemon.Health(ctx); herr == nil && h.Store != nil && h.Store.State != api.StoreOK {
 			c.cfg.Tray.SetTitle(c.words().T("{name} !", map[string]any{"name": brand.Name}))
@@ -363,6 +378,9 @@ func (c *Controller) refresh(ctx context.Context, health, rows bool) {
 			c.quitItem(),
 		})
 		return
+	}
+	if rows {
+		c.floatArrivals()
 	}
 	c.cfg.Tray.SetTitle(c.title())
 	c.cfg.Tray.SetMenu(c.menu(c.health))
@@ -494,6 +512,7 @@ func (c *Controller) menu(h api.Health) []MenuItem {
 		MenuItem{Title: w.T("Open cockpit", nil), Enabled: true, Action: c.later(func(ctx context.Context) error { return c.open(window.HomeRoute) })},
 		MenuItem{Title: w.T("Sweep now", nil), Enabled: true, Action: c.later(func(ctx context.Context) error { return c.cfg.Daemon.Trigger(ctx, "sweep") })},
 	)
+	items = append(items, c.floatItem()...)
 	pause := MenuItem{Title: w.T("Pause automatic rounds", nil), Enabled: true, Action: c.later(func(ctx context.Context) error { return c.cfg.Daemon.SetPause(ctx, api.PauseRequest{Paused: true}) })}
 	if h.Paused {
 		pause = MenuItem{Title: w.T("Resume automatic rounds", nil), Enabled: true, Action: c.later(func(ctx context.Context) error { return c.cfg.Daemon.SetPause(ctx, api.PauseRequest{Paused: false}) })}

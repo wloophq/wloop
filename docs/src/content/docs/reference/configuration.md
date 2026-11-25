@@ -221,6 +221,8 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `window` | table |  | The app's own window on macOS, which the app reads when it starts. |
 | `window.enabled` | bool | `true` | Show the cockpit in the app's own window on macOS; false opens it in the browser. |
 | `window.hotkey` | string | `ctrl+option+space` | The global shortcut that opens the omnibox panel, such as cmd+shift+space; empty for none. |
+| `window.float` | one of `on`, `off` | `off` | on shows the floating widget, which carries what waits on you; while it is on, Needs you banners do not post. Needs the app's own window. |
+| `window.float_hotkey` | string | `ctrl+option+f` | The global shortcut that hides the floating widget until something new arrives, and shows it again; empty for none. Only while window.float is on. |
 
 ### Units and tasks
 

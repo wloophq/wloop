@@ -255,6 +255,22 @@ func (c *Controller) OnFloatHide(fn func(mode string)) {
 	c.floatHide = fn
 }
 
+// OnFloatHotkey sets what the float's hotkey does; until set, nothing.
+func (c *Controller) OnFloatHotkey(fn func()) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.floatHotkey = fn
+}
+
+func (c *Controller) pressFloatHotkey() {
+	c.mu.Lock()
+	press := c.floatHotkey
+	c.mu.Unlock()
+	if press != nil {
+		press()
+	}
+}
+
 // placeFloat moves a shown float to its placement on the known screens; it
 // runs under c.mu.
 func (c *Controller) placeFloat() {

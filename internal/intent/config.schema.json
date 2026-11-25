@@ -902,6 +902,20 @@
           "description": "Show the cockpit in the app's own window on macOS; false opens it in the browser.",
           "type": "boolean"
         },
+        "float": {
+          "default": "off",
+          "description": "on shows the floating widget, which carries what waits on you; while it is on, Needs you banners do not post. Needs the app's own window.",
+          "enum": [
+            "on",
+            "off"
+          ],
+          "type": "string"
+        },
+        "float_hotkey": {
+          "default": "ctrl+option+f",
+          "description": "The global shortcut that hides the floating widget until something new arrives, and shows it again; empty for none. Only while window.float is on.",
+          "type": "string"
+        },
         "hotkey": {
           "default": "ctrl+option+space",
           "description": "The global shortcut that opens the omnibox panel, such as cmd+shift+space; empty for none.",

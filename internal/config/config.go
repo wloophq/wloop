@@ -180,11 +180,20 @@ type Notifications struct {
 
 // Window: Enabled shows the cockpit in the app's own window on macOS instead
 // of the browser; Hotkey is the global shortcut that opens the omnibox panel,
-// "" for none.
+// "" for none. Float turns the floating widget on, and FloatHotkey shows and
+// hides it.
 type Window struct {
-	Enabled bool   `json:"enabled"`
-	Hotkey  string `json:"hotkey"`
+	Enabled     bool   `json:"enabled"`
+	Hotkey      string `json:"hotkey"`
+	Float       string `json:"float"`
+	FloatHotkey string `json:"float_hotkey"`
 }
+
+// The values of window.float.
+const (
+	FloatOn  = "on"
+	FloatOff = "off"
+)
 
 // SinkConfig is one view sink's own settings.
 type SinkConfig struct {
@@ -467,7 +476,7 @@ func Defaults() Config {
 		Classify:      Classify{PerDay: 50},
 		Tasks:         Tasks{StaleWaitingDays: 2, CandidateWindow: Days(14 * 24 * time.Hour), CandidateCap: 5},
 		Notifications: Notifications{DigestAt: "09:00"},
-		Window:        Window{Enabled: true, Hotkey: "ctrl+option+space"},
+		Window:        Window{Enabled: true, Hotkey: "ctrl+option+space", Float: FloatOff, FloatHotkey: "ctrl+option+f"},
 		Drafts:        Drafts{RepeatAfter: Days(7 * 24 * time.Hour), StaleAfterDays: 20, IgnoredReactions: []string{"eyes"}},
 		Headless:      Headless{Tier: turns.TierBalanced, PerCallUSD: 0.5, PerDayUSD: 5},
 		Turns:         Turns{PerDay: 20, PerUnitPerDay: DefaultPRDailyCap, NoStartWait: Days(2 * time.Hour), BlindBlockWait: Days(24 * time.Hour)},

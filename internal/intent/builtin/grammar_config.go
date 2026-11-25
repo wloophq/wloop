@@ -173,6 +173,8 @@ var configGrammar = slices.Concat(
 		cfgKey("window", KindTable, "", "The app's own window on macOS, which the app reads when it starts."),
 		cfgKey("window.enabled", KindBool, "true", "Show the cockpit in the app's own window on macOS; false opens it in the browser."),
 		cfgKey("window.hotkey", KindText, "ctrl+option+space", "The global shortcut that opens the omnibox panel, such as cmd+shift+space; empty for none."),
+		cfgEnum("window.float", cfgValues("on", "off"), "off", "on shows the floating widget, which carries what waits on you; while it is on, Needs you banners do not post. Needs the app's own window."),
+		cfgKey("window.float_hotkey", KindText, "ctrl+option+f", "The global shortcut that hides the floating widget until something new arrives, and shows it again; empty for none. Only while window.float is on."),
 		retired(cfgKey("dossiers", KindTable, "", "Retired: the task dossiers are gone, and a config that still sets the table loads.")),
 		retired(cfgKey("dossiers.archive_after", KindDur, "", "Retired.")),
 		retired(cfgKey("dossiers.purge_after", KindDur, "", "Retired.")),
