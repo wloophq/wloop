@@ -106,6 +106,9 @@ var migrations = []migration{
 		`DROP TABLE dossier_moves`,
 		`ALTER TABLE tasks ADD COLUMN closed_at TEXT NOT NULL DEFAULT ''`,
 	)},
+	{to: 16, name: "turns_ended_at", compatible: 15, up: execAll(
+		`CREATE INDEX turns_ended_at ON turns(ended_at)`,
+	)},
 }
 
 // schemaSet is a schema and the migrations that reach it, so tests can run

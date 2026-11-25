@@ -61,7 +61,10 @@ const planInputs = port.TopicPlan | port.TopicPending | port.TopicConfig
 // a draft and its items, a message (whose writes note TopicTasks) or a pending plan item.
 const gateInputs = port.TopicGates | port.TopicDrafts | port.TopicItems | port.TopicTasks | port.TopicPlan | port.TopicPending
 
-const flagInputs = planInputs | gateInputs
+// turnInputs are the notes after which a change says the turns moved: a turn sent, started, asked, answered or ended.
+const turnInputs = port.TopicTurns
+
+const flagInputs = planInputs | gateInputs | turnInputs
 
 // bridged are the handlers whose verbs a task with units runs as its unit's action when no handler takes them.
 var bridged = []string{handlerApprove, handlerDelegate, handlerDrop}
@@ -1502,24 +1505,29 @@ func (s *Server) feedTasks(ctx context.Context) {
 }
 
 // publishTasks publishes the counters with the units c and the row changes since the last call moved, unless
-// nothing moved but rows no task holds, and says whether the plan and the gates moved by the topics of flags. A
+// nothing moved but rows no task holds, and says whether the plan, the gates and the turns moved by the topics of flags. A
 // reloaded profile moves every task, since it can change their facets.
 func (s *Server) publishTasks(ctx context.Context, c, flags port.Change) {
 	rows, all := s.moved.take()
 	var held []unit.Unit
 	var snap coretasks.Snapshot
 	err := errTasksUnavailable
-	if s.deps.Tasks == nil {
+	switch {
+	case s.deps.Tasks == nil:
 		all = false
-	} else if snap, err = s.deps.Tasks.Snapshot(ctx); err != nil {
-		s.logf("tasks feed: %v", err)
-		held = rows
-	} else {
-		held = snap.Held(rows)
+	case c.Empty() && !all && len(rows) == 0:
+		// only flags moved: nothing to list, so no pass over the tasks
+	default:
+		if snap, err = s.deps.Tasks.Snapshot(ctx); err != nil {
+			s.logf("tasks feed: %v", err)
+			held = rows
+		} else {
+			held = snap.Held(rows)
+		}
 	}
 	pos := s.hub.position()
 	ch := api.Change{Type: "changed", Epoch: pos.Epoch, Rev: pos.Rev,
-		Plan: flags.All || flags.Has(planInputs), Gates: flags.All || flags.Has(gateInputs)}
+		Plan: flags.All || flags.Has(planInputs), Gates: flags.All || flags.Has(gateInputs), Turns: flags.All || flags.Has(turnInputs)}
 	if !c.Empty() || all || len(held) > 0 {
 		ch.All = c.All || all || c.Has(port.TopicConfig)
 		if err == nil {
@@ -1530,7 +1538,7 @@ func (s *Server) publishTasks(ctx context.Context, c, flags port.Change) {
 			slices.SortFunc(units, api.CompareUnits)
 			ch.Units = slices.Compact(units)
 		}
-	} else if !ch.Plan && !ch.Gates {
+	} else if !ch.Plan && !ch.Gates && !ch.Turns {
 		return
 	}
 	s.hub.publish(ch)

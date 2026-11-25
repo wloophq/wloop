@@ -122,7 +122,7 @@ func TestHotPlans(t *testing.T) {
 // only constrains INSERT OR IGNORE.
 var indexesPlannedElsewhere = []string{
 	"events_unkeyed",
-	"turns_unit", "turns_turn_id", "turns_session", "turns_sent_to", "turns_open",
+	"turns_unit", "turns_turn_id", "turns_session", "turns_sent_to", "turns_open", "turns_ended_at",
 	"turn_records_once", "turn_records_unit", "turn_answers_unit", "turn_stops_session", "turn_stops_at", "intakes_open",
 	"session_handles_handle", "session_handles_open",
 	"plan_items_workflow",

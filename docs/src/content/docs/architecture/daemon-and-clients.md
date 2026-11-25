@@ -24,11 +24,12 @@ a task, gate, wake or draft ───┴─▶ change log ─┬─▶ read mode
                                            event ─▶ client ─▶ GET /api/tasks?since=…&units=…
 ```
 
-An event names the rest of what moved, and a client reads only that: `plan` after a note of what `GET /api/plan` serves (a plan item's served columns, which the ledger compares before and after each write, never its save time, and its measured gain only at the tenth of a MiB or GiB a client shows, so a sweep pass that rewrites the same items notes nothing; the pending items; a session's close, whose closed sessions the plan lists; a reloaded profile), `gates` after a note of a gate or of what one shows (a draft and its items, a message, a pending plan item), `health` when the health a client shows moved. These flags never move the rows' position. The plan shows its units' rows, so a client also reads it again when a row change names a unit the plan holds; a reconnection reads everything again. A `notify` event carries its notices and makes no client read anything.
+An event names the rest of what moved, and a client reads only that: `plan` after a note of what `GET /api/plan` serves (a plan item's served columns, which the ledger compares before and after each write, never its save time, and its measured gain only at the tenth of a MiB or GiB a client shows, so a sweep pass that rewrites the same items notes nothing; the pending items; a session's close, whose closed sessions the plan lists; a reloaded profile), `gates` after a note of a gate or of what one shows (a draft and its items, a message, a pending plan item), `turns` after any write to a turn's book, a turn's state, a record or an answer (`GET /api/turns/live`), which can be a write the route does not show, `health` when the health a client shows moved. These flags never move the rows' position. The plan shows its units' rows, so a client also reads it again when a row change names a unit the plan holds; a reconnection reads everything again. A `notify` event carries its notices and makes no client read anything.
 
 ```
 plan item, pending item, closed session, profile ─▶ plan  ─▶ GET /api/plan
 gate, draft, item, message, pending item         ─▶ gates ─▶ GET /api/gates
+a turn's state, record or answer written        ─▶ turns ─▶ GET /api/turns/live
 a burst of health notes, the menu bar, a recheck ─▶ digest moved? ─▶ health ─▶ GET /api/health
 ```
 
@@ -41,6 +42,8 @@ The home and the decision queues read the views the same way, in one pass over t
 The reads that start while the change log's generation holds share one pass, its tasks and the facts read of each, for at most two seconds: a screen's tasks, counters, home and queues, and the tasks feed's publish before them, read every task's facts once. A write that notes a change starts a new pass, a page whose position is newer than the shared pass lists from the store, and a fact a write does not note, or one that moves with the clock, is late by two seconds at most.
 
 A page of the rows names the version of `GET /api/catalog` (`catalog`), and a page of the tasks that of `GET /api/views` (`specs`); a client holding another version reads it again, so a reloaded profile reaches it. A reload also moves every task in the next change (`all`), since it can change their facets, so a paged view reads its tasks again.
+
+`GET /api/turns/live` serves the floating widget: the running turns (sent or started) with their start, the turns that ended since the viewer's local midnight (newest first, at most 20, as the daemon's clock reads the day), how many turns ask the user, and each intent's usual duration, the nearest-rank median (`api.QuantilesOf`, which the timings report uses too) of the turns that ended in the last 14 days, a dismissed one included. A turn of an intent whose manifest sets `reports = false` is in none of them, and a dismissed turn is not listed as done. A turn carries its task and title when a task holds its unit (an open task first), else its row's title.
 
 ## The API
 

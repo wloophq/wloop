@@ -142,6 +142,7 @@ func (s *Server) routes() []route {
 		{"DELETE " + api.UnitSkip, s.handleUnitUnskip},
 		{"POST " + api.DraftCloseSilently, s.handleDraftCloseSilently},
 		{"GET " + api.OutboxPath, s.handleOutbox},
+		{"GET " + api.TurnsLivePath, s.handleTurnsLive},
 
 		{"POST " + api.AgentTurnsStart, s.handleTurnStart},
 		{"POST " + api.AgentTurnsByHand, s.handleTurnByHand},

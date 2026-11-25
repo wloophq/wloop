@@ -670,6 +670,32 @@ func (s *Store) OpenTurns(ctx context.Context) (map[unit.Unit][]turn.Turn, error
 	return out, rows.Err()
 }
 
+var _ turns.Timeline = (*Store)(nil)
+
+const timelineSQL = `SELECT provider, unit_key, seq, intent, trigger, state, session, sent_at, started_at, ended_at FROM turns
+	WHERE ended_at >= ? OR state IN ('sent', 'started', 'asked')`
+
+// Timeline are the turns, with their times, that are open or ended at or after since.
+func (s *Store) Timeline(ctx context.Context, since time.Time) (map[unit.Unit][]turn.Turn, error) {
+	rows, err := s.db.R().QueryContext(ctx, timelineSQL, since.UTC().Format(event.TimeLayout))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[unit.Unit][]turn.Turn{}
+	for rows.Next() {
+		var u unit.Unit
+		var t turn.Turn
+		var sent, started, ended string
+		if err := rows.Scan(&u.Provider, &u.Key, &t.Seq, &t.Intent, &t.Trigger, &t.State, &t.Session, &sent, &started, &ended); err != nil {
+			return nil, err
+		}
+		t.SentAt, t.StartedAt, t.EndedAt = parseTime(sent), parseTime(started), parseTime(ended)
+		out[u] = append(out[u], t)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) WithTurns(ctx context.Context, i turn.Intent) ([]unit.Unit, error) {
 	return queryUnits(ctx, s.db.R(), `SELECT DISTINCT provider, unit_key FROM turns WHERE intent = ? AND state != ? ORDER BY provider, unit_key`, string(i), string(turn.Withdrawn))
 }

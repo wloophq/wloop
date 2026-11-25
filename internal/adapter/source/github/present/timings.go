@@ -20,22 +20,6 @@ import (
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
-// quantiles are the nearest-rank p50 and p90 of ds.
-func quantiles(ds []time.Duration) api.Quantiles {
-	q := api.Quantiles{Count: len(ds)}
-	if len(ds) == 0 {
-		return q
-	}
-	s := slices.Clone(ds)
-	slices.Sort(s)
-	rank := func(p float64) int64 {
-		n := int(p*float64(len(s)) + 0.999999999)
-		return s[min(max(n, 1), len(s))-1].Milliseconds()
-	}
-	q.P50MS, q.P90MS = rank(0.5), rank(0.9)
-	return q
-}
-
 // me is the viewer as a timings report knows them: the login and the
 // teams, as <org>/<slug>.
 type me struct {
@@ -204,7 +188,7 @@ func timings(d dinv.TimingsData, since, now time.Time, m me, reports func(intent
 		}
 	}
 	for key, ds := range spans {
-		rep.Milestones[key] = quantiles(ds)
+		rep.Milestones[key] = api.QuantilesOf(ds)
 	}
 	rep.Waiting = waiting(d, since, now, m)
 	rep.ChangeFailure = changeFailure(d, merged, now)
@@ -235,7 +219,7 @@ func timings(d dinv.TimingsData, since, now time.Time, m me, reports func(intent
 	turnSpans[api.TurnBriefWait] = briefWaits(d, counted)
 	for key, ds := range turnSpans {
 		if len(ds) > 0 {
-			rep.Turns[key] = quantiles(ds)
+			rep.Turns[key] = api.QuantilesOf(ds)
 		}
 	}
 	for _, u := range d.Tokens {
@@ -255,7 +239,7 @@ func timings(d dinv.TimingsData, since, now time.Time, m me, reports func(intent
 			waits = append(waits, i.StartingAt.Sub(i.AcceptedAt))
 		}
 	}
-	rep.Intakes = quantiles(waits)
+	rep.Intakes = api.QuantilesOf(waits)
 
 	var calls []time.Duration
 	dropped := map[string]int{}
@@ -282,7 +266,7 @@ func timings(d dinv.TimingsData, since, now time.Time, m me, reports func(intent
 			dropped[t]++
 		}
 	}
-	rep.Briefs.Call, rep.Briefs.Outages = quantiles(calls), d.Outages
+	rep.Briefs.Call, rep.Briefs.Outages = api.QuantilesOf(calls), d.Outages
 	for _, t := range slices.Sorted(maps.Keys(dropped)) {
 		rep.Dropped = append(rep.Dropped, fmt.Sprintf("%s (%d)", t, dropped[t]))
 	}

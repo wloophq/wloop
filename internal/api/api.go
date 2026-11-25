@@ -180,6 +180,7 @@ var Operations = []Operation{
 	{"DELETE", UnitSkip},
 	{"POST", DraftCloseSilently},
 	{"GET", OutboxPath},
+	{"GET", TurnsLivePath},
 
 	{"POST", AgentTurnsStart},
 	{"POST", AgentTurnsByHand},
