@@ -50,7 +50,7 @@ Geist for interface and prose (`sans`), Geist Mono for figures and identifiers (
 
 - Hairlines in `rule`, 1px; dashed for soft separators inside a list (timeline, activity) and for disabled or stale controls.
 - Radii: `radius-md` for controls and cards, `radius-lg` for inset cards, tiles and panels, `radius-pill` for chips, `radius-sm` for flags, key hints, code spans and the late age.
-- No shadows. Elevation is `panel` over `bg` plus a `rule` border.
+- No shadows. Elevation is `panel` over `bg` plus a `rule` border. The one exception is the floating widget, which floats over other apps' windows rather than over `bg`: its pill casts `0 6px 24px #0000002e` over a `backdrop-filter: blur(18px) saturate(1.4)`, and its panel, `panel` at 94% with radius 14px, casts `0 18px 50px #00000040` over `blur(22px) saturate(1.4)`.
 - The waits-on strip is the one colored edge: `strip-row` on rows and the situation block, `strip-card` on cards, tasks and the current rail view.
 
 ### States
@@ -86,7 +86,16 @@ The menu bar notifications use four 128px PNG badges (assets group **Notificatio
 | Cockpit | all tokens, both themes from `prefers-color-scheme` |
 | Terminal client | the same views, keys and words; bold for the current view, dim for disabled actions; no hues of its own |
 | Menu bar | `wloop <n>` title, menu sections in cockpit order, the four notification badges |
+| Floating widget | the cockpit's tokens on a transparent page (`#/float`) that a native panel window fits; the elevation exception above |
 | Docs | Starlight with `me` as its accent and the loop mark |
+
+## Floating widget
+
+The cockpit's page at `#/float`, which the app hosts in a borderless panel above other windows. The page is transparent and draws only:
+
+- **The pill**, 32px tall, `radius 16px`, `mono` at `meta`: the `me` marker, a `me` dot with how many decisions wait on the user, a static `loop` ring and the count of running turns, and the oldest decision's age in `faint` (a `late` chip past a day). While a peek shows it widens to the arrival's kind word in `me-text`, its unit and its text. Docked on a side edge it stands upright, 34px wide, and drops the age and the peek. Nothing waiting and nothing running fades it to 45%; offline it says so in `muted`, with no count.
+- **The panel**, `min(460px, 100vw - 24px)` wide: a header with the count, the position in the queue and Pin; the agents (each running turn's static arc and a 3px `loop` bar of elapsed over its intent's usual duration, the turns done today); the queue in the daemon's order. The current item is drawn whole in place as a `raise` card with the `me` card strip; every other item is one line of dot, kind word, unit and title, and age. A question whose options pin drafts is one card with a tab per option, the recommended one selected, its draft's verdict chip and its comments tallied by Conventional Comments label, blocking in `err` first.
+- **Motion**: none of its own. The running ring is a static arc that grows with the turn; it never spins.
 
 ## Further sections
 

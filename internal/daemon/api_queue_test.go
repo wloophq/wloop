@@ -342,3 +342,17 @@ func TestOptionDraftCountsAgainOnceQuestionCloses(t *testing.T) {
 		t.Fatalf("items %v, want the drafts back as %v once their message closed and they can be sent", ids, want)
 	}
 }
+
+func TestQueueItemCarriesItsKindWordAndSince(t *testing.T) {
+	t.Parallel()
+	q := newQueueRig(t, nil)
+	q.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "plan the move"})
+	g := q.open(t, "t-0000000000000001", gate.KindPlan, "1", 3*time.Hour)
+	got := q.all(t)
+	if len(got.Items) != 1 {
+		t.Fatalf("items %+v, want the plan", got.Items)
+	}
+	if it := got.Items[0]; it.Word != "plan" || !it.Since.Equal(g.OpenedAt) {
+		t.Fatalf("item word %q since %v, want the kind's noun %q and the gate's opening %v", it.Word, it.Since, "plan", g.OpenedAt)
+	}
+}

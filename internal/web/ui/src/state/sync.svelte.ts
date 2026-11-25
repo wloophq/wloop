@@ -155,19 +155,36 @@ export const stream = {
 
 const conn = { retries: 0, opened: false };
 
-// connect follows the daemon's event stream, reconnecting with a backoff up to RECONNECT_MAX_MS, and loads what a
-// reconnect may have missed.
-export function connect(): void {
+// CONN_CLOSED is the stream's state once it is lost, until a reconnect opens it.
+export const CONN_CLOSED = "closed";
+
+// Follow is what a page does with the stream: read a change, catch up after a reconnect, and read everything
+// once the stream is lost.
+export interface Follow {
+  change: (e: { data: string }) => void;
+  reopened: () => void;
+  lost: () => void;
+}
+
+const page: Follow = {
+  change: onChange,
+  reopened: () => {
+    forgetTasksPage();
+    scheduleLoad({ rows: true, health: true, tasks: true, plan: true, gates: true });
+  },
+  lost: () => void load(),
+};
+
+// connect follows the daemon's event stream, reconnecting with a backoff up to RECONNECT_MAX_MS, and has follow
+// catch up on what a reconnect may have missed.
+export function connect(follow: Follow = page): void {
   const es = stream.open(`/api/events?api=${API_VERSION}`);
-  es.onmessage = onChange;
+  es.onmessage = follow.change;
   es.onopen = () => {
     conn.retries = 0;
     state.conn = "open";
     state.authLost = false;
-    if (conn.opened) {
-      forgetTasksPage();
-      scheduleLoad({ rows: true, health: true, tasks: true, plan: true, gates: true });
-    }
+    if (conn.opened) follow.reopened();
     conn.opened = true;
   };
   es.onerror = () => {
@@ -176,9 +193,9 @@ export function connect(): void {
       return;
     }
     es.close();
-    state.conn = "closed";
-    load();
-    timer.set(connect, Math.min(RECONNECT_MAX_MS, 1000 * 2 ** conn.retries++));
+    state.conn = CONN_CLOSED;
+    follow.lost();
+    timer.set(() => connect(follow), Math.min(RECONNECT_MAX_MS, 1000 * 2 ** conn.retries++));
   };
 }
 

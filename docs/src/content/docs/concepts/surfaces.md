@@ -49,6 +49,14 @@ A task's page shows, in order: its header (its units, each opening in the cockpi
 
 The cockpit reads in the interface language (`ui.locale`, else the system's; see [Translate the interface](/guides/localization/)): its own words are the profile's `strings.toml`, the core's event kinds and the timeline's facts are `timeline.toml`'s, and dates and numbers follow the locale. It renders in English at once when the daemon does not serve the strings within a moment, and follows a language changed while it is open.
 
+### The floating widget
+
+The cockpit's page at `#/float` draws the floating widget, made to sit in a small window of its own above other apps: a pill and, beside it, a panel. The page is transparent, draws only those two and tells the window that hosts it its size, so the window can fit them.
+
+The pill shows how many decisions wait on you (`GET /api/queue`, every kind in the profile's order), how many agent turns run with a ring that fills as the longest one nears its intent's usual duration (`GET /api/turns/live`), and the age of the oldest decision, marked late past a day. It fades when nothing waits and nothing runs, and says Offline, with no count, while the daemon does not answer, until the event stream comes back. When decisions arrive while the panel is closed, it peeks once at the first of them: their kind, unit and text for a few seconds, and opening the panel then opens on that one. A burst of arrivals peeks once.
+
+Hovering the pill opens the panel, leaving both closes it, and a click or `Enter` on the pill pins it open. The panel lists the agents first (each running turn with its elapsed time over its intent's usual one, how many turns ask you, the turns done today, the last two shown), then the queue in the daemon's order, the current decision drawn whole in place and the others one line each. A gate draws its card as the detail does, with its intents; a question whose options pin drafts is one card with a tab per option, the recommended one selected, and the selected draft's verdict, its comments counted by their [Conventional Comments](https://conventionalcomments.org) label, blocking first, its text and its comments. `↑`/`↓` or `j`/`k` move (wrapping at the ends), `Enter` takes the current decision's primary action (with the selected option), `o` opens it in the cockpit and `Esc` closes the panel. Every action goes through the gate's own intent; when a decision leaves the queue, settled here or elsewhere, the next one becomes current, and nothing is sent against a gate the queue no longer holds.
+
 ## The terminal client
 
 ```sh

@@ -801,6 +801,28 @@
 "matched" = "matched"
 "frees" = "frees"
 "wait" = "wait"
+# The floating widget.
+"{n} wait on you" = { one = "{n} waits on you", other = "{n} wait on you" }
+"Nothing waits on you" = "Nothing waits on you"
+"Pin" = "Pin"
+"Offline" = "Offline"
+"The daemon is not answering." = "The daemon is not answering."
+"Agents" = "Agents"
+"{n} running" = { one = "{n} running", other = "{n} running" }
+"{n} waiting on you" = { one = "{n} waiting on you", other = "{n} waiting on you" }
+"{n} done today" = { one = "{n} done today", other = "{n} done today" }
+"Hide" = "Hide"
+"Show" = "Show"
+"Show {n} more done" = { one = "Show {n} more done", other = "Show {n} more done" }
+"Fewer" = "Fewer"
+"{elapsed} / {usual}" = "{elapsed} / {usual}"
+"{seconds}s" = "{seconds}s"
+"All clear" = "All clear"
+"The loop brings the next thing here." = "The loop brings the next thing here."
+"Open in the cockpit" = "Open in the cockpit"
+"Post {what}" = "Post {what}"
+"More" = "More"
+"Less" = "Less"
 
 [formats]
 time = "3:04 PM"

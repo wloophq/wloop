@@ -1,5 +1,7 @@
 package api
 
+import "time"
+
 // HomePath serves the cockpit's home, as Home.
 const HomePath = "/api/home"
 
@@ -79,7 +81,10 @@ type Queue struct {
 
 // QueueItem is one decision of kind Kind: a task's open gate, or a situation of one of its units.
 type QueueItem struct {
-	Kind      string          `json:"kind"`
+	Kind string `json:"kind"`
+	// Word is the kind's noun for one item, as decisions.toml words it; Since is when the decision began.
+	Word      string          `json:"word,omitempty"`
+	Since     time.Time       `json:"since,omitzero"`
 	Task      TaskView        `json:"task"`
 	Gate      *GateView       `json:"gate,omitempty"`
 	Situation *QueueSituation `json:"situation,omitempty"`
