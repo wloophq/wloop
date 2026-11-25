@@ -3,7 +3,8 @@ import { cleanup, fireEvent, render } from "@testing-library/svelte";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { J } from "../../lib/util";
 import { nav } from "../../state/route.svelte";
-import { floatDeps, floatLoad, floatState, resetFloat } from "../../state/float.svelte";
+import { FLOAT_HOVER_CLOSE_MS, floatDeps, floatLoad, floatState, resetFloat } from "../../state/float.svelte";
+import { flushSync } from "svelte";
 import { notice, tasksState } from "../../state/store.svelte";
 import { draftGate, pendingDraft, reviewDraft, taskCatalog } from "../../testing/gates";
 import { FakeDaemon } from "../../testing/fakedaemon";
@@ -41,6 +42,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   cleanup();
   Object.assign(floatDeps, saved);
@@ -281,4 +283,58 @@ test("no style of the float reads the viewport, which is the float window sized 
   const panel = rules.find((r) => /\.fl-panel\s*\{/.test(r)) || "";
   expect(panel).toContain("calc(var(--fl-max-w) - 24px)");
   expect(panel).toContain("calc(var(--fl-max-h) - 48px)");
+});
+
+const click = async (el: Element) => {
+  await fireEvent.pointerDown(el, { button: 0, clientX: 0, clientY: 0 });
+  await fireEvent.pointerUp(el, { button: 0, clientX: 0, clientY: 0 });
+};
+
+test("a click on the pill opens the panel without pinning it, and another closes it", async () => {
+  await floatLoad();
+  const c = render(Float).container;
+  await settle();
+  await click(pill(c));
+  expect([floatState().mode, floatState().pinned]).toEqual(["panel", false]);
+  await click(pill(c));
+  expect(floatState().mode).toBe("pill");
+});
+
+test("a panel a click opened closes once the pointer has been gone for the hover delay", async () => {
+  await floatLoad();
+  const c = render(Float).container;
+  await settle();
+  await click(pill(c));
+  vi.useFakeTimers();
+  await fireEvent.pointerLeave(flRoot(c));
+  vi.advanceTimersByTime(FLOAT_HOVER_CLOSE_MS - 1);
+  expect(floatState().mode).toBe("panel");
+  vi.advanceTimersByTime(1);
+  flushSync();
+  expect(floatState().mode).toBe("pill");
+});
+
+test("a panel a click opened closes at once when the float window loses focus", async () => {
+  await floatLoad();
+  const c = render(Float).container;
+  await settle();
+  await click(pill(c));
+  await fireEvent.blur(window);
+  expect(floatState().mode).toBe("pill");
+});
+
+test("a pinned panel stays open when the pointer leaves and when the window loses focus, and Esc closes it", async () => {
+  await floatLoad();
+  const c = render(Float).container;
+  await settle();
+  await click(pill(c));
+  await fireEvent.click(c.querySelector(".fl-quiet[aria-pressed]")!);
+  expect(floatState().pinned).toBe(true);
+  vi.useFakeTimers();
+  await fireEvent.pointerLeave(flRoot(c));
+  vi.advanceTimersByTime(FLOAT_HOVER_CLOSE_MS * 2);
+  await fireEvent.blur(window);
+  expect(floatState().mode).toBe("panel");
+  await fireEvent.keyDown(window, { key: "Escape" });
+  expect([floatState().mode, floatState().pinned]).toEqual(["pill", false]);
 });

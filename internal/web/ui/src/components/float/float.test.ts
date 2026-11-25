@@ -56,3 +56,13 @@ test("a drag whose release never reaches the page drops on the host's next place
   bridge.setMode("pill", { edge: "left", up: false });
   expect([listening.size, drops]).toEqual([0, 2]);
 });
+
+test("the host's word that the float lost the keyboard closes the panel unless it is pinned", () => {
+  const bridge = installFloat({});
+  bridge.setMode("panel");
+  bridge.blur();
+  expect(floatState().mode).toBe("pill");
+  floatState().setPinned(true);
+  bridge.blur();
+  expect([floatState().mode, floatState().pinned]).toEqual(["panel", true]);
+});

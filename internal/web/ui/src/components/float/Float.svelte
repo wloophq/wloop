@@ -56,8 +56,13 @@
 
   function toggle(): void {
     clearTimeout(hover);
-    if (open && f.pinned) f.setMode("pill");
-    else f.setPinned(true);
+    f.setMode(open ? "pill" : "panel");
+  }
+
+  function blur(): void {
+    if (f.pinned) return;
+    clearTimeout(hover);
+    f.blur();
   }
 
   function keydown(e: KeyboardEvent): void {
@@ -93,7 +98,7 @@
   });
 </script>
 
-<svelte:window onkeydown={keydown} />
+<svelte:window onkeydown={keydown} onblur={blur} />
 
 <div
   class={["fl", open && "open", !f.online && "offline", f.place.up && "up"]}

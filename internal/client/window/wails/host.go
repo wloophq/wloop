@@ -164,6 +164,7 @@ type floatNative struct {
 	frame     func() window.Rect
 	isKey     func() bool
 	handBack  func()
+	run       func(js string)
 }
 
 func appKitFloat(w *application.WebviewWindow) floatNative {
@@ -175,6 +176,7 @@ func appKitFloat(w *application.WebviewWindow) floatNative {
 		},
 		isKey:    func() bool { return isKey(w) },
 		handBack: func() { application.InvokeSync(func() { handBackKeyboard(nsWindow(w)) }) },
+		run:      func(js string) { evalJS(w, js) },
 	}
 }
 
@@ -189,6 +191,7 @@ func newHost(app *application.App, name string) *host {
 	h.native = appKitFloat(h.float)
 	h.float.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) { e.Cancel() })
 	h.float.OnWindowEvent(events.Mac.WindowDidMove, func(*application.WindowEvent) { h.do(h.floatMoved) })
+	h.float.OnWindowEvent(events.Mac.WindowDidResignKey, func(*application.WindowEvent) { h.do(h.floatResigned) })
 	h.main.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
 		e.Cancel()
 		h.do(h.hideMain)
@@ -415,7 +418,22 @@ func (h *host) SetFloatFrame(r window.Rect) {
 
 // PlaceFloat tells the float's page where it sits, in the mode it draws in.
 func (h *host) PlaceFloat(p window.FloatPlace) {
-	h.do(func() { evalJS(h.float, floatPlaceJS(h.floatMode, p)) })
+	h.do(func() { h.native.run(floatPlaceJS(h.floatMode, p)) })
+}
+
+// floatResigned tells the open panel's page that the float lost the
+// keyboard, as the person moved to another app, so a panel not pinned
+// collapses; WebKit may not fire the page's blur in a non-activating panel.
+func (h *host) floatResigned() {
+	if h.floatMode == window.ModePanel {
+		h.native.run(floatBlurJS())
+	}
+}
+
+// floatBlurJS calls blur on the page's bridge.
+func floatBlurJS() string {
+	name, _ := json.Marshal(window.FloatBridge)
+	return "(function(b){if(b&&b.blur)b.blur()})(window[" + string(name) + "])"
 }
 
 // floatPlaceJS calls the page's bridge with mode, the pill when the page has

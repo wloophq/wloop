@@ -132,6 +132,7 @@ type fakeFloat struct {
 	up, key   bool
 	frame     window.Rect
 	handBacks int
+	ran       []string
 }
 
 func (f *fakeFloat) set(fn func(f *fakeFloat)) { f.mu.Lock(); fn(f); f.mu.Unlock() }
@@ -145,6 +146,7 @@ func (f *fakeFloat) native() floatNative {
 		frame:     func() window.Rect { return read(func() any { return f.frame }).(window.Rect) },
 		isKey:     func() bool { return read(func() any { return f.key }).(bool) },
 		handBack:  func() { f.set(func(f *fakeFloat) { f.handBacks++; f.key = false }) },
+		run:       func(js string) { f.set(func(f *fakeFloat) { f.ran = append(f.ran, js) }) },
 	}
 }
 
@@ -236,6 +238,27 @@ func TestTheKeyboardGoesBackOnceTheButtonsAreUp(t *testing.T) {
 		synctest.Wait()
 		if n := f.handedBack(); n != 1 {
 			t.Fatalf("handed back %d times after returning to the panel, want still once", n)
+		}
+	})
+}
+
+// The float resigning key tells the open panel's page, which collapses
+// unless pinned; the pill, never key, is told nothing.
+func TestTheOpenPanelHearsTheFloatResignKey(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		f := &fakeFloat{up: true}
+		h := runningHost(t, f, window.Handlers{})
+		h.do(func() { h.setFloatMode(window.ModePill) })
+		h.do(h.floatResigned)
+		h.do(func() { h.setFloatMode(window.ModePanel) })
+		h.do(h.floatResigned)
+		synctest.Wait()
+		name, _ := json.Marshal(window.FloatBridge)
+		want := `(function(b){if(b&&b.blur)b.blur()})(window[` + string(name) + `])`
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		if len(f.ran) != 1 || f.ran[0] != want {
+			t.Fatalf("ran %q, want once %s", f.ran, want)
 		}
 	})
 }

@@ -325,6 +325,11 @@ function setPinned(on: boolean): void {
   if (on) setMode("panel");
 }
 
+// blur collapses a panel that is not pinned, as the float loses the keyboard.
+function blur(): void {
+  if (fl.mode === "panel" && !fl.pinned) setMode("pill");
+}
+
 // floatState is the widget's state and what moves it.
 export function floatState() {
   return {
@@ -379,6 +384,7 @@ export function floatState() {
     peek,
     setMode,
     setPinned,
+    blur,
     move,
     select: (i: number) => {
       if (i >= 0 && i < fl.items.length) fl.current = i;

@@ -7,8 +7,8 @@ import { resolveDraft, resolveGate } from "../gates/gates";
 import { queueDeps, queueDraft, queueDraftOf, queueUnit, queueVerb } from "../screens/queue";
 
 // The floating widget's ends: resolving an item through the gates endpoint, and the bridge to the window that
-// hosts the page. The host calls window[FLOAT_BRIDGE].setMode; the page posts JSON messages through the Wails
-// runtime's message handler, which a plain browser lacks, so there they go nowhere.
+// hosts the page. The host calls window[FLOAT_BRIDGE].setMode, and blur as the float resigns key; the page posts
+// JSON messages through the Wails runtime's message handler, which a plain browser lacks, so there they go nowhere.
 
 // FLOAT_BRIDGE is the window property the host calls: the brand's command followed by Float.
 export const FLOAT_BRIDGE = brand.command + "Float";
@@ -18,6 +18,7 @@ export const toneClass = (tone: unknown): string => (typeof tone === "string" &&
 
 export interface FloatBridge {
   setMode: (m: FloatMode, place?: Partial<FloatPlace>) => void;
+  blur: () => void;
 }
 
 interface Handler {
@@ -116,6 +117,7 @@ export function installFloat(win: J = window): FloatBridge {
       if (place) floatDragEnd();
       f.setMode(m, place);
     },
+    blur: () => f.blur(),
   };
   win[FLOAT_BRIDGE] = bridge;
   floatDeps.resolve = floatResolve;
