@@ -173,6 +173,7 @@ var objcRuntime struct {
 	err           error
 	replaceMethod func(cls objc.Class, name objc.SEL, imp objc.IMP, types string) objc.IMP
 	methodIMP     func(cls objc.Class, name objc.SEL) objc.IMP
+	responds      func(cls objc.Class, name objc.SEL) bool
 }
 
 func loadObjcRuntime() error {
@@ -184,6 +185,7 @@ func loadObjcRuntime() error {
 		}
 		purego.RegisterLibFunc(&objcRuntime.replaceMethod, lib, "class_replaceMethod")
 		purego.RegisterLibFunc(&objcRuntime.methodIMP, lib, "class_getMethodImplementation")
+		purego.RegisterLibFunc(&objcRuntime.responds, lib, "class_respondsToSelector")
 	})
 	return objcRuntime.err
 }
@@ -208,13 +210,10 @@ func (u unready) Warn(reason string, args ...any) {
 // for every other instance of cls; types is its type encoding. False when cls
 // has no such method to answer for.
 func answerFor(only objc.ID, cls objc.Class, s objc.SEL, types string, answer func() bool) bool {
-	if cls == 0 {
+	if cls == 0 || !objcRuntime.responds(cls, s) {
 		return false
 	}
 	before := objcRuntime.methodIMP(cls, s)
-	if before == 0 {
-		return false
-	}
 	var prev func(self objc.ID, cmd objc.SEL, arg objc.ID) bool
 	purego.RegisterFunc(&prev, uintptr(before))
 	objcRuntime.replaceMethod(cls, s, objc.NewIMP(func(self objc.ID, cmd objc.SEL, arg objc.ID) bool {
@@ -234,7 +233,23 @@ const (
 	pointerEntered = "entered"
 	pointerMoved   = "moved"
 	pointerExited  = "exited"
+	// pointerReset forgets the element last under the pointer, dispatching
+	// nothing.
+	pointerReset = "reset"
 )
+
+// pointerKind is what the host dispatches for a move of kind: nothing while
+// the float is key, since WebKit then gives the page the pointer, but a
+// reset on its exit, so a later entry enters again.
+func pointerKind(kind string, key bool) string {
+	switch {
+	case !key:
+		return kind
+	case kind == pointerExited:
+		return pointerReset
+	}
+	return ""
+}
 
 // floatPointerJS calls floatPointerScript for kind at x, y in the page's
 // coordinates.
@@ -251,10 +266,9 @@ type floatTracked struct{ win, webview objc.ID }
 // trackTargets maps each tracking area's owner to what it tracks.
 var trackTargets sync.Map
 
-// pointerTo dispatches the pointer's kind of move in the float's page while
-// the float is not key: WebKit drops the mouse's moves in a window that is
-// not key, so its page would see no hover, and a key float gets them from
-// WebKit itself. It runs on the main thread.
+// pointerTo dispatches the pointer's kind of move in the float's page, as
+// pointerKind says: WebKit drops the mouse's moves in a window that is not
+// key, so its page would see no hover. It runs on the main thread.
 func pointerTo(s objc.SEL, kind string) objc.MethodDef {
 	return objc.MethodDef{Cmd: s, Fn: func(self objc.ID, _ objc.SEL, event objc.ID) {
 		v, ok := trackTargets.Load(self)
@@ -262,11 +276,12 @@ func pointerTo(s objc.SEL, kind string) objc.MethodDef {
 			return
 		}
 		t := v.(floatTracked)
-		if objc.Send[bool](t.win, sel("isKeyWindow")) {
+		k := pointerKind(kind, objc.Send[bool](t.win, sel("isKeyWindow")))
+		if k == "" {
 			return
 		}
 		at := objc.Send[point](t.webview, sel("convertPoint:fromView:"), objc.Send[point](event, sel("locationInWindow")), objc.ID(0))
-		t.webview.Send(sel("evaluateJavaScript:completionHandler:"), nsString(floatPointerJS(kind, at.X, at.Y)), objc.ID(0))
+		t.webview.Send(sel("evaluateJavaScript:completionHandler:"), nsString(floatPointerJS(k, at.X, at.Y)), objc.ID(0))
 	}}
 }
 

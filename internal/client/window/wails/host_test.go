@@ -279,3 +279,28 @@ func TestAFloatItCannotReadyIsLogged(t *testing.T) {
 		t.Fatalf("logged %q", w)
 	}
 }
+
+// While the float is key WebKit gives the page the pointer, so the host
+// dispatches nothing, but an exit then clears the element it last tracked:
+// a later entry onto that element enters it again.
+func TestAKeyFloatOnlyResetsThePointerOnExit(t *testing.T) {
+	for _, c := range []struct {
+		kind string
+		key  bool
+		want string
+	}{
+		{pointerEntered, false, pointerEntered},
+		{pointerMoved, false, pointerMoved},
+		{pointerExited, false, pointerExited},
+		{pointerEntered, true, ""},
+		{pointerMoved, true, ""},
+		{pointerExited, true, pointerReset},
+	} {
+		if got := pointerKind(c.kind, c.key); got != c.want {
+			t.Errorf("%s key=%v: %q, want %q", c.kind, c.key, got, c.want)
+		}
+	}
+	if js := floatPointerJS(pointerReset, 0, 0); !strings.Contains(js, `kind === "reset"`) {
+		t.Errorf("the script ignores a reset:\n%s", js)
+	}
+}

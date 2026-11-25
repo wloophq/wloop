@@ -1,10 +1,14 @@
 // Dispatches, at a point of the float's page, the pointer and mouse events of
 // a pointer that entered, moved or exited, as the browser would: over and
 // enter, move, out and leave. The element last under the pointer is kept in a
-// global beside the bridge.
+// global beside the bridge; a reset forgets it, dispatching nothing.
 (function (bridge, kind, x, y) {
   var key = bridge + "Pointer";
   var s = window[key] || (window[key] = { el: null });
+  if (kind === "reset") {
+    s.el = null;
+    return;
+  }
   var to = kind === "exited" ? null : document.elementFromPoint(x, y);
   var from = s.el;
   function chain(e) {
