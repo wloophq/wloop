@@ -17,8 +17,8 @@ empty        = "Nothing waits on you. The loop handles the rest."
 [[counters]]
 id     = "needs-you"
 view   = "needs-you"
-noun   = { one = "task", other = "tasks" }
-clause = { one = "{counter} needs you", other = "{counter} need you" }
+noun   = { one = "thing", other = "things" }
+clause = { one = "{counter} waits on you", other = "{counter} wait on you" }
 
 [[counters]]
 id     = "loop"

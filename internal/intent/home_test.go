@@ -26,7 +26,7 @@ func TestHomeLoadsTheBundledBriefingInEachLocale(t *testing.T) {
 	if len(problems) > 0 {
 		t.Fatalf("problems: %v", problems)
 	}
-	if h := pt.Home; h.LastJoin != " e " || h.CaptureHint != "Anote o que está na sua cabeça" || h.Counters[2].Clause["other"] != "{counter} estão com outras pessoas" || h.Counters[0].Clause["one"] != "{counter} precisa de você" {
+	if h := pt.Home; h.LastJoin != " e " || h.CaptureHint != "Anote o que está na sua cabeça" || h.Counters[2].Clause["other"] != "{counter} estão com outras pessoas" || h.Counters[0].Clause["one"] != "{counter} espera por você" {
 		t.Fatalf("pt-BR home = %+v", h)
 	}
 }

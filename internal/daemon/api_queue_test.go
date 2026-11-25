@@ -430,6 +430,37 @@ func TestTheHomesNeedsYouSectionIsTheQueueOfEveryKind(t *testing.T) {
 	}
 }
 
+// sentence is the home's first briefing sentence, its counters written as [label].
+func sentence(h api.Home) string {
+	var b strings.Builder
+	for _, p := range h.Briefing.Sentences[0] {
+		if p.Counter != nil {
+			b.WriteString("[" + h.Briefing.Counters[*p.Counter].Label + "]")
+		} else {
+			b.WriteString(p.Text)
+		}
+	}
+	return b.String()
+}
+
+func TestTheBriefingCountsWhatWaitsOnYouNotTasks(t *testing.T) {
+	t.Parallel()
+	q := newQueueRig(t, nil)
+	q.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "ship the retries"})
+	q.open(t, "t-0000000000000001", gate.KindQuestion, "7", time.Hour)
+	var one api.Home
+	get(t, q.s, api.HomePath, &one)
+	if got := sentence(one); got != "[1 thing] waits on you." {
+		t.Fatalf("sentence %q for one item", got)
+	}
+	q.open(t, "t-0000000000000001", gate.KindDraft, "41", 2*time.Hour)
+	var two api.Home
+	get(t, q.s, api.HomePath, &two)
+	if got := sentence(two); got != "[2 things] wait on you." {
+		t.Fatalf("sentence %q for two items of one task, want them counted as things, not tasks", got)
+	}
+}
+
 func TestNeedsYouIsOneCount(t *testing.T) {
 	t.Parallel()
 	q := newQueueRig(t, nil)

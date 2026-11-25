@@ -27,14 +27,14 @@ The fact `task.decisions` lists the kinds a task waits on, the oldest first: tho
 
 ## The briefing
 
-`home.toml` lists the counters in order. A counter counts the tasks of a view with its own noun and clause, or the decisions of a kind, one per decision as its queue lists them; a counter of a view drawn as the queue (`layout = "queue"`) counts the items of the queue of every kind instead. The bundled briefing counts the items of Needs you, the tasks the loop handles and those with other people:
+`home.toml` lists the counters in order. A counter counts the tasks of a view with its own noun and clause, or the decisions of a kind, one per decision as its queue lists them; a counter of a view drawn as the queue (`layout = "queue"`) counts the items of the queue of every kind instead. The bundled briefing counts the items of Needs you as things that wait on you ("1 thing waits on you", "2 things wait on you", a task with two open gates counting twice), the tasks the loop handles and those with other people:
 
 ```toml
 [[counters]]
 id     = "needs-you"
 view   = "needs-you"
-noun   = { one = "task", other = "tasks" }
-clause = { one = "{counter} needs you", other = "{counter} need you" }
+noun   = { one = "thing", other = "things" }
+clause = { one = "{counter} waits on you", other = "{counter} wait on you" }
 
 [[counters]]
 id     = "loop"

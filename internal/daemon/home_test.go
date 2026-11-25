@@ -30,7 +30,7 @@ func TestHomeEndpoint(t *testing.T) {
 		t.Fatalf("counters %v, want %v", ids, want)
 	}
 	needs := h.Briefing.Counters[0]
-	if needs.View != "needs-you" || needs.Count != 1 || needs.Label != "1 task" {
+	if needs.View != "needs-you" || needs.Count != 1 || needs.Label != "1 thing" {
 		t.Fatalf("needs-you counter %+v", needs)
 	}
 	if len(h.Briefing.Sentences) != 1 {
@@ -44,7 +44,7 @@ func TestHomeEndpoint(t *testing.T) {
 			b.WriteString(p.Text)
 		}
 	}
-	if got := b.String(); got != "[1 task] needs you." {
+	if got := b.String(); got != "[1 thing] waits on you." {
 		t.Fatalf("sentence %q", got)
 	}
 	var sections []string
@@ -89,7 +89,7 @@ func TestHomeInPtBR(t *testing.T) {
 	if code := get(t, r.s, api.HomePath, &h); code != 200 {
 		t.Fatalf("%d", code)
 	}
-	if got := h.Briefing.Counters[0].Label; got != "1 tarefa" {
+	if got := h.Briefing.Counters[0].Label; got != "1 coisa" {
 		t.Fatalf("label %q", got)
 	}
 	if h.Sections[0].Label != "Precisa de você" || h.Sections[0].Empty != "Nada precisa de você." || h.Sections[1].Label != "Paradas há mais tempo" || h.Capture.Hint != "Anote o que está na sua cabeça" {
