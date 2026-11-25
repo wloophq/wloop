@@ -617,6 +617,7 @@
 "Could not load the Outbox: {error}" = "Não foi possível carregar a Outbox: {error}"
 "{n} draft" = { one = "{n} rascunho", other = "{n} rascunhos" }
 "Stop drafting these" = "Parar de rascunhar estes"
+"An open question decides these drafts: the option you pick posts its draft and withdraws the other options' drafts." = "Uma pergunta aberta decide estes rascunhos: a opção que você escolher posta o rascunho dela e retira os rascunhos das outras opções."
 "Stop this workflow" = "Parar este workflow"
 "Keep it" = "Manter"
 "Stopped {workflow}" = "{workflow} parado"

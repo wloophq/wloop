@@ -5,12 +5,15 @@ import (
 	"context"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -43,9 +46,10 @@ func (s *Server) handleOutbox(w http.ResponseWriter, r *http.Request) {
 	}
 	rows := ev.rowsOf(r.Context(), units)
 	listed := make([]faced, 0, len(ps))
+	var asking []int64
 	for _, p := range ps {
-		if p.Draft.State == draft.Held && pins[int64(p.Draft.ID)] != 0 {
-			continue
+		if q := pins[int64(p.Draft.ID)]; p.Draft.State == draft.Held && q != 0 && !slices.Contains(asking, q) {
+			asking = append(asking, q)
 		}
 		d := s.draftDetail(ctx, p.Draft, p.Gate, ev.unitItems())
 		c, err := ev.draftContext(ctx, d)
@@ -71,7 +75,31 @@ func (s *Server) handleOutbox(w http.ResponseWriter, r *http.Request) {
 		out = append(out, f.draft)
 	}
 	facets, heads := outboxWords(l, listed)
-	writeJSON(w, api.OutboxPage{Drafts: out, Facets: facets, Heads: heads})
+	writeJSON(w, api.OutboxPage{Drafts: out, Facets: facets, Heads: heads, Questions: s.askingGates(ctx, asking)})
+}
+
+// askingGates are the open gates of the question messages ids, as their cards serve them, in ids' order.
+func (s *Server) askingGates(ctx context.Context, ids []int64) []api.GateView {
+	if len(ids) == 0 || s.deps.GateReader == nil {
+		return nil
+	}
+	subjects := make([]string, len(ids))
+	for i, id := range ids {
+		subjects[i] = strconv.FormatInt(id, 10)
+	}
+	gs, err := s.deps.GateReader.Where(ctx, gates.Query{Kind: gate.KindQuestion, Statuses: []gate.Status{gate.Open}, Subjects: subjects})
+	if err != nil {
+		s.logf("outbox: the questions that pin its drafts: %v", err)
+		return nil
+	}
+	slices.SortStableFunc(gs, func(a, b gate.Gate) int {
+		return slices.Index(subjects, a.Subject) - slices.Index(subjects, b.Subject)
+	})
+	out := make([]api.GateView, 0, len(gs))
+	for _, g := range gs {
+		out = append(out, s.gateView(ctx, g, nil))
+	}
+	return out
 }
 
 // faced is a draft the Outbox serves with the facts its draft facets read.

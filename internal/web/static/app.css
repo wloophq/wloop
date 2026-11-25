@@ -780,6 +780,8 @@ textarea.draft-text { box-sizing: border-box; width: 100%; padding: var(--space-
 .plan-posts { margin: var(--space-2) 0 0; font-size: var(--text-meta); color: var(--muted); }
 .plan-item > .plan-on, .plan-item > .plan-does, .plan-item > .plan-why { margin: var(--space-4) 0 0; }
 .opts { display: flex; flex-direction: column; gap: var(--space-6); margin: var(--space-8) 0; }
+.opt-col { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }
+.ob-question .opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); align-items: start; }
 .opt { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: var(--space-2) var(--space-8); align-items: start; padding: var(--space-8) var(--space-10); font: inherit; color: inherit; text-align: left; background: var(--panel); border: 1px solid var(--rule-strong); border-radius: var(--radius-md); cursor: pointer; transition: border-color var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease); }
 .opt:hover { background: var(--hover); }
 .opt.on { border-color: var(--me); background: var(--sel); }

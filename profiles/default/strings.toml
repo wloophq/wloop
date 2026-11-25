@@ -624,6 +624,7 @@
 "Could not load the Outbox: {error}" = "Could not load the Outbox: {error}"
 "{n} draft" = { one = "{n} draft", other = "{n} drafts" }
 "Stop drafting these" = "Stop drafting these"
+"An open question decides these drafts: the option you pick posts its draft and withdraws the other options' drafts." = "An open question decides these drafts: the option you pick posts its draft and withdraws the other options' drafts."
 "Stop this workflow" = "Stop this workflow"
 "Keep it" = "Keep it"
 "Stopped {workflow}" = "Stopped {workflow}"

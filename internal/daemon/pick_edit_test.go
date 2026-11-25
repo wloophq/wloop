@@ -21,15 +21,33 @@ import (
 // gate open and the gates service reading its options.
 func pickRig(t *testing.T) (*outboxRig, draft.Draft, gate.Gate) {
 	t.Helper()
+	r, ds, qg := pickRigOf(t, "Approve it")
+	return r, ds[0], qg
+}
+
+// pickRigOf is pickRig whose question pins a held review reply of each of texts, in options "approve", then
+// "option-2" on; the last option, "hold", pins none.
+func pickRigOf(t *testing.T, texts ...string) (*outboxRig, []draft.Draft, gate.Gate) {
+	t.Helper()
 	r := newOutboxRig(t)
 	ctx := context.Background()
-	d, err := r.o.Propose(ctx, outbox.Proposal{Unit: r7u, Kind: draft.Kind("reply"), Text: "Approve it",
-		Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 3, Session: "term_1"}, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})})
-	if err != nil {
-		t.Fatal(err)
+	var ds []draft.Draft
+	var opts []record.Option
+	for i, text := range texts {
+		d, err := r.o.Propose(ctx, outbox.Proposal{Unit: r7u, Kind: draft.Kind("reply"), Text: text,
+			Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 3, Session: "term_1"}, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})})
+		if err != nil {
+			t.Fatal(err)
+		}
+		id, label := "approve", "Post it"
+		if i > 0 {
+			id, label = "option-"+strconv.Itoa(i+1), "Post "+text
+		}
+		ds = append(ds, d)
+		opts = append(opts, record.Option{ID: id, Label: label, Draft: &record.DraftRef{ID: int64(d.ID), Rev: d.Rev}})
 	}
 	q := dmessage.Message{ID: 9, Unit: r7u, Kind: dmessage.Question, Text: "Post it?", Origin: dmessage.Origin{Kind: dmessage.OriginTurn, TurnSeq: 3},
-		Options: []record.Option{{ID: "approve", Label: "Post it", Draft: &record.DraftRef{ID: int64(d.ID), Rev: d.Rev}}, {ID: "hold", Label: "Hold"}}}
+		Options: append(opts, record.Option{ID: "hold", Label: "Hold"})}
 	m := &messages.Service{Store: openMessages{q}, Books: noBooks{}, Drafts: outboxDrafts{r}}
 	r.s.deps.Messages = m
 	st := r.db.Gates(r.clock.Now)
@@ -41,7 +59,7 @@ func pickRig(t *testing.T) (*outboxRig, draft.Draft, gate.Gate) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return r, d, qg
+	return r, ds, qg
 }
 
 func pickBody(t *testing.T, args map[string]string) string {

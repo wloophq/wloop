@@ -62,8 +62,8 @@ func (o outboxDrafts) DraftGate(ctx context.Context, id int64) (draft.Draft, gat
 func (o outboxDrafts) WithdrawOther(context.Context, int64, string) error { return nil }
 
 // TestAPinnedDraftIsItsQuestionsOnly serves a held draft an open question of its turn pins as that question's:
-// its card names the message, the Outbox leaves it out and it notifies nothing of its own, and the person edits
-// it; a draft no question pins is served as before.
+// its card names the message, it notifies nothing of its own, and the person edits it; a draft no question pins
+// is served as before.
 func TestAPinnedDraftIsItsQuestionsOnly(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
@@ -87,15 +87,6 @@ func TestAPinnedDraftIsItsQuestionsOnly(t *testing.T) {
 		if want := map[int64]int64{int64(pinned.ID): 9, int64(free.ID): 0}[d.ID]; d.PinnedBy != want {
 			t.Errorf("draft %d pinned by %d, want %d", d.ID, d.PinnedBy, want)
 		}
-	}
-	var page api.OutboxPage
-	get(t, r.s, api.OutboxPath, &page)
-	var listed []int64
-	for _, d := range page.Drafts {
-		listed = append(listed, d.ID)
-	}
-	if len(listed) != 1 || listed[0] != int64(free.ID) {
-		t.Errorf("the Outbox lists %v, want only the draft no question pins", listed)
 	}
 	edit := api.TaskRequest{Args: map[string]string{"text": "a person's change", "rev": strconv.FormatInt(pinned.Rev, 10)}, Source: "cli"}
 	body, _ := json.Marshal(edit)

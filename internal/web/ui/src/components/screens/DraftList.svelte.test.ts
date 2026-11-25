@@ -11,6 +11,7 @@ import { nav, readHash } from "../../state/route.svelte";
 import { outboxState, tasksState } from "../../state/store.svelte";
 import { filterPalette, lensChips, lensItems, listYAML } from "../chrome/toolbar";
 import { resetStore } from "../../testing/reset.svelte";
+import { recordPosts, restoreFetch } from "../../testing/gates";
 import { fixture, useCatalogs } from "../rows/testdata/fixtures";
 import LensBar from "../chrome/LensBar.svelte";
 import DraftList from "./DraftList.svelte";
@@ -186,5 +187,57 @@ describe("a workflow's head", () => {
     flushSync();
     expect(card).not.toBeNull();
     expect(c.querySelector('[data-draft="8"]')).toBe(card);
+  });
+});
+
+describe("a question's drafts in the Outbox", () => {
+  beforeEach(() => outboxView("#view=outbox"));
+  afterEach(restoreFetch);
+
+  // pinnedPage is the Outbox page whose drafts 7 and 8 an open question pins in its options, with its gate.
+  function pinnedPage(): J {
+    const page = fixture("outbox-page.json");
+    const pinned = page.drafts.filter((d: J) => d.id === 7 || d.id === 8).map((d: J) => ({ ...d, pinned_by: 5 }));
+    page.drafts = page.drafts.map((d: J) => pinned.find((p: J) => p.id === d.id) || d);
+    page.questions = [{
+      id: 55, task: "t-1", kind: "question", name: "question", status: "open", intents: [{ id: "answer", label: "Answer", answer: true }],
+      subject: { id: 5, kind: "question", text: "Nudge whom?", recommend: "b", pinned,
+        options: [{ id: "a", label: "Nudge Dana", draft: { id: 7, rev: 3 } }, { id: "b", label: "Nudge Eli", draft: { id: 8, rev: 3 } }, { id: "c", label: "Wait" }] },
+    }];
+    return page;
+  }
+
+  it("shows the drafts with the question that pins them, its options side by side, the recommended one marked", () => {
+    outboxState.page = pinnedPage();
+    const c = render(DraftList, { page: outboxState.page, lens: lensOf(readHash()) }).container;
+    const asks = c.querySelectorAll(".ob-question");
+    expect(asks).toHaveLength(1);
+    const q = asks[0];
+    expect(q.querySelector(".bd")!.textContent).toContain("Nudge whom?");
+    expect(q.querySelector(".ob-about")!.textContent).toContain("An open question decides these drafts");
+    expect(Array.from(q.querySelectorAll(".d-pin[data-draft]")).map((n) => n.getAttribute("data-draft"))).toEqual(["8", "7"]);
+    expect(Array.from(q.querySelectorAll(".opt .rec")).map((n) => n.closest(".opt")!.getAttribute("data-pin"))).toEqual(["8@3"]);
+    expect(cards(c).filter((id) => id === 7 || id === 8)).toEqual([8, 7]);
+    expect(heads(c)).toContain("Ask who hasn't answered 2 drafts");
+  });
+
+  it("answers the question through its gate when an option is picked there", async () => {
+    outboxState.page = pinnedPage();
+    const posts = recordPosts();
+    const c = render(DraftList, { page: outboxState.page, lens: lensOf(readHash()) }).container;
+    await fireEvent.click(c.querySelector('[data-focus="gate:55:option:b"]')!);
+    await fireEvent.click(Array.from(c.querySelectorAll(".ob-question button.act")).find((b) => b.textContent!.includes("Answer"))!);
+    await Promise.resolve();
+    expect(posts.map((p) => p.path)).toEqual(["/api/gates/55/answer"]);
+    expect(posts[0].body.args).toMatchObject({ answer: "b", rev: "3" });
+  });
+
+  it("falls back to the draft's own card when the page serves no question for it", () => {
+    const page = pinnedPage();
+    page.questions = [];
+    outboxState.page = page;
+    const c = render(DraftList, { page: outboxState.page, lens: lensOf(readHash()) }).container;
+    expect(c.querySelectorAll(".ob-question")).toHaveLength(0);
+    expect(cards(c)).toEqual([10, 9, 7, 8]);
   });
 });
