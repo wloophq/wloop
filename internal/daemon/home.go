@@ -106,7 +106,7 @@ type homeWords struct{ l *intentload.Loaded }
 func (w homeWords) Profile() home.Profile {
 	d := w.l.Home
 	p := home.Profile{Template: d.Template, Join: d.Join, LastJoin: d.LastJoin, End: d.End, Count: d.Count, Empty: d.Empty,
-		PerSentence: d.PerSentence, CaptureHint: d.CaptureHint, Order: w.l.Decisions.Order}
+		PerSentence: d.PerSentence, CaptureHint: d.CaptureHint, Order: w.l.Decisions.Order, Sort: w.l.Decisions.Sort}
 	for _, c := range d.Counters {
 		v, _ := w.l.Views.View(c.View)
 		p.Counters = append(p.Counters, home.Counter{ID: c.ID, Kind: c.Kind, View: task.View(c.View), Noun: home.Forms(c.Noun), Clause: home.Forms(c.Clause),

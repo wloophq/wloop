@@ -93,7 +93,7 @@ func (s Service) Home(ctx context.Context) (Home, error) {
 	var items []Item
 	if queued {
 		var err error
-		if items, err = s.QueueAll(ctx, p.Order, nil); err != nil {
+		if items, err = s.QueueAll(ctx, p.Order, p.Sort, nil); err != nil {
 			return Home{}, err
 		}
 	}

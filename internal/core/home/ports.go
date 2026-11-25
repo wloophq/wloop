@@ -52,7 +52,7 @@ func (f Forms) For(form string) string {
 }
 
 // Profile is home.toml: the briefing's words and counters, the sections and the capture hint; Order is the
-// order of the decision kinds a queue section lists.
+// order of the decision kinds a queue section lists and Sort how it lists them.
 type Profile struct {
 	Template, Join, LastJoin, End, Count, Empty string
 	PerSentence                                 int
@@ -60,6 +60,7 @@ type Profile struct {
 	Sections                                    []Section
 	CaptureHint                                 string
 	Order                                       []decision.Kind
+	Sort                                        decision.Sort
 }
 
 // Counter counts a decision kind's decisions (Kind), one per item of its queue, or a view's tasks (View, with its

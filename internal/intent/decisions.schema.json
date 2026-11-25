@@ -149,7 +149,7 @@
       "type": "string"
     },
     "order": {
-      "description": "The order of the decision kinds in the queue of every kind, each once; a kind it leaves out comes after the listed ones. Items of one kind follow, oldest decision first. Only the default layer's file sets it.",
+      "description": "The order of the decision kinds in the queue of every kind, each once; a kind it leaves out comes after the listed ones. Under sort \"kind\", items of one kind follow, oldest decision first. Only the default layer's file sets it.",
       "items": {
         "enum": [
           "answer",
@@ -209,6 +209,15 @@
       },
       "description": "The decision kind of a unit in a situation its plugin derives, by situation; only a plugin's layer maps them.",
       "type": "object"
+    },
+    "sort": {
+      "default": "kind",
+      "description": "How the queue of every kind lists its items. Only the default layer's file sets it.",
+      "enum": [
+        "kind",
+        "newest"
+      ],
+      "type": "string"
     }
   },
   "title": "Decision kinds (decisions.toml)",

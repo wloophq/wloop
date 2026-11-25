@@ -71,7 +71,7 @@ func (s Service) Queue(ctx context.Context, k decision.Kind, keep coretasks.Keep
 
 // QueueAll is the items of every kind that keep takes (every one when nil): the kinds in order, a kind order
 // leaves out after the listed ones, each kind's items as its Queue lists them.
-func (s Service) QueueAll(ctx context.Context, order []decision.Kind, keep coretasks.Keep) ([]Item, error) {
+func (s Service) QueueAll(ctx context.Context, order []decision.Kind, sort decision.Sort, keep coretasks.Keep) ([]Item, error) {
 	var out []Item
 	for _, k := range decision.Ordered(order) {
 		q, err := s.Queue(ctx, k, keep)
@@ -79,6 +79,9 @@ func (s Service) QueueAll(ctx context.Context, order []decision.Kind, keep coret
 			return nil, err
 		}
 		out = append(out, q.Items...)
+	}
+	if sort == decision.SortNewest {
+		slices.SortStableFunc(out, func(a, b Item) int { return b.Found.Since.Compare(a.Found.Since) })
 	}
 	return out, nil
 }

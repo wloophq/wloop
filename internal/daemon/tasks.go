@@ -906,7 +906,7 @@ func (s *Server) queueCounted(ctx context.Context, g *coretasks.Service, c *task
 			return keep(ctx, e)
 		}
 	}
-	items, err := s.home(g).QueueAll(ctx, l.Decisions.Order, take)
+	items, err := s.home(g).QueueAll(ctx, l.Decisions.Order, l.Decisions.Sort, take)
 	if err != nil {
 		s.logf("tasks: counting the queue: %v", err)
 		return

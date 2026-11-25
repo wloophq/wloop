@@ -7,6 +7,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -271,5 +272,25 @@ func TestAQueueCounterCountsTheQueuesItemsReadOnceWithItsSection(t *testing.T) {
 	}
 	if n := len(lists.asked); n != len(decision.Ordered(w.profile.Order)) {
 		t.Fatalf("Sets called %d times, want once per kind of one queue read and no read of the queue's own view", n)
+	}
+}
+
+func TestTheQueueOfEveryKindSortedNewestListsItsItemsNewestFirstAcrossKinds(t *testing.T) {
+	w := words()
+	w.profile.Order = []decision.Kind{decision.LastStep, decision.Answer}
+	w.profile.Sort = decision.SortNewest
+	w.profile.Sections = []home.Section{{ID: "needs-you", View: "needs-you", Label: "Needs you", Limit: 3, Queue: true}}
+	lists := &fakeLists{sets: map[task.View][]task.Task{"decide-answer": tasks("a", 2), "decide-last-step": tasks("l", 1), "needs-you": tasks("x", 9)}}
+	d := fakeDecisions{"a-0": foundAt(decision.Answer, "", t0.Add(2*time.Hour)), "a-1": foundAt(decision.Answer, "", t0), "l-0": foundAt(decision.LastStep, "alpha", t0.Add(time.Hour))}
+	h, err := service(lists, d, w).Home(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, it := range h.Sections[0].Items {
+		got = append(got, string(it.Task.ID))
+	}
+	if !slices.Equal(got, []string{"a-0", "l-0", "a-1"}) {
+		t.Fatalf("items %v, want the newest decision first whatever its kind", got)
 	}
 }

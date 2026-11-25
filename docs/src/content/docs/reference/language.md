@@ -1243,7 +1243,7 @@ The fields each notice reads besides `Name` and `Command`:
 ## Decision kinds (`decisions.toml`)
 
 - `open` (string, localized): What a queue's button that opens a unit at its source says; only the default layer's file sets it.
-- `order` (list of `answer`, `approve-plan`, `send-draft`, `review-step`, `last-step`, `pick-someone`, `act`): The order of the decision kinds in the queue of every kind, each once; a kind it leaves out comes after the listed ones. Items of one kind follow, oldest decision first. Only the default layer's file sets it.
+- `order` (list of `answer`, `approve-plan`, `send-draft`, `review-step`, `last-step`, `pick-someone`, `act`): The order of the decision kinds in the queue of every kind, each once; a kind it leaves out comes after the listed ones. Under sort "kind", items of one kind follow, oldest decision first. Only the default layer's file sets it.
   - `answer`: An agent's question or a post waits for the user's answer.
   - `approve-plan`: An agent's plan waits for the user's approval.
   - `send-draft`: A draft waits for the user to send, edit or drop it.
@@ -1251,6 +1251,9 @@ The fields each notice reads besides `Name` and `Command`:
   - `last-step`: A unit waits only for its last step at its source, such as a merge or a closure, which the user takes there.
   - `pick-someone`: A unit waits for the user to pick who takes it next, such as a reviewer.
   - `act`: A proposal or a trust request waits for the user to act on it.
+- `sort` (one of `kind`, `newest`, default `kind`): How the queue of every kind lists its items. Only the default layer's file sets it.
+  - `kind`: By kind, in order; within a kind, oldest decision first.
+  - `newest`: Every item, newest decision first, whatever its kind.
 - `queue_all` (string, localized): The title of the queue of every kind; only the default layer's file sets it.
 - `empty_all` (string, localized): What the queue of every kind says when it holds nothing; only the default layer's file sets it.
 - `gates` (table): The decision kind of an open gate, by gate kind; only the default layer's file maps gates.

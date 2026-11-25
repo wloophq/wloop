@@ -34,6 +34,8 @@ type Decisions struct {
 	Order []decision.Kind
 	// QueueAll and EmptyAll are the title of the queue of every kind and what it says when it holds nothing.
 	QueueAll, EmptyAll string
+	// Sort is how the queue of every kind lists its items.
+	Sort decision.Sort
 }
 
 // KindTexts are a decision kind's view and words; Primary is the gate intent a queue offers first, "" the
@@ -51,6 +53,7 @@ type KindTexts struct {
 type mDecisions struct {
 	Open       *string           `toml:"open"`
 	Order      []string          `toml:"order"`
+	Sort       *string           `toml:"sort"`
 	QueueAll   *string           `toml:"queue_all"`
 	EmptyAll   *string           `toml:"empty_all"`
 	Gates      map[string]string `toml:"gates"`
@@ -85,6 +88,7 @@ func loadDecisions(layers []profile.Layer, r layerReader) (*decisionsLoad, Probl
 				Signals: map[dunit.ProviderID]map[string]decision.Kind{}},
 			Kinds:   map[decision.Kind]KindTexts{},
 			Primary: map[dunit.ProviderID]map[decision.Kind]string{},
+			Sort:    decision.SortKind,
 		},
 		primaryAt: map[dunit.ProviderID]map[decision.Kind]*sheet{},
 	}
@@ -139,6 +143,13 @@ func (l *decisionsLoad) merge(plugin dunit.ProviderID, file string, src []byte, 
 		text(s, "open", m.Open, &l.def.Open)
 		text(s, "queue_all", m.QueueAll, &l.def.QueueAll)
 		text(s, "empty_all", m.EmptyAll, &l.def.EmptyAll)
+		if m.Sort != nil {
+			n := len(s.problems)
+			s.oneOf("sort", *m.Sort, builtin.DecisionSorts())
+			if len(s.problems) == n {
+				l.def.Sort = decision.Sort(*m.Sort)
+			}
+		}
 		if m.Order != nil {
 			l.def.Order = nil
 			for i, v := range m.Order {
@@ -183,7 +194,7 @@ func (l *decisionsLoad) merge(plugin dunit.ProviderID, file string, src []byte, 
 		for _, section := range []struct {
 			name string
 			set  bool
-		}{{"gates", m.Gates != nil}, {"kinds", m.Kinds != nil}, {"open", m.Open != nil}, {"order", m.Order != nil},
+		}{{"gates", m.Gates != nil}, {"kinds", m.Kinds != nil}, {"open", m.Open != nil}, {"order", m.Order != nil}, {"sort", m.Sort != nil},
 			{"queue_all", m.QueueAll != nil}, {"empty_all", m.EmptyAll != nil}} {
 			if section.set {
 				s.add(section.name, "%s belong to the profile's own %s, not a plugin's layer", section.name, DecisionsFile)

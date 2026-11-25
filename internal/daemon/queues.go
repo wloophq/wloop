@@ -60,7 +60,7 @@ func (s *Server) handleQueueAll(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := withPlanReads(r.Context())
 	d := s.loaded().Decisions
-	all, err := s.home(g).QueueAll(ctx, d.Order, s.queueKeep(ctx, g, r))
+	all, err := s.home(g).QueueAll(ctx, d.Order, d.Sort, s.queueKeep(ctx, g, r))
 	if err != nil {
 		writeTasksError(w, err)
 		return

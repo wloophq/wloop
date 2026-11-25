@@ -9,10 +9,13 @@
 # What a queue's button that opens a unit at its source says.
 open = "Open at source"
 
-# The queue of every kind: its title, what it says when empty, and the order
-# of its kinds; items of one kind follow, oldest decision first.
+# The queue of every kind: its title, what it says when empty, how it sorts
+# its items and the order of its kinds. With sort = "kind", items of one kind
+# follow, oldest decision first; with sort = "newest", every item is listed
+# newest decision first and order is left aside.
 queue_all = "Needs you"
 empty_all = "Nothing needs you."
+sort      = "kind"
 order     = ["answer", "send-draft", "approve-plan", "review-step", "act", "pick-someone", "last-step"]
 
 [gates]

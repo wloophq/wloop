@@ -293,3 +293,17 @@ func TestTheQueueViewListsTheTasksOfTheKindsViews(t *testing.T) {
 		t.Fatalf("needs-you lists %q, want the when the user set", v.WhenText)
 	}
 }
+
+func TestDecisionsSortTheQueueOfEveryKindByKindUnlessSetToNewest(t *testing.T) {
+	l, problems := loadProfile(t, "en", nil)
+	if len(problems) > 0 || l.Decisions.Sort != decision.SortKind {
+		t.Fatalf("default sort %q, problems %v", l.Decisions.Sort, problems)
+	}
+	l, problems = loadProfile(t, "en", map[string]string{"decisions.toml": "sort = \"newest\"\n"})
+	if len(problems) > 0 || l.Decisions.Sort != decision.SortNewest {
+		t.Fatalf("sort %q, problems %v", l.Decisions.Sort, problems)
+	}
+	if _, problems = loadProfile(t, "en", map[string]string{"decisions.toml": "sort = \"newset\"\n"}); len(problems) == 0 {
+		t.Fatal("an unknown sort passes")
+	}
+}

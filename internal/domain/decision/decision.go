@@ -27,6 +27,18 @@ const (
 // Kinds are every kind, in the order the home and the queues list them.
 var Kinds = []Kind{Answer, ApprovePlan, SendDraft, ReviewStep, LastStep, PickSomeone, Act}
 
+// Sort is how the queue of every kind lists its items: SortKind groups them by kind in the profile's order,
+// oldest decision first within a kind; SortNewest lists every item newest decision first.
+type Sort string
+
+const (
+	SortKind   Sort = "kind"
+	SortNewest Sort = "newest"
+)
+
+// Sorts are every Sort.
+var Sorts = []Sort{SortKind, SortNewest}
+
 // Valid says whether k is one of Kinds.
 func Valid(k Kind) bool { return slices.Contains(Kinds, k) }
 
