@@ -967,12 +967,16 @@ body.panel-omnibox .omni-keys { cursor: grab; }
    Its shadow and backdrop blur are the one elevation exception design/README.md records. */
 html.float-page, html.float-page body { background: transparent; height: auto; }
 html.float-page body { display: block; overflow: hidden; }
-/* --fl-max-w and --fl-max-h are the visible frame of the screen holding the float, which the page sets; the window
-   is sized to what the page draws, so its viewport cannot bound the panel. These are where nothing sets them. */
+/* --fl-max-w and --fl-max-h are the room from the float's anchor corner to the far side of its screen's visible frame,
+   which the page sets; the window is sized to what the page draws, so its viewport cannot bound the panel. These are where nothing sets them. */
 .fl { display: inline-flex; width: max-content; flex-direction: column; align-items: flex-start; gap: var(--space-6); padding: var(--space-8); font: var(--text-body)/1.4 var(--sans); color: var(--ink); --fl-max-w: 1440px; --fl-max-h: 900px; }
 .fl.up { flex-direction: column-reverse; }
 .fl[data-edge="left"] { flex-direction: row; align-items: flex-start; }
 .fl[data-edge="right"] { flex-direction: row-reverse; align-items: flex-start; }
+/* The host keeps the float's anchor corner still as the window resizes, so the pill sits at that corner and the panel
+   grows away from it. */
+.fl.up[data-edge] { align-items: flex-end; }
+.fl.leftward:not([data-edge]) { align-items: flex-end; }
 .fl-sp { flex: 1; }
 .fl-mark { display: inline-block; width: 3px; height: 14px; border-radius: var(--radius-xs); background: var(--me); flex: none; }
 .fl .tone-me { --tone: var(--me); --tone-text: var(--me-text); }

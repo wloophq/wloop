@@ -23,11 +23,13 @@ type Screen struct{ Frame, Visible Rect }
 
 // FloatPlace is what the float's page needs of its placement: the edge it
 // is docked on, whether its anchor is in the lower half of its screen, so
-// the panel opens upward, and the size of the visible frame of the screen
-// that holds it, which bounds what the page draws.
+// the panel opens upward, whether it is in the right half, so the panel
+// opens leftward, and the room from its anchor to the far side of its
+// screen's visible frame, which bounds what the page draws.
 type FloatPlace struct {
 	Edge       string
 	Up         bool
+	Leftward   bool
 	MaxW, MaxH float64
 }
 
@@ -121,6 +123,26 @@ func ClampToScreens(p FloatPlacement, screens []Screen) Rect {
 	r.X = max(min(r.X, s.right()-r.W), s.X)
 	r.Y = max(min(r.Y, s.bottom()-r.H), s.Y)
 	return r
+}
+
+// RoomOf is how wide and tall the float at p may grow: from its anchor
+// corner to the far side of its screen's visible frame, so a frame within it
+// never needs the clamp to move the anchor, and the pill stays put as the
+// panel opens.
+func RoomOf(p FloatPlacement, screens []Screen) (w, h float64) {
+	if len(screens) == 0 {
+		return p.W, p.H
+	}
+	s := screenOf(p.frame(), screens)
+	x, y := max(min(p.X, s.right()), s.X), max(min(p.Y, s.bottom()), s.Y)
+	w, h = s.right()-x, s.bottom()-y
+	if strings.HasSuffix(p.Corner, "r") {
+		w = x - s.X
+	}
+	if strings.HasPrefix(p.Corner, "b") {
+		h = y - s.Y
+	}
+	return w, h
 }
 
 // PlacementOf is the placement of a frame the person dropped: docked on the
@@ -359,8 +381,9 @@ func (c *Controller) placeFloat() {
 	frame := ClampToScreens(c.placement, c.screens)
 	c.cfg.Host.SetFloatFrame(frame)
 	if c.tellPlace && c.pageReady {
-		s := screenOf(frame, c.screens)
-		c.cfg.Host.PlaceFloat(FloatPlace{Edge: c.placement.Edge, Up: strings.HasPrefix(c.placement.Corner, "b"), MaxW: s.W, MaxH: s.H})
+		w, h := RoomOf(c.placement, c.screens)
+		c.cfg.Host.PlaceFloat(FloatPlace{Edge: c.placement.Edge, Up: strings.HasPrefix(c.placement.Corner, "b"),
+			Leftward: strings.HasSuffix(c.placement.Corner, "r"), MaxW: w, MaxH: h})
 		c.tellPlace = false
 	}
 }

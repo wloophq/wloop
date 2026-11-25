@@ -216,7 +216,7 @@ func TestFloatSizeKeepsAnchorCorner(t *testing.T) {
 		want(t, r.host.taken(), "float-frame {1288 868 112 32}", "float-load "+base+"#"+FloatRoute)
 		r.host.handlers().OnFloat(FloatMessage{Kind: FloatSize, W: 460, H: 600, Mode: ModePanel})
 		r.host.handlers().OnFloat(size(112, 32))
-		want(t, r.host.taken(), "float-frame {940 300 460 600}", `float-place "" true 1512x911`, "float-frame {1288 868 112 32}")
+		want(t, r.host.taken(), "float-frame {940 300 460 600}", `float-place "" true true 1400x867`, "float-frame {1288 868 112 32}")
 	})
 }
 
@@ -252,7 +252,7 @@ func TestTheFloatStartsDockedRight(t *testing.T) {
 			t.Fatalf("host calls %q, want a frame flush with the laptop's right edge", got)
 		}
 		r.host.handlers().OnFloat(size(34, 84))
-		want(t, r.host.taken(), "float-frame {1478 260.75 34 84}", `float-place "right" false 1512x911`)
+		want(t, r.host.taken(), "float-frame {1478 260.75 34 84}", `float-place "right" false true 1512x683.25`)
 	})
 }
 
@@ -280,8 +280,8 @@ func TestScreensChangingMoveTheFloatBack(t *testing.T) {
 		r.host.handlers().OnScreens([]Screen{laptop})
 		r.host.handlers().OnScreens([]Screen{laptop, wide})
 		want(t, r.host.taken(),
-			"float-frame {1400 912 112 32}", `float-place "" true 1512x911`,
-			"float-frame {3788 1268 112 32}", `float-place "" true 2560x1390`)
+			"float-frame {1400 912 112 32}", `float-place "" true true 1512x911`,
+			"float-frame {3788 1268 112 32}", `float-place "" true true 2388x1275`)
 	})
 }
 
@@ -301,7 +301,7 @@ func TestADropIsSavedAndSnapped(t *testing.T) {
 		if want := (FloatPlacement{Edge: EdgeLeft, Corner: CornerBottomLeft, X: 0, Y: 532, W: 112, H: 32}); !ok || got != want {
 			t.Fatalf("saved %+v %v, want %+v", got, ok, want)
 		}
-		want(t, r.host.taken(), "float-frame {0 500 112 32}", `float-place "left" true 1512x911`)
+		want(t, r.host.taken(), "float-frame {0 500 112 32}", `float-place "left" true false 1512x499`)
 	})
 }
 
@@ -315,7 +315,7 @@ func TestASizeDuringADragWaitsForTheDrop(t *testing.T) {
 		r.host.handlers().OnFloat(size(34, 84))
 		want(t, r.host.taken())
 		r.host.handlers().OnFloatDropped(Rect{X: 10, Y: 500, W: 112, H: 32})
-		want(t, r.host.taken(), "float-frame {0 448 34 84}", `float-place "left" true 1512x911`)
+		want(t, r.host.taken(), "float-frame {0 448 34 84}", `float-place "left" true false 1512x499`)
 		if got, _ := LoadPlacement(d); got.W != 34 || got.H != 84 {
 			t.Fatalf("saved %+v, want the size sent during the drag", got)
 		}
@@ -544,4 +544,40 @@ func TestAFloatPageNotYetReadyLoadsAnewOnTheFirstSubscription(t *testing.T) {
 		synctest.Wait()
 		want(t, r.host.taken(), "float-load "+base+"#"+FloatRoute)
 	})
+}
+
+// The room a float may grow into runs from its anchor to the far side of its
+// screen's visible frame, so the panel it opens never pushes the pill.
+func TestTheRoomRunsFromTheAnchorToTheFarSideOfTheScreen(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		p    FloatPlacement
+		w, h float64
+	}{
+		{"docked right, a quarter down", FloatPlacement{Edge: EdgeRight, Corner: CornerTopRight, X: 1512, Y: 260.75, W: 34, H: 84}, 1512, 33 + 911 - 260.75},
+		{"docked left, low", FloatPlacement{Edge: EdgeLeft, Corner: CornerBottomLeft, X: 0, Y: 800, W: 34, H: 84}, 1512, 800 - 33},
+		{"free, top right quarter", FloatPlacement{Corner: CornerTopRight, X: 1200, Y: 100, W: 112, H: 32}, 1200, 33 + 911 - 100},
+		{"free, bottom left quarter", FloatPlacement{Corner: CornerBottomLeft, X: 300, Y: 900, W: 112, H: 32}, 1512 - 300, 900 - 33},
+		{"anchor above the visible frame", FloatPlacement{Corner: CornerTopLeft, X: 2000, Y: 5, W: 112, H: 32}, 1512 + 2560 - 2000, 1390},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			w, h := RoomOf(c.p, []Screen{laptop, wide})
+			if w != c.w || h != c.h {
+				t.Fatalf("room %vx%v, want %vx%v", w, h, c.w, c.h)
+			}
+		})
+	}
+}
+
+// A float whose panel is as tall as the room it was told stays where its pill
+// was: the clamp never moves its anchor.
+func TestAPanelAsTallAsItsRoomKeepsThePillInPlace(t *testing.T) {
+	p := FloatPlacement{Edge: EdgeRight, Corner: CornerTopRight, X: 1512, Y: 260.75, W: 34, H: 84}
+	pill := ClampToScreens(p, []Screen{laptop})
+	w, h := RoomOf(p, []Screen{laptop})
+	p.W, p.H = min(476, w), h
+	panel := ClampToScreens(p, []Screen{laptop})
+	if panel.Y != pill.Y || panel.right() != pill.right() {
+		t.Fatalf("panel %+v moved the pill's corner from %+v", panel, pill)
+	}
 }

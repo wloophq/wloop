@@ -116,11 +116,11 @@ func TestOnlyTheCockpitsPageSendsFloatMessages(t *testing.T) {
 // last said it draws in, the pill until it says one.
 func TestThePlaceGoesToTheBrandsGlobal(t *testing.T) {
 	name, _ := json.Marshal(window.FloatBridge)
-	want := `(function(b){if(b&&b.setMode)b.setMode("pill",{"edge":"left","up":true,"maxW":1512,"maxH":911})})(window[` + string(name) + `])`
-	if got := floatPlaceJS("", window.FloatPlace{Edge: window.EdgeLeft, Up: true, MaxW: 1512, MaxH: 911}); got != want {
+	want := `(function(b){if(b&&b.setMode)b.setMode("pill",{"edge":"left","up":true,"leftward":true,"maxW":1512,"maxH":911})})(window[` + string(name) + `])`
+	if got := floatPlaceJS("", window.FloatPlace{Edge: window.EdgeLeft, Up: true, Leftward: true, MaxW: 1512, MaxH: 911}); got != want {
 		t.Fatalf("js\n got %s\nwant %s", got, want)
 	}
-	if got := floatPlaceJS(window.ModePanel, window.FloatPlace{}); !strings.Contains(got, `setMode("panel",{"edge":"","up":false,"maxW":0,"maxH":0})`) {
+	if got := floatPlaceJS(window.ModePanel, window.FloatPlace{}); !strings.Contains(got, `setMode("panel",{"edge":"","up":false,"leftward":false,"maxW":0,"maxH":0})`) {
 		t.Fatalf("js %s", got)
 	}
 }

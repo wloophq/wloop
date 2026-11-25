@@ -138,7 +138,7 @@
 <svelte:window onkeydown={keydown} onblur={blur} />
 
 <div
-  class={["fl", open && "open", !f.online && "offline", f.place.up && "up"]}
+  class={["fl", open && "open", !f.online && "offline", f.place.up && "up", f.place.leftward && "leftward"]}
   data-mode={f.mode}
   data-edge={f.place.edge || undefined}
   style:--fl-max-w="{maxW}px"

@@ -274,6 +274,17 @@ test("the panel is bounded by the visible frame of the screen the host names, ne
   expect(flRoot(c).style.getPropertyValue("--fl-max-h")).toBe("900px");
 });
 
+test("a float the host says opens leftward marks its root, so the pill keeps to the right where its anchor is", async () => {
+  await floatLoad();
+  const c = render(Float).container;
+  floatState().setMode("pill", { edge: "", up: false, leftward: true, maxW: 1200, maxH: 800 });
+  await settle();
+  expect(flRoot(c).classList.contains("leftward")).toBe(true);
+  floatState().setMode("pill", { edge: "", up: false, leftward: false, maxW: 1200, maxH: 800 });
+  await settle();
+  expect(flRoot(c).classList.contains("leftward")).toBe(false);
+});
+
 test("before the host names a screen the panel is bounded by the one the page reads", async () => {
   vi.spyOn(window.screen, "availWidth", "get").mockReturnValue(1280);
   vi.spyOn(window.screen, "availHeight", "get").mockReturnValue(760);

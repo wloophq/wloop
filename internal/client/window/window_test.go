@@ -54,7 +54,7 @@ func (h *fakeHost) ShowFloat(url string, reload bool) {
 func (h *fakeHost) HideFloat()           { h.record("hide-float") }
 func (h *fakeHost) SetFloatFrame(r Rect) { h.record(fmt.Sprint("float-frame ", r)) }
 func (h *fakeHost) PlaceFloat(p FloatPlace) {
-	h.record(fmt.Sprintf("float-place %q %v %vx%v", p.Edge, p.Up, p.MaxW, p.MaxH))
+	h.record(fmt.Sprintf("float-place %q %v %v %vx%v", p.Edge, p.Up, p.Leftward, p.MaxW, p.MaxH))
 }
 func (h *fakeHost) Listen(hs Handlers) error {
 	h.mu.Lock()

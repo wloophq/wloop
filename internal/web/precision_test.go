@@ -104,3 +104,26 @@ func TestTheFloatsRootSizesToItsContentNotToItsWindow(t *testing.T) {
 	}
 	t.Fatal("no .fl rule")
 }
+
+// The pill sits at the float's anchor corner, which the host keeps still, so
+// opening the panel grows the window away from the pill without moving it:
+// at the bottom when the float opens upward from an edge, at the right when a
+// free float opens leftward.
+func TestThePillSitsAtTheFloatsAnchorCorner(t *testing.T) {
+	b, err := files.ReadFile("static/app.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{".fl.up[data-edge]": false, ".fl.leftward:not([data-edge])": false}
+	end := regexp.MustCompile(`(^|;)\s*align-items:\s*flex-end\s*(;|$)`)
+	for _, r := range cssRules(string(b)) {
+		if _, ok := want[strings.TrimSpace(r[0])]; ok && end.MatchString(r[1]) {
+			want[strings.TrimSpace(r[0])] = true
+		}
+	}
+	for sel, ok := range want {
+		if !ok {
+			t.Errorf("no %s { align-items: flex-end }", sel)
+		}
+	}
+}
