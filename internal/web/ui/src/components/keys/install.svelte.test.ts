@@ -163,6 +163,23 @@ describe("installKeys", () => {
     await settle();
     expect(asked).toEqual(["queue:skip"]);
   });
+
+  test("the view drawn as the queue takes the queue's keys", async () => {
+    daemon();
+    tasksState.catalog = { views: [{ id: "needs-you", label: "Needs you", rail: true, layout: "queue" }] };
+    const asked: string[] = [];
+    keyHooks.queue = (a) => { asked.push(a); return true; };
+    nav.hash = "#view=needs-you";
+    const installed = installKeys(appEnv());
+    stop = installed.stop;
+    await installed.loaded;
+    press(BINDINGS.find((b) => b.context === "queue" && b.action === "queue:skip")!.key);
+    await settle();
+    expect(asked).toEqual(["queue:skip"]);
+    queueState.key = "needs-you:?";
+    queueState.queue = { items: [{ task: { id: "t-1" }, gate: { id: 7, kind: "question", intents: [{ id: "answer" }] } }] };
+    expect(pageQuestion(document.body)?.gate.id).toBe(7);
+  });
 });
 
 describe("queue_test.go", () => {

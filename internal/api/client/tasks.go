@@ -80,6 +80,17 @@ func (c *Client) TaskDo(ctx context.Context, id, verb string, req api.TaskReques
 	return res, err
 }
 
+// QueueAll is the queue of every decision kind, narrowed by the lens query, every item when "".
+func (c *Client) QueueAll(ctx context.Context, query string) (api.Queue, error) {
+	path := api.QueueAllPath
+	if query != "" {
+		path += "?" + url.Values{"q": {query}}.Encode()
+	}
+	var out api.Queue
+	err := c.do(ctx, ReadTimeout, http.MethodGet, path, nil, &out)
+	return out, err
+}
+
 // Counters are the counters of area, "" for every area, of the tasks the lens query keeps, every task when "".
 func (c *Client) Counters(ctx context.Context, area, query string) (api.Counters, error) {
 	q := url.Values{}

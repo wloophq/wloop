@@ -82,6 +82,25 @@ describe("the home", () => {
     expect(links(c)).toContainEqual({ href: "#view=home-blocked", text: "See all 9" });
   });
 
+  it("home shows one Needs you section in profile order", () => {
+    const h = fixture("home.json");
+    h.sections.unshift({
+      id: "needs-you", view: "needs-you", label: "Needs you", time: "", rows: [], total: 7,
+      items: [
+        { kind: "answer", task: fixture("home.json").sections[0].rows[2], primary: { kind: "gate", id: "answer", label: "Answer" } },
+        { kind: "send-draft", task: fixture("home.json").sections[0].rows[0], primary: { kind: "gate", id: "approve", label: "Send" } },
+        { kind: "send-draft", task: fixture("home.json").sections[0].rows[0], primary: { kind: "gate", id: "approve", label: "Send" } },
+      ],
+    });
+    homeState.home = h;
+    const c = render(Home).container as HTMLElement;
+    const needs = c.querySelector('[data-section="needs-you"]')!;
+    expect(c.querySelectorAll(".home-section")[0]).toBe(needs);
+    expect(needs.querySelector("h2")!.textContent).toBe("Needs you");
+    expect(Array.from(needs.querySelectorAll("[data-row]")).map((n) => n.getAttribute("data-row"))).toEqual(["task:t-3", "task:t-1", "task:t-1"]);
+    expect(links(c)).toContainEqual({ href: "#view=needs-you", text: "See all 7" });
+  });
+
   it("says every word through the strings", () => {
     I18N.strings = new Proxy({}, { get: (_, k) => (typeof k === "string" ? "«" + k + "»" : undefined), has: () => true });
     const c = draw();

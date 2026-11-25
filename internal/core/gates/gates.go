@@ -357,6 +357,36 @@ func Unpinned(gs []gate.Gate, pinned map[int64]int64) []gate.Gate {
 	return out
 }
 
+// Undelivered are the approved draft gates of the drafts failed names, whose delivery failed, by task: each waits on
+// a person to retry or discard its draft, as an open draft gate waits to be sent. A draft's newest approved gate
+// stands for it.
+func Undelivered(ctx context.Context, where func(context.Context, Query) ([]gate.Gate, error), failed []int64) (map[task.ID][]gate.Gate, error) {
+	out := map[task.ID][]gate.Gate{}
+	if len(failed) == 0 {
+		return out, nil
+	}
+	subjects := make([]string, len(failed))
+	for i, id := range failed {
+		subjects[i] = strconv.FormatInt(id, 10)
+	}
+	gs, err := where(ctx, Query{Kind: gate.KindDraft, Statuses: []gate.Status{gate.Approved}, Subjects: subjects})
+	if err != nil {
+		return nil, err
+	}
+	newest := map[string]gate.Gate{}
+	for _, g := range gs {
+		if cur, ok := newest[g.Subject]; !ok || g.ID > cur.ID {
+			newest[g.Subject] = g
+		}
+	}
+	for _, subject := range slices.Sorted(maps.Keys(newest)) {
+		if g := newest[subject]; g.Task != "" {
+			out[g.Task] = append(out[g.Task], g)
+		}
+	}
+	return out, nil
+}
+
 // Supersede closes open gate id as superseded by by, its subject gone or
 // replaced, with no consequence: the subject's owner settles the subject.
 // It refuses an agent: no agent closes an open gate. A person supersedes

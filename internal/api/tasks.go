@@ -176,6 +176,9 @@ type ViewsCatalog struct {
 	Version string `json:"version,omitempty"`
 }
 
+// DraftTaskPrefix starts the id of a draft's task, "draft:<draft-id>".
+const DraftTaskPrefix = "draft:"
+
 // TaskViewSpec is a view of views.toml: Summary is one line on what it lists, Empty what it shows when it lists
 // nothing, Over what it lists (tasks or gates), When and Sort its rule as the profile writes it, Group the fact it
 // groups by, Key the key that jumps to it, Badge whether the badge counts it, HideDisabled whether it hides the
@@ -195,8 +198,11 @@ type TaskViewSpec struct {
 	RemoveClean  bool   `json:"remove_clean,omitempty"`
 	// Rail says whether the rail lists the view; a view only the home, a queue or search reads does not.
 	Rail bool `json:"rail"`
-	// Layout is how the cockpit draws the view: list, board or outbox.
+	// Layout is how the cockpit draws the view: list, board, outbox or queue.
 	Layout string `json:"layout,omitempty"`
+	// Opens is the route a page of the view opens instead, "" for its own: the Outbox's opens the queue's view
+	// narrowed to the kind draft gates count as.
+	Opens string `json:"opens,omitempty"`
 }
 
 // StateSpec is a state of tasks.toml and the category Go reads of it.

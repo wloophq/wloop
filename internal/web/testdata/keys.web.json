@@ -419,6 +419,14 @@
       "help": "area 9"
     },
     {
+      "key": "g q",
+      "action": "nav:needs-you",
+      "context": "global",
+      "owner": "core",
+      "help": "Needs you",
+      "summary": "What waits on you, one decision at a time: questions first, then drafts to send, plans, steps and the rest."
+    },
+    {
       "key": "g i",
       "action": "nav:inbox",
       "context": "global",

@@ -51,13 +51,15 @@ func (f Forms) For(form string) string {
 	return f["other"]
 }
 
-// Profile is home.toml: the briefing's words and counters, the sections and the capture hint.
+// Profile is home.toml: the briefing's words and counters, the sections and the capture hint; Order is the
+// order of the decision kinds a queue section lists.
 type Profile struct {
 	Template, Join, LastJoin, End, Count, Empty string
 	PerSentence                                 int
 	Counters                                    []Counter
 	Sections                                    []Section
 	CaptureHint                                 string
+	Order                                       []decision.Kind
 }
 
 // Counter counts a decision kind's decisions (Kind), one per item of its queue, or a view's tasks (View, with its own Noun and Clause).
@@ -68,12 +70,14 @@ type Counter struct {
 	Noun, Clause Forms
 }
 
-// Section is the first Limit rows of View, titled Label, each showing Time.
+// Section is the first Limit rows of View, titled Label, each showing Time; with Queue, the first Limit items of
+// the queue of every decision kind, which View draws.
 type Section struct {
 	ID          string
 	View        task.View
 	Label, Time string
 	Limit       int
+	Queue       bool
 }
 
 // KindWords are a decision kind's view and words; Primary is the gate intent a queue offers first.

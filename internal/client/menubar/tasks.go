@@ -9,13 +9,14 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
+	"github.com/wloophq/wloop/internal/client/window"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// pullTasks reads the catalog, then each view the profile's badge counts, whole: the menu lists those views
-// first, in the profile's order. A task's attention also moves with its row's notice and its proposed draft,
-// which no task write marks, so a delta would miss it. The counters come with the first view's page, or on
-// their own when the menu lists no view.
+// pullTasks reads the catalog, each view the profile's badge counts, whole, whose tasks notify, and the queue
+// of every decision kind, which the menu lists first. A task's attention also moves with its row's notice and
+// its proposed draft, which no task write marks, so a delta would miss it. The counters come with the first
+// view's page, or on their own when no view is badged.
 func (c *Controller) pullTasks(ctx context.Context) error {
 	cat, err := c.cfg.Daemon.Views(ctx)
 	if err != nil {
@@ -50,7 +51,11 @@ func (c *Controller) pullTasks(ctx context.Context) error {
 		}
 		c.counters = &counters
 	}
-	c.taskViews, c.tasks, c.tasksLoading = views, tasks, loading
+	needs, err := c.cfg.Daemon.QueueAll(ctx, "")
+	if err != nil {
+		return err
+	}
+	c.taskViews, c.tasks, c.tasksLoading, c.needs = views, tasks, loading, needs
 	c.mu.Lock()
 	c.cat = cat
 	c.mu.Unlock()
@@ -111,14 +116,20 @@ func (c *Controller) title() string {
 	return c.words().T("{name} {n}", params)
 }
 
-func (c *Controller) taskSection(label string, view string) []MenuItem {
-	tasks := c.viewTasks(view)
-	items := []MenuItem{{Title: fmt.Sprintf("%s (%d)", label, len(tasks))}}
-	for i, e := range tasks {
+// needsSection is what waits on the user, as many as the queue holds, and its first items, each opening its
+// task; more opens the queue's view, else the home.
+func (c *Controller) needsSection() []MenuItem {
+	items := []MenuItem{{Title: fmt.Sprintf("%s (%d)", c.needs.Title, c.needs.Total)}}
+	more := window.HomeRoute
+	if c.needs.View != "" {
+		more = viewRoute(c.needs.View)
+	}
+	for i, it := range c.needs.Items {
 		if i == perSection {
-			items = append(items, MenuItem{Title: c.words().T("more…", nil), Enabled: true, Action: c.later(func(context.Context) error { return c.open(viewRoute(view)) })})
+			items = append(items, MenuItem{Title: c.words().T("more…", nil), Enabled: true, Action: c.later(func(context.Context) error { return c.open(more) })})
 			break
 		}
+		e := it.Task
 		items = append(items, MenuItem{Title: taskLabel(e), Enabled: true, Action: c.later(func(context.Context) error { return c.open(taskRoute(e.ID)) })})
 	}
 	return items

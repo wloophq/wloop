@@ -22,7 +22,7 @@ import (
 	intentload "github.com/wloophq/wloop/internal/intent"
 )
 
-const draftPrefix = "draft:"
+const draftPrefix = api.DraftTaskPrefix
 
 // gatesView serves the profile's views over gates, never stored: each gate in the view stands as a task, a
 // draft gate as its draft's own task, any other as the task it is on.

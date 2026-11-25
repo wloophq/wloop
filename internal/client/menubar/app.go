@@ -54,6 +54,7 @@ type Daemon interface {
 	Plugins(ctx context.Context) ([]api.Plugin, error)
 	Views(ctx context.Context) (api.ViewsCatalog, error)
 	Counters(ctx context.Context, area, query string) (api.Counters, error)
+	QueueAll(ctx context.Context, query string) (api.Queue, error)
 }
 
 type Config struct {
@@ -105,9 +106,11 @@ type Controller struct {
 	// plugins are the served plugins, read with the sections.
 	plugins []api.Plugin
 	tasks   map[string][]api.TaskView
-	// taskViews are the views the menu lists first: those the profile's badge counts.
+	// taskViews are the views whose tasks notify: those the profile's badge counts.
 	taskViews []api.TaskViewSpec
-	counters  *api.Counters
+	// needs is what waits on the user, the queue of every decision kind, which the menu lists first.
+	needs    api.Queue
+	counters *api.Counters
 	// tasksLoading and rowsLoading are the plugins the last pages of tasks and of rows said are still
 	// loading.
 	tasksLoading, rowsLoading []api.Loading
@@ -472,10 +475,8 @@ func (c *Controller) menu(h api.Health) []MenuItem {
 		open = w.T("Open in {manager}", map[string]any{"manager": h.WorkspaceManagers[0]})
 	}
 	items = append(items, c.loadingItems()...)
-	for _, v := range c.taskViews {
-		items = append(items, c.taskSection(v.Label, v.ID)...)
-		items = append(items, MenuItem{Separator: true})
-	}
+	items = append(items, c.needsSection()...)
+	items = append(items, MenuItem{Separator: true})
 	for _, sec := range c.sections {
 		items = append(items, c.section(sec.Label, sec.View, c.set.View(sec.View), open)...)
 		items = append(items, MenuItem{Separator: true})

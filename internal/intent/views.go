@@ -149,6 +149,16 @@ func (d ViewsDef) IDs() []string {
 // Badged says whether the badge counts view id.
 func (d ViewsDef) Badged(id string) bool { return slices.Contains(d.Badge, id) }
 
+// QueueView is the first view drawn as the queue of every decision kind; "" when none is.
+func (d ViewsDef) QueueView() string {
+	for _, v := range d.Views {
+		if v.Layout == builtin.ViewLayoutQueue {
+			return v.ID
+		}
+	}
+	return ""
+}
+
 // LensWords are what a list's lens bar says, each a template whose only actions are the {{.name}} its key's
 // doc lists, which clients fill in.
 type LensWords struct {

@@ -55,6 +55,8 @@ export const PLAN = "plan";
 export const RECENT = "recent";
 export const EXPLORE = "explore";
 export const DASH = "dash";
+// KIND is the parameter that narrows a view drawn as the queue to one decision kind.
+export const KIND = "kind";
 // QUEUE_LIST is the queue of the tasks a route's ids name, in their order; QUEUE_IDS_MAX the most it takes.
 export const QUEUE_LIST = "list";
 export const QUEUE_IDS_MAX = 200;
@@ -85,6 +87,7 @@ export function routeParams(hash: string): URLSearchParams {
 export interface Route {
   view: string;
   queue: string;
+  kind: string;
   ids: string[];
   unit: string;
   task: string;
@@ -104,6 +107,7 @@ export function readRoute(hash: string): Route {
   return {
     view: routeView(p),
     queue: (p.get("queue") || "").slice(0, 100),
+    kind: (p.get(KIND) || "").slice(0, 100),
     ids: (p.get("ids") || "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, QUEUE_IDS_MAX),
     unit: routeUnitKey(p.get("unit")),
     task: (p.get("task") || "").slice(0, 200),

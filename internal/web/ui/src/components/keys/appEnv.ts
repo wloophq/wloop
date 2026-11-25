@@ -1,7 +1,7 @@
-import { isCoreView } from "../../lib/catalog";
+import { isCoreView, isQueueView } from "../../lib/catalog";
 import { t } from "../../lib/i18n.svelte";
 import { groupedRows, pipeline } from "../../lib/lens";
-import { PLAN, readRoute } from "../../lib/routes";
+import { PLAN, QUEUE, readRoute } from "../../lib/routes";
 import { taskById } from "../../lib/tasks";
 import { keyOf, unitOf, type J } from "../../lib/util";
 import { readLens } from "../../lib/view";
@@ -134,7 +134,7 @@ export function appEnv(): KeysEnv {
     planAction: (it, id) => actOnPlan(it, id),
     overlay: () => overlays.stack.length > 0 || !!omni.open,
     pluginKey: (e) => !!keyHooks.pluginKey && keyHooks.pluginKey(e),
-    viewContext: () => keyContextOf(readHash().view),
+    viewContext: () => keyContextOf(isQueueView(readHash().view) ? QUEUE : readHash().view),
     queue: (action) => !!keyHooks.queue && keyHooks.queue(action),
     step: (action) => reviewKey(action),
     detailAt: (el) => !!(readHash().task || readHash().pr) && (detailOnly() || !!(el && (el as Element).closest && (el as Element).closest("#detail"))),

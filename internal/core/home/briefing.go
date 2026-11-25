@@ -54,10 +54,11 @@ type PluginNoun struct {
 	Noun   string
 }
 
-// Rows are a section's first rows and how many it holds.
+// Rows are a section's first rows, or a queue section's first items, and how many it holds.
 type Rows struct {
 	Section
 	Tasks []task.Task
+	Items []Item
 	Total int
 }
 
@@ -69,7 +70,9 @@ func (s Service) Home(ctx context.Context) (Home, error) {
 		views = append(views, s.viewOf(c))
 	}
 	for _, sec := range p.Sections {
-		views = append(views, sec.View)
+		if !sec.Queue {
+			views = append(views, sec.View)
+		}
 	}
 	slices.Sort(views)
 	sets, err := s.Lists.Sets(ctx, slices.Compact(views), nil)
@@ -95,6 +98,14 @@ func (s Service) Home(ctx context.Context) (Home, error) {
 		h.Empty = p.Empty
 	}
 	for _, sec := range p.Sections {
+		if sec.Queue {
+			items, err := s.QueueAll(ctx, p.Order, nil)
+			if err != nil {
+				return Home{}, err
+			}
+			h.Sections = append(h.Sections, Rows{Section: sec, Items: items[:min(len(items), sec.Limit)], Total: len(items)})
+			continue
+		}
 		ts := sets[sec.View]
 		h.Sections = append(h.Sections, Rows{Section: sec, Tasks: ts[:min(len(ts), sec.Limit)], Total: len(ts)})
 	}

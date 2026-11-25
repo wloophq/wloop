@@ -5,18 +5,8 @@ count     = "{n} {noun}"
 empty     = "Nada espera por você. O loop cuida do resto."
 
 [[counters]]
-
-[[counters]]
-
-[[counters]]
-
-[[counters]]
-
-[[counters]]
-
-[[counters]]
-
-[[counters]]
+noun   = { one = "tarefa", other = "tarefas" }
+clause = { one = "{counter} precisa de você", other = "{counter} precisam de você" }
 
 [[counters]]
 noun   = { one = "tarefa", other = "tarefas" }

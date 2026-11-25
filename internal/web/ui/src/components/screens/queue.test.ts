@@ -4,9 +4,9 @@ import { flushSync } from "svelte";
 import { readRoute, unitPath, type Unit } from "../../lib/routes";
 import type { J } from "../../lib/util";
 import { net } from "../../state/api";
-import { queueLoad } from "../../state/loaders.svelte";
-import { nav } from "../../state/route.svelte";
-import { notice, queueState } from "../../state/store.svelte";
+import { loadTasks, queueLoad } from "../../state/loaders.svelte";
+import { nav, viewHash } from "../../state/route.svelte";
+import { notice, queueState, tasksState } from "../../state/store.svelte";
 import { resetStore } from "../../testing/reset.svelte";
 import { fixture, useCatalogs } from "../rows/testdata/fixtures";
 import Queue from "./Queue.svelte";
@@ -41,7 +41,8 @@ beforeEach(() => {
       const e = (input.tasks || {})[decodeURIComponent(url.slice("/api/tasks/".length))];
       return e ? ok(e) : new Response("{}", { status: 404 });
     }
-    const q = (input.queues || {})[decodeURIComponent(url.split("/")[3].split("?")[0])];
+    const path = url.split("?")[0].split("/");
+    const q = (input.queues || {})[path[2] === "queue" ? "" : decodeURIComponent(path[3] || "")];
     return q ? ok(structuredClone(q)) : new Response("{}", { status: 404 });
   };
   queueDeps.open = (u: string) => log.opened.push(u);
@@ -243,5 +244,49 @@ describe("a decision queue", () => {
     flushSync();
     expect(c.querySelector('.queue-item [data-row="task:t-1"]')).toBe(row);
     expect(row!.textContent).toContain("one, renamed");
+  });
+});
+
+// withNeedsYou is the views catalog with Needs you drawn as the queue and the Outbox opening it narrowed to drafts.
+function withNeedsYou(): void {
+  const cat = fixture("views.json");
+  cat.views = [{ id: "needs-you", label: "Needs you", rail: true, layout: "queue" },
+    ...cat.views.filter((v: J) => v.id !== "outbox"),
+    { id: "outbox", label: "Outbox", rail: true, over: "gates", layout: "outbox", opens: "view=needs-you&kind=send-draft" }];
+  tasksState.catalog = cat;
+}
+
+function itemOf(kind: string, id: string): J {
+  return { kind, task: { id, title: "task " + id, units: [] }, primary: { kind: "task", id, label: "Open" } };
+}
+
+describe("Needs you", () => {
+  it("draws the queue of every kind on the view drawn as the queue", async () => {
+    withNeedsYou();
+    input.queues = { "": { title: "Needs you", view: "needs-you", empty: "Nothing needs you.", total: 2, items: [itemOf("answer", "t-1"), itemOf("send-draft", "t-2")] } };
+    const c = await open("#view=needs-you");
+    expect(log.gets).toEqual(["/api/queue"]);
+    expect(c.querySelector(".crumbs")!.textContent).toContain("Needs you");
+    expect(progress(c)).toBe("1 of 2");
+  });
+
+  it("keeps its kind through a task it opens", () => {
+    withNeedsYou();
+    nav.hash = "#view=needs-you&kind=send-draft";
+    expect(viewHash({ task: "t-9" })).toBe("view=needs-you&kind=send-draft&task=t-9");
+    nav.hash = "#view=inbox&kind=send-draft";
+    expect(viewHash({ task: "t-9" })).toBe("view=inbox&task=t-9");
+  });
+
+  it("outbox route opens Needs you filtered to send-draft", async () => {
+    withNeedsYou();
+    input.queues = { "send-draft": { kind: "send-draft", title: "Drafts to send", empty: "No draft waits to be sent.", total: 1, items: [itemOf("send-draft", "t-9")] } };
+    nav.hash = "#view=outbox";
+    await loadTasks();
+    expect(nav.hash).toBe("#view=needs-you&kind=send-draft");
+    expect(log.gets).toContain("/api/queues/send-draft");
+    expect(log.gets.some((u) => u.startsWith("/api/outbox"))).toBe(false);
+    const c = render(Queue).container as HTMLElement;
+    expect(rows(c)[0]).toBe("task:t-9");
   });
 });
