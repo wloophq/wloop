@@ -921,6 +921,11 @@
           "description": "The local HH:MM at which Hide until tomorrow shows the floating widget again.",
           "type": "string"
         },
+        "float_over_full_screen": {
+          "default": false,
+          "description": "The floating widget shows over a full-screen app or a presentation too; off, it stays off a full-screen space.",
+          "type": "boolean"
+        },
         "hotkey": {
           "default": "ctrl+option+space",
           "description": "The global shortcut that opens the omnibox panel, such as cmd+shift+space; empty for none.",

@@ -181,14 +181,16 @@ type Notifications struct {
 // Window: Enabled shows the cockpit in the app's own window on macOS instead
 // of the browser; Hotkey is the global shortcut that opens the omnibox panel,
 // "" for none. Float turns the floating widget on, FloatHotkey shows and
-// hides it, and FloatMorning is the local "HH:MM" a snooze until tomorrow
-// ends at.
+// hides it, FloatMorning is the local "HH:MM" a snooze until tomorrow ends
+// at, and FloatOverFullScreen lets the floating widget show over a
+// full-screen app.
 type Window struct {
-	Enabled      bool   `json:"enabled"`
-	Hotkey       string `json:"hotkey"`
-	Float        string `json:"float"`
-	FloatHotkey  string `json:"float_hotkey"`
-	FloatMorning string `json:"float_morning"`
+	Enabled             bool   `json:"enabled"`
+	Hotkey              string `json:"hotkey"`
+	Float               string `json:"float"`
+	FloatHotkey         string `json:"float_hotkey"`
+	FloatMorning        string `json:"float_morning"`
+	FloatOverFullScreen bool   `json:"float_over_full_screen"`
 }
 
 // The values of window.float.

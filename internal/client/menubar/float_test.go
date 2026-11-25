@@ -34,14 +34,25 @@ func (d *fakeDefaults) SetString(key, value string) {
 	d.m[key] = value
 }
 
-// floatHost counts the float's shows and hides.
+// floatHost counts the float's shows and hides; a show fails with err, and
+// its page has reported in unless loading holds.
 type floatHost struct {
 	mu           sync.Mutex
 	shows, hides int
+	err          error
+	loading      bool
 }
 
-func (h *floatHost) show() error { h.mu.Lock(); h.shows++; h.mu.Unlock(); return nil }
+func (h *floatHost) show() error { h.mu.Lock(); defer h.mu.Unlock(); h.shows++; return h.err }
 func (h *floatHost) hide()       { h.mu.Lock(); h.hides++; h.mu.Unlock() }
+
+func (h *floatHost) ready() bool { h.mu.Lock(); defer h.mu.Unlock(); return h.err == nil && !h.loading }
+
+func (h *floatHost) set(err error, loading bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.err, h.loading = err, loading
+}
 
 func (h *floatHost) counts() (shows, hides int) {
 	h.mu.Lock()
@@ -63,6 +74,7 @@ func floatRig(t *testing.T, d *fakeDefaults) (*rig, *floatHost) {
 		FloatMorning: "09:00",
 		ShowFloat:    h.show,
 		HideFloat:    h.hide,
+		FloatReady:   h.ready,
 	}
 	if d != nil {
 		cfg.Defaults = d
@@ -279,8 +291,8 @@ func TestDigestPostsWhileShown(t *testing.T) {
 	}
 }
 
-// The menu bar's side of Review Focus 3: the float stays while the daemon is
-// down, and a recovery is no arrival.
+// The float stays as it was while the daemon is down, and a recovery is no
+// arrival.
 func TestDaemonDownShowsOfflineThenRecovers(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		r, h := floatRig(t, nil)
@@ -736,6 +748,48 @@ func TestTheVisibilityKeepsThePlacement(t *testing.T) {
 		window.SavePlacement(d, p)
 		if v := r.c.loadVisibility(); v.Mode != VisibilityQuiet {
 			t.Fatalf("visibility %+v after saving the placement", v)
+		}
+	})
+}
+
+// While the float's page has not reported in, the Needs you banners post;
+// once it has, they are withdrawn, as the float carries them.
+func TestNeedsBannersPostUntilTheFloatsPageReportsIn(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r, h := floatRig(t, nil)
+		h.set(nil, true)
+		r.d.events = make(chan api.Change)
+		r.d.tasks["inbox"] = []api.TaskView{pendingTask(1)}
+		stop := run(t, r)
+		defer stop()
+		synctest.Wait()
+		if needsPosted(r.notes) != 1 {
+			t.Fatalf("posted %d NEEDS banners before the float's page reported in, want 1", needsPosted(r.notes))
+		}
+		h.set(nil, false)
+		r.c.FloatPageReady()
+		synctest.Wait()
+		if w := r.notes.withdrawnIDs(); len(w) != 1 || w[0] != pendingTask(1).Attention.ID {
+			t.Fatalf("withdrew %q, want the NEEDS banner the float now carries", w)
+		}
+	})
+}
+
+// A float that cannot show leaves the Needs you banners on, and stays wanted.
+func TestAFloatThatCannotShowLeavesTheNeedsBannersOn(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r, h := floatRig(t, nil)
+		h.set(errors.New("no http.json: the daemon is not running"), false)
+		r.d.events = make(chan api.Change)
+		r.d.tasks["inbox"] = []api.TaskView{pendingTask(1)}
+		stop := run(t, r)
+		defer stop()
+		synctest.Wait()
+		if shows, _ := h.counts(); shows != 1 || r.mode() != VisibilityShown {
+			t.Fatalf("shown %d, mode %q; want one show, the float still wanted", shows, r.mode())
+		}
+		if needsPosted(r.notes) != 1 {
+			t.Fatalf("posted %d NEEDS banners with no float, want 1", needsPosted(r.notes))
 		}
 	})
 }

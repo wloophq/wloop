@@ -224,6 +224,7 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `window.float` | one of `on`, `off` | `off` | on shows the floating widget, which carries what waits on you; Needs you banners do not post unless it is turned off from the menu bar. Needs the app's own window. |
 | `window.float_hotkey` | string | `cmd+option+.` | The global shortcut that hides the floating widget until something new arrives, and shows it again, such as cmd+shift+j; empty for none. Bound only while window.float is on. The default leaves out ctrl+option, VoiceOver's modifier. |
 | `window.float_morning` | string | `09:00` | The local HH:MM at which Hide until tomorrow shows the floating widget again. |
+| `window.float_over_full_screen` | bool | `false` | The floating widget shows over a full-screen app or a presentation too; off, it stays off a full-screen space. |
 
 ### Units and tasks
 

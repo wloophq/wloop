@@ -374,9 +374,14 @@ func (h *host) OpenExternal(url string) {
 	}
 }
 
-func (h *host) ShowFloat(url string) {
+func (h *host) ShowFloat(url string, reload bool) {
 	h.do(func() {
-		navigate(h.float, &h.floatURL, url)
+		if reload {
+			h.float.SetURL(url)
+			h.floatURL = url
+		} else {
+			navigate(h.float, &h.floatURL, url)
+		}
 		h.floatShown = true
 		h.float.Show()
 	})

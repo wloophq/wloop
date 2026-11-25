@@ -35,7 +35,7 @@ func (h *recHost) HidePanel()                   {}
 func (h *recHost) Reword(*texts.Catalog)        { h.mu.Lock(); h.reworded++; h.mu.Unlock() }
 func (h *recHost) ShowDetached(string, string)  {}
 func (h *recHost) OpenExternal(string)          {}
-func (h *recHost) ShowFloat(string)             { h.mu.Lock(); h.floats++; h.mu.Unlock() }
+func (h *recHost) ShowFloat(string, bool)       { h.mu.Lock(); h.floats++; h.mu.Unlock() }
 func (h *recHost) HideFloat()                   {}
 func (h *recHost) SetFloatFrame(window.Rect)    {}
 func (h *recHost) PlaceFloat(window.FloatPlace) {}
@@ -250,6 +250,28 @@ func TestTheFloatKeyTurnsTheFloatOn(t *testing.T) {
 			defer host.mu.Unlock()
 			if host.floats != 2 {
 				t.Fatalf("shown %d times, want at start and after the hotkey hid and showed it", host.floats)
+			}
+		})
+	}
+}
+
+// window.float_over_full_screen reaches the host's listen, which sets the
+// float's collection behavior.
+func TestTheFullScreenKeyReachesTheHost(t *testing.T) {
+	t.Parallel()
+	for _, over := range []bool{false, true} {
+		synctest.Test(t, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			var wg sync.WaitGroup
+			events := heldEvents{release: make(chan struct{})}
+			defer func() { cancel(); close(events.release); wg.Wait() }()
+			host := &recHost{}
+			cockpit := func(string) (string, error) { return "http://127.0.0.1:1/", nil }
+			win := config.Window{Enabled: true, Float: config.FloatOn, FloatOverFullScreen: over}
+			windowShow(ctx, &wg, host, events, cockpit, win, func(string, ...any) {})
+			synctest.Wait()
+			if _, hs := host.state(); hs.FloatOverFullScreen != over {
+				t.Fatalf("listened with FloatOverFullScreen %v, want %v", hs.FloatOverFullScreen, over)
 			}
 		})
 	}

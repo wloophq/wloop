@@ -39,8 +39,9 @@ type Host interface {
 	// OpenExternal opens url, a web address, in the default browser.
 	OpenExternal(url string)
 	// ShowFloat shows the floating widget at url on every space, without
-	// activating the app or taking the keyboard.
-	ShowFloat(url string)
+	// activating the app or taking the keyboard; reload loads url anew though
+	// the float shows it already.
+	ShowFloat(url string, reload bool)
 	HideFloat()
 	// SetFloatFrame moves and sizes the floating widget to r.
 	SetFloatFrame(r Rect)
@@ -108,7 +109,11 @@ type Controller struct {
 	mu         sync.Mutex
 	panelShown bool
 
-	floatShown bool
+	// floatWanted says the float should show, though the daemon could not
+	// serve its page yet; floatShown that the host shows it, at floatURL.
+	floatWanted, floatShown bool
+	floatURL                string
+	floatReady              func()
 	// placement is where the float goes once placed, its saved placement or
 	// the default one on the first screens known.
 	placement   FloatPlacement
@@ -118,7 +123,7 @@ type Controller struct {
 	floatHotkey func()
 	// dragging holds the frame still while the person drags it; tellPlace
 	// says the page is due its place, which it gets once it has loaded
-	// (pageReady) and the frame is set.
+	// (pageReady: it sent a message since its last load) and the frame is set.
 	dragging, tellPlace, pageReady bool
 }
 
@@ -138,8 +143,9 @@ func New(cfg Config) *Controller {
 }
 
 // Run binds the host's handlers, then follows the window requests the daemon
-// relays until ctx ends, subscribing again whenever the daemon goes away; it
-// returns once the stream it follows has closed.
+// relays until ctx ends, subscribing again whenever the daemon goes away and
+// showing the float again once it answers; it returns once the stream it
+// follows has closed.
 func (c *Controller) Run(ctx context.Context) error {
 	err := c.cfg.Host.Listen(Handlers{
 		Hotkey:         c.cfg.Hotkey,
@@ -159,10 +165,13 @@ func (c *Controller) Run(ctx context.Context) error {
 	if err != nil {
 		c.cfg.Log("window.hotkey %q, window.float_hotkey %q: %v", c.cfg.Hotkey, c.cfg.FloatHotkey, err)
 	}
+	back := false
 	for {
 		if changes, err := c.cfg.Daemon.Events(ctx, api.WindowClient, api.Since{}); err == nil {
+			c.refloat(back)
 			c.follow(ctx, changes)
 		}
+		back = true
 		select {
 		case <-ctx.Done():
 			return nil

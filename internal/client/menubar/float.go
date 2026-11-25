@@ -81,14 +81,32 @@ func (c *Controller) visibility() Visibility {
 }
 
 // muteNeeds says whether the float carries what waits on the user, so no
-// Needs you banner posts.
+// Needs you banner posts: while the user hid it for a while, or while it
+// shows a page that has reported in.
 func (c *Controller) muteNeeds() bool {
 	if !c.floatOn() {
 		return false
 	}
 	c.floatMu.Lock()
 	defer c.floatMu.Unlock()
-	return c.started && c.vis.Mode != VisibilityOff
+	switch {
+	case !c.started || c.vis.Mode == VisibilityOff:
+		return false
+	case c.vis.Mode != VisibilityShown:
+		return true
+	}
+	return c.cfg.FloatReady == nil || c.cfg.FloatReady()
+}
+
+// FloatPageReady follows the float's page reporting in: the banners it now
+// carries are withdrawn, off the caller's goroutine.
+func (c *Controller) FloatPageReady() {
+	c.floatMu.Lock()
+	defer c.floatMu.Unlock()
+	if c.running && !c.stopped {
+		ctx := c.runCtx()
+		c.bg.Go(func() { c.redraw(ctx) })
+	}
 }
 
 // StartFloat puts the float as the last run left it, a snooze that has

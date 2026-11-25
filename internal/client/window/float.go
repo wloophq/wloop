@@ -250,26 +250,70 @@ func ParseFloatMessage(raw string) (FloatMessage, bool) {
 // the app the person types in.
 func FloatKeyable(mode string) bool { return mode == ModePanel }
 
-// ShowFloat shows the floating widget where the person left it.
+// ShowFloat shows the floating widget where the person left it, loading its
+// page unless the page loaded at the same URL has reported in. When the
+// daemon cannot serve the page yet the float stays wanted, and Run shows it
+// once the daemon's events answer.
 func (c *Controller) ShowFloat() error {
+	c.mu.Lock()
+	c.floatWanted = true
+	c.mu.Unlock()
 	u, err := c.url(FloatRoute)
 	if err != nil {
 		return err
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.floatShown, c.pageReady, c.tellPlace = true, false, true
+	if !c.floatWanted {
+		return nil
+	}
+	reload := u != c.floatURL || !c.pageReady
+	if reload {
+		c.floatURL, c.pageReady = u, false
+	}
+	c.floatShown, c.tellPlace = true, true
 	c.placeFloat()
-	c.cfg.Host.ShowFloat(u)
+	c.cfg.Host.ShowFloat(u, reload)
 	return nil
+}
+
+// refloat shows the wanted float again as the daemon's events answer: after
+// they were lost, so a page the daemon refused loads anew, or when the daemon
+// could not serve the page before.
+func (c *Controller) refloat(back bool) {
+	c.mu.Lock()
+	again := c.floatWanted && (back || c.floatURL == "")
+	c.mu.Unlock()
+	if !again {
+		return
+	}
+	if err := c.ShowFloat(); err != nil {
+		c.cfg.Log("float: %v", err)
+	}
 }
 
 // HideFloat hides the floating widget.
 func (c *Controller) HideFloat() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.floatShown = false
+	c.floatWanted, c.floatShown = false, false
 	c.cfg.Host.HideFloat()
+}
+
+// FloatReady says whether the float shows a page that has reported in since
+// it last loaded, so it carries what waits on the user.
+func (c *Controller) FloatReady() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.floatShown && c.pageReady
+}
+
+// OnFloatReady sets what runs when the float's page first reports in after a
+// load; until set, nothing.
+func (c *Controller) OnFloatReady(fn func()) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.floatReady = fn
 }
 
 // OnFloatHide sets what a hide the float's page asks for does; until set,
@@ -319,8 +363,15 @@ func (c *Controller) placeFloat() {
 
 func (c *Controller) floatMessage(m FloatMessage) {
 	c.mu.Lock()
+	ready := c.floatReady
+	if c.pageReady || !c.floatShown {
+		ready = nil
+	}
 	c.pageReady = true
 	c.mu.Unlock()
+	if ready != nil {
+		ready()
+	}
 	switch m.Kind {
 	case FloatSize:
 		c.mu.Lock()

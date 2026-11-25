@@ -1,9 +1,12 @@
 package window
 
 import (
+	"errors"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
+	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
@@ -210,7 +213,7 @@ func TestFloatSizeKeepsAnchorCorner(t *testing.T) {
 		if err := r.ctl.ShowFloat(); err != nil {
 			t.Fatal(err)
 		}
-		want(t, r.host.taken(), "float-frame {1288 868 112 32}", "float "+base+"#"+FloatRoute)
+		want(t, r.host.taken(), "float-frame {1288 868 112 32}", "float-load "+base+"#"+FloatRoute)
 		r.host.handlers().OnFloat(FloatMessage{Kind: FloatSize, W: 460, H: 600, Mode: ModePanel})
 		r.host.handlers().OnFloat(size(112, 32))
 		want(t, r.host.taken(), "float-frame {940 300 460 600}", `float-place "" true`, "float-frame {1288 868 112 32}")
@@ -375,5 +378,140 @@ func TestTheFloatHotkeyReachesItsHook(t *testing.T) {
 			t.Fatalf("hook ran %d times, want 1", pressed)
 		}
 		want(t, r.host.taken())
+	})
+}
+
+// downRig is a controller whose daemon does not answer yet: its cockpit URL
+// fails while down holds, and its events serve streams in turn.
+func downRig(down *atomic.Bool, streams ...chan api.Change) *rig {
+	r := &rig{host: &fakeHost{}, events: &fakeEvents{streams: streams, stop: make(chan struct{})}, logs: &logs{}}
+	url := func(route string) (string, error) {
+		if down.Load() {
+			return "", errors.New("no http.json: the daemon is not running")
+		}
+		return cockpitURL(route)
+	}
+	r.ctl = New(Config{Host: r.host, Daemon: r.events, CockpitURL: url, Log: r.logs.logf})
+	return r
+}
+
+// A float shown before the daemon could serve its page shows once the
+// daemon's events answer, though the first subscription already does.
+func TestAFloatTheDaemonCouldNotServeShowsOnceItsEventsAnswer(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var down atomic.Bool
+		down.Store(true)
+		r := downRig(&down, make(chan api.Change))
+		if err := r.ctl.ShowFloat(); err == nil {
+			t.Fatal("ShowFloat with no cockpit URL answered no error")
+		}
+		want(t, r.host.taken())
+		down.Store(false)
+		r.run(t)
+		synctest.Wait()
+		want(t, r.host.taken(), "float-load "+base+"#"+FloatRoute)
+	})
+}
+
+// A float whose page the daemon refused, as it went down, loads its page
+// anew when the daemon's events come back, at the same URL.
+func TestARefusedFloatPageLoadsAnewWhenTheDaemonComesBack(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var down atomic.Bool
+		r := downRig(&down, nil, make(chan api.Change))
+		if err := r.ctl.ShowFloat(); err != nil {
+			t.Fatal(err)
+		}
+		want(t, r.host.taken(), "float-load "+base+"#"+FloatRoute)
+		r.run(t)
+		synctest.Wait()
+		want(t, r.host.taken())
+		time.Sleep(reconnectAfter)
+		synctest.Wait()
+		want(t, r.host.taken(), "float-load "+base+"#"+FloatRoute)
+	})
+}
+
+// A hidden float stays hidden when the daemon comes back.
+func TestAHiddenFloatStaysHiddenWhenTheDaemonComesBack(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var down atomic.Bool
+		down.Store(true)
+		r := downRig(&down, nil, make(chan api.Change))
+		_ = r.ctl.ShowFloat()
+		r.ctl.HideFloat()
+		r.host.taken()
+		down.Store(false)
+		r.run(t)
+		time.Sleep(reconnectAfter)
+		synctest.Wait()
+		want(t, r.host.taken())
+	})
+}
+
+// A float whose page loaded and is shown again at the same URL keeps its
+// page, which learns where it sits at once.
+func TestAFloatShownAgainKeepsItsLoadedPageAndIsPlacedAtOnce(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := shownRig(t, memDefaults{}, laptop)
+		r.ctl.HideFloat()
+		if err := r.ctl.ShowFloat(); err != nil {
+			t.Fatal(err)
+		}
+		got := r.host.taken()
+		if len(got) != 4 || got[0] != "hide-float" || !strings.HasPrefix(got[2], "float-place ") || got[3] != "float "+base+"#"+FloatRoute {
+			t.Fatalf("host calls %q, want the frame, the place and a show without a load", got)
+		}
+	})
+}
+
+// A float whose page loaded keeps it when the daemon restarts at the same
+// URL; the page follows the daemon's events on its own.
+func TestAFloatPageThatLoadedIsKeptAcrossADaemonRestart(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		first := make(chan api.Change)
+		r := &rig{host: &fakeHost{}, events: &fakeEvents{streams: []chan api.Change{first, make(chan api.Change)}, stop: make(chan struct{})}, logs: &logs{}}
+		r.ctl = New(Config{Host: r.host, Daemon: r.events, CockpitURL: cockpitURL, Log: r.logs.logf})
+		r.run(t)
+		synctest.Wait()
+		r.host.handlers().OnScreens([]Screen{laptop})
+		if err := r.ctl.ShowFloat(); err != nil {
+			t.Fatal(err)
+		}
+		r.host.handlers().OnFloat(size(112, 32))
+		r.host.taken()
+		close(first)
+		time.Sleep(reconnectAfter)
+		synctest.Wait()
+		for _, c := range r.host.taken() {
+			if strings.HasPrefix(c, "float-load ") {
+				t.Fatalf("the restart reloaded the float's page: %q", c)
+			}
+		}
+	})
+}
+
+// The float reports ready only once its page has reported in since it was
+// last loaded, and says so to its hook once.
+func TestTheFloatIsReadyOnceItsPageReportsIn(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := floatRig(t, nil, laptop)
+		readies := 0
+		r.ctl.OnFloatReady(func() { readies++ })
+		if err := r.ctl.ShowFloat(); err != nil {
+			t.Fatal(err)
+		}
+		if r.ctl.FloatReady() {
+			t.Fatal("ready before its page reported in")
+		}
+		r.host.handlers().OnFloat(size(112, 32))
+		r.host.handlers().OnFloat(size(460, 600))
+		if !r.ctl.FloatReady() || readies != 1 {
+			t.Fatalf("ready %v, hook ran %d times; want ready, once", r.ctl.FloatReady(), readies)
+		}
+		r.ctl.HideFloat()
+		if r.ctl.FloatReady() {
+			t.Fatal("a hidden float reports ready")
+		}
 	})
 }

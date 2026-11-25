@@ -176,6 +176,7 @@ var configGrammar = slices.Concat(
 		cfgEnum("window.float", cfgValues("on", "off"), "off", "on shows the floating widget, which carries what waits on you; Needs you banners do not post unless it is turned off from the menu bar. Needs the app's own window."),
 		cfgKey("window.float_hotkey", KindText, "cmd+option+.", "The global shortcut that hides the floating widget until something new arrives, and shows it again, such as cmd+shift+j; empty for none. Bound only while window.float is on. The default leaves out ctrl+option, VoiceOver's modifier."),
 		cfgKey("window.float_morning", KindText, "09:00", "The local HH:MM at which Hide until tomorrow shows the floating widget again."),
+		cfgKey("window.float_over_full_screen", KindBool, "false", "The floating widget shows over a full-screen app or a presentation too; off, it stays off a full-screen space."),
 		retired(cfgKey("dossiers", KindTable, "", "Retired: the task dossiers are gone, and a config that still sets the table loads.")),
 		retired(cfgKey("dossiers.archive_after", KindDur, "", "Retired.")),
 		retired(cfgKey("dossiers.purge_after", KindDur, "", "Retired.")),

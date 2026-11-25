@@ -73,6 +73,10 @@ type Config struct {
 	Float     bool
 	ShowFloat func() error
 	HideFloat func()
+	// FloatReady says whether the float shows a page that has reported in,
+	// so it carries what waits on the user; nil takes every shown float as
+	// ready.
+	FloatReady func() bool
 	// Defaults keeps the float's visibility across launches; nil keeps it
 	// for this run only.
 	Defaults window.Defaults
