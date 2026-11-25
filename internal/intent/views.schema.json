@@ -5,10 +5,10 @@
   "properties": {
     "badge": {
       "additionalProperties": false,
-      "description": "The menu bar's badge.",
+      "description": "The views whose tasks the menu bar notifies, the daily digest counts and `status` prints; the menu bar's title counts Needs you, the queue of every decision kind, instead.",
       "properties": {
         "views": {
-          "description": "The views whose counts the badge adds up, each a view of views.",
+          "description": "Those views, each a view of views: the tasks of the ones on the rail post the menu bar's banners, the digest counts what moved in them, `status` prints their tasks, and their counts add up to the counters' badge, which no client title reads.",
           "items": {
             "type": "string"
           },

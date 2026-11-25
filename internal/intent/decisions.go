@@ -260,8 +260,6 @@ func (l *decisionsLoad) mergeKind(s *sheet, k decision.Kind, m mKind) {
 	l.def.Kinds[k] = t
 }
 
-// check says what of the decisions names what the profile lacks: a kind's view, a kind's primary gate intent,
-// a plugin's primary action.
 // queueViews gives each view of views drawn as the queue of every kind that sets no when of its own the union of
 // the whens of the views the kinds name, so it lists the tasks the queue walks and a profile that edits a kind's
 // view moves it too.
@@ -293,6 +291,8 @@ func (l *decisionsLoad) queueViews(views *ViewsDef, tasks TasksDef) Problems {
 	return out
 }
 
+// check says what of the decisions names what the profile lacks: a kind's view, a kind's primary gate intent,
+// a plugin's primary action.
 func (l *decisionsLoad) check(views ViewsDef, gates GatesDef, actions map[string]BuiltinAction, offered func(dunit.ProviderID) []string) Problems {
 	var out Problems
 	viewIDs := views.IDs()

@@ -3,7 +3,10 @@ package daemon
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strconv"
@@ -13,6 +16,9 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/api/client"
+	"github.com/wloophq/wloop/internal/brand"
+	"github.com/wloophq/wloop/internal/client/menubar"
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/domain/decision"
@@ -488,5 +494,64 @@ func TestNeedsYouIsOneCount(t *testing.T) {
 	}
 	if !slices.Equal(labels, []string{"question", "draft"}) {
 		t.Fatalf("item labels %q, want each item's kind word, so the task's two rows read apart", labels)
+	}
+}
+
+// titleTray keeps the menu bar's title.
+type titleTray struct {
+	mu    sync.Mutex
+	title string
+}
+
+func (r *titleTray) SetTitle(title string)    { r.mu.Lock(); r.title = title; r.mu.Unlock() }
+func (*titleTray) SetMenu([]menubar.MenuItem) {}
+
+// quietNotifier posts nothing.
+type quietNotifier struct{}
+
+func (quietNotifier) Authorize(context.Context) (menubar.Permission, error) {
+	return menubar.PermissionDenied, nil
+}
+func (quietNotifier) Permission(context.Context) (menubar.Permission, error) {
+	return menubar.PermissionDenied, nil
+}
+func (quietNotifier) Post(menubar.Notification) error   { return nil }
+func (quietNotifier) Withdraw([]string)                 {}
+func (quietNotifier) WithdrawAll()                      {}
+func (quietNotifier) OnResponse(func(menubar.Response)) {}
+
+func TestTheCounterTheQueueAndTheMenuBarTitleAgree(t *testing.T) {
+	t.Parallel()
+	q := newQueueRig(t, nil)
+	q.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "ship the retries"})
+	q.open(t, "t-0000000000000001", gate.KindQuestion, "7", time.Hour)
+	q.open(t, "t-0000000000000001", gate.KindDraft, "41", 2*time.Hour)
+	dir, err := os.MkdirTemp("", "q")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	l, err := net.Listen("unix", filepath.Join(dir, "d.sock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewUnstartedServer(q.s.Handler())
+	srv.Listener.Close()
+	srv.Listener = l
+	srv.Start()
+	t.Cleanup(srv.Close)
+	tray := &titleTray{}
+	bar := menubar.New(menubar.Config{Daemon: client.New(l.Addr().String()), Tray: tray, Notifier: quietNotifier{}, Now: func() time.Time { return tasksNow },
+		CockpitURL: func(route string) (string, error) { return "cockpit#" + route, nil }, Log: t.Logf})
+	bar.Refresh(context.Background())
+	var h api.Home
+	get(t, q.s, api.HomePath, &h)
+	i := slices.IndexFunc(h.Briefing.Counters, func(c api.HomeCounter) bool { return c.ID == "needs-you" })
+	all := q.all(t)
+	tray.mu.Lock()
+	title := tray.title
+	tray.mu.Unlock()
+	if i < 0 || h.Briefing.Counters[i].Count != 2 || all.Total != 2 || title != brand.Name+" 2" {
+		t.Fatalf("counter %+v, queue %d, title %q: want the task's two items counted alike", h.Briefing.Counters, all.Total, title)
 	}
 }
