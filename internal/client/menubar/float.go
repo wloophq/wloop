@@ -3,6 +3,8 @@ package menubar
 import (
 	"context"
 	"encoding/json"
+	"maps"
+	"slices"
 	"strconv"
 	"time"
 
@@ -10,11 +12,12 @@ import (
 	"github.com/wloophq/wloop/internal/client/window"
 )
 
-// Visibility is how the floating widget shows: Mode, and for a snooze the
-// time it shows again.
+// Visibility is how the floating widget shows: Mode, for a snooze the time
+// it shows again, and while quiet the keys of the queue the user last saw.
 type Visibility struct {
 	Mode  string    `json:"mode"`
 	Until time.Time `json:"until,omitzero"`
+	Seen  []string  `json:"seen,omitempty"`
 }
 
 // The float's modes. Quiet hides it until something new arrives in the queue,
@@ -38,15 +41,36 @@ const (
 // beside its placement.
 var VisibilityKey = window.PlacementKey + ".visibility"
 
-const morningHour = 9
+// snoozeHour is how long "Hide for 1 hour" hides the float.
+const snoozeHour = time.Hour
 
-// nextMorning is the next 09:00 after now, in now's location.
-func nextMorning(now time.Time) time.Time {
-	at := time.Date(now.Year(), now.Month(), now.Day(), morningHour, 0, 0, 0, now.Location())
-	if !at.After(now) {
-		at = time.Date(now.Year(), now.Month(), now.Day()+1, morningHour, 0, 0, 0, now.Location())
+type clockTime struct{ hour, minute int }
+
+// defaultMorning is when "Hide until tomorrow" ends while Config.FloatMorning
+// does not read.
+var defaultMorning = clockTime{9, 0}
+
+// morning is Config.FloatMorning, the local "HH:MM" a snooze until tomorrow
+// ends at.
+func (c *Controller) morning() clockTime {
+	if c.cfg.FloatMorning == "" {
+		return defaultMorning
 	}
-	return at
+	t, err := time.Parse("15:04", c.cfg.FloatMorning)
+	if err != nil {
+		c.cfg.Log("float: window.float_morning %q is not HH:MM; using 09:00", c.cfg.FloatMorning)
+		return defaultMorning
+	}
+	return clockTime{t.Hour(), t.Minute()}
+}
+
+// nextMorning is the next time at after now, in now's location.
+func nextMorning(now time.Time, at clockTime) time.Time {
+	next := time.Date(now.Year(), now.Month(), now.Day(), at.hour, at.minute, 0, 0, now.Location())
+	if !next.After(now) {
+		next = time.Date(now.Year(), now.Month(), now.Day()+1, at.hour, at.minute, 0, 0, now.Location())
+	}
+	return next
 }
 
 // floatOn says whether this app has a float the configuration turned on.
@@ -61,28 +85,66 @@ func (c *Controller) visibility() Visibility {
 // muteNeeds says whether the float carries what waits on the user, so no
 // Needs you banner posts.
 func (c *Controller) muteNeeds() bool {
-	return c.floatOn() && c.visibility().Mode != VisibilityOff
+	if !c.floatOn() {
+		return false
+	}
+	c.floatMu.Lock()
+	defer c.floatMu.Unlock()
+	return c.started && c.vis.Mode != VisibilityOff
 }
 
-// startFloat puts the float as the last run left it; a snooze that has
-// passed shows it.
-func (c *Controller) startFloat() {
+// StartFloat puts the float as the last run left it, a snooze that has
+// passed showing it; until it runs, nothing moves the float. It runs once:
+// before the daemon answers when it is down at launch, so the float can say
+// it is offline, else as Run starts.
+func (c *Controller) StartFloat() {
 	if !c.floatOn() {
 		return
 	}
+	c.floatMu.Lock()
+	defer c.floatMu.Unlock()
+	if c.started || c.stopped {
+		return
+	}
+	c.started = true
 	v := c.loadVisibility()
 	if v.Mode == VisibilitySnoozed && !c.cfg.Now().Before(v.Until) {
 		v = Visibility{Mode: VisibilityShown}
 	}
+	c.vis = v
+	if v.Mode == VisibilityQuiet && v.Seen != nil {
+		c.seen = setOf(v.Seen)
+	}
+	if v.Mode == VisibilityShown {
+		c.showFloat()
+	}
+}
+
+// runFloat lets the float start goroutines, in bg, and arms a snooze's
+// timer.
+func (c *Controller) runFloat() {
 	c.floatMu.Lock()
 	defer c.floatMu.Unlock()
-	c.vis = v
-	switch v.Mode {
-	case VisibilityShown:
-		c.showFloat()
-	case VisibilitySnoozed:
-		c.wakeAt(v.Until)
+	if c.stopped {
+		return
 	}
+	c.running = true
+	if c.vis.Mode == VisibilitySnoozed {
+		c.wakeAt(c.vis.Until)
+	}
+}
+
+// stopFloat keeps anything from moving the float from now on, then waits on
+// the goroutines it started.
+func (c *Controller) stopFloat() {
+	c.floatMu.Lock()
+	c.stopped, c.running = true, false
+	if c.wake != nil {
+		close(c.wake)
+		c.wake = nil
+	}
+	c.floatMu.Unlock()
+	c.bg.Wait()
 }
 
 func (c *Controller) loadVisibility() Visibility {
@@ -95,10 +157,12 @@ func (c *Controller) loadVisibility() Visibility {
 		return shown
 	}
 	switch v.Mode {
-	case VisibilityShown, VisibilityQuiet, VisibilityOff:
+	case VisibilityShown, VisibilityOff:
 		return Visibility{Mode: v.Mode}
+	case VisibilityQuiet:
+		return Visibility{Mode: v.Mode, Seen: v.Seen}
 	case VisibilitySnoozed:
-		return v
+		return Visibility{Mode: v.Mode, Until: v.Until}
 	}
 	return shown
 }
@@ -110,28 +174,24 @@ func (c *Controller) FloatHide(mode string) {
 	case HideQuiet:
 		c.setVisibility(Visibility{Mode: VisibilityQuiet})
 	case HideHour:
-		c.setVisibility(Visibility{Mode: VisibilitySnoozed, Until: now.Add(time.Hour)})
+		c.setVisibility(Visibility{Mode: VisibilitySnoozed, Until: now.Add(snoozeHour)})
 	case HideTomorrow:
-		c.setVisibility(Visibility{Mode: VisibilitySnoozed, Until: nextMorning(now)})
+		c.setVisibility(Visibility{Mode: VisibilitySnoozed, Until: nextMorning(now, c.morning())})
 	default:
 		c.cfg.Log("float: no way to hide %q", mode)
 	}
 }
 
 // ToggleFloat is the hotkey's: it quiets a shown float and shows a hidden one.
-func (c *Controller) ToggleFloat() {
-	if c.visibility().Mode == VisibilityShown {
-		c.setVisibility(Visibility{Mode: VisibilityQuiet})
-		return
-	}
-	c.setVisibility(Visibility{Mode: VisibilityShown})
-}
+func (c *Controller) ToggleFloat() { c.toggle(VisibilityQuiet) }
 
 // trayFloat is the tray item's: it turns a shown float off and shows any
 // other.
-func (c *Controller) trayFloat() {
+func (c *Controller) trayFloat() { c.toggle(VisibilityOff) }
+
+func (c *Controller) toggle(hidden string) {
 	if c.visibility().Mode == VisibilityShown {
-		c.setVisibility(Visibility{Mode: VisibilityOff})
+		c.setVisibility(Visibility{Mode: hidden})
 		return
 	}
 	c.setVisibility(Visibility{Mode: VisibilityShown})
@@ -146,24 +206,32 @@ func (c *Controller) floatItem() []MenuItem {
 	return []MenuItem{{Title: c.words().T("Floating widget", nil), Enabled: true, Checked: c.visibility().Mode != VisibilityOff, Action: c.trayFloat}}
 }
 
-// setVisibility moves the float to v, keeps it for the next launch, then
-// redraws the menu and the banners off the caller's goroutine, which may be
-// the host's or the main thread.
+// setVisibility moves the float to v and keeps it for the next launch; while
+// Run runs, it redraws the menu and the banners off the caller's goroutine,
+// which may be the host's or the main thread.
 func (c *Controller) setVisibility(v Visibility) {
 	if !c.floatOn() {
 		return
 	}
 	c.floatMu.Lock()
+	defer c.floatMu.Unlock()
+	if !c.started || c.stopped {
+		return
+	}
 	c.moveFloat(v)
-	c.floatMu.Unlock()
-	ctx := c.runCtx()
-	c.bg.Go(func() { c.redraw(ctx) })
+	if c.running {
+		ctx := c.runCtx()
+		c.bg.Go(func() { c.redraw(ctx) })
+	}
 }
 
 // moveFloat shows or hides the float as v asks and saves v; it runs under
 // floatMu.
 func (c *Controller) moveFloat(v Visibility) {
 	was := c.vis.Mode
+	if v.Mode == VisibilityQuiet && c.seen != nil {
+		v.Seen = slices.Sorted(maps.Keys(c.seen))
+	}
 	c.vis = v
 	if c.wake != nil {
 		close(c.wake)
@@ -178,10 +246,15 @@ func (c *Controller) moveFloat(v Visibility) {
 	if v.Mode == VisibilitySnoozed {
 		c.wakeAt(v.Until)
 	}
-	if c.cfg.Defaults != nil {
-		b, _ := json.Marshal(v)
-		c.cfg.Defaults.SetString(VisibilityKey, string(b))
+	c.saveVisibility()
+}
+
+func (c *Controller) saveVisibility() {
+	if c.cfg.Defaults == nil {
+		return
 	}
+	b, _ := json.Marshal(c.vis)
+	c.cfg.Defaults.SetString(VisibilityKey, string(b))
 }
 
 func (c *Controller) showFloat() {
@@ -191,8 +264,11 @@ func (c *Controller) showFloat() {
 }
 
 // wakeAt shows the float at until unless it moved before; it runs under
-// floatMu.
+// floatMu, and starts nothing unless Run runs.
 func (c *Controller) wakeAt(until time.Time) {
+	if !c.running || c.stopped {
+		return
+	}
 	stop := make(chan struct{})
 	c.wake = stop
 	ctx := c.runCtx()
@@ -219,30 +295,58 @@ func (c *Controller) snoozeEnded(until time.Time) {
 	c.redraw(c.runCtx())
 }
 
-// floatArrivals shows a quiet float when the queue holds an item it did not
-// hold on the last read, and a snoozed one whose time passed while its timer
-// stood still, as on a sleeping Mac; the first read only learns the queue.
-// It runs under refreshMu, after a read of the queue.
-func (c *Controller) floatArrivals() {
+// floatRefreshed follows a refresh that read the daemon. A snooze past its
+// time shows the float, since a sleeping Mac stops its timer. When the
+// refresh read the queue, a quiet float shows if the queue holds an item
+// the last read did not, and otherwise keeps the queue as the user last saw
+// it. The first read after launch only learns the queue, unless the float
+// starts quiet with a saved one. It runs under refreshMu.
+func (c *Controller) floatRefreshed(queueRead bool) {
 	if !c.floatOn() {
 		return
 	}
-	keys := make(map[string]bool, len(c.needs.Items))
+	var keys map[string]bool
+	if queueRead {
+		keys = make(map[string]bool, len(c.needs.Items))
+		for _, it := range c.needs.Items {
+			keys[queueKey(it)] = true
+		}
+	}
+	c.floatMu.Lock()
+	defer c.floatMu.Unlock()
+	if !c.started {
+		return
+	}
+	if c.vis.Mode == VisibilitySnoozed && !c.cfg.Now().Before(c.vis.Until) {
+		c.moveFloat(Visibility{Mode: VisibilityShown})
+	}
+	if !queueRead {
+		return
+	}
 	fresh := false
-	for _, it := range c.needs.Items {
-		k := queueKey(it)
-		keys[k] = true
+	for k := range keys {
 		fresh = fresh || c.seen != nil && !c.seen[k]
 	}
 	c.seen = keys
-	c.floatMu.Lock()
-	defer c.floatMu.Unlock()
-	switch {
-	case c.vis.Mode == VisibilityQuiet && fresh:
-		c.moveFloat(Visibility{Mode: VisibilityShown})
-	case c.vis.Mode == VisibilitySnoozed && !c.cfg.Now().Before(c.vis.Until):
-		c.moveFloat(Visibility{Mode: VisibilityShown})
+	if c.vis.Mode != VisibilityQuiet {
+		return
 	}
+	if fresh {
+		c.moveFloat(Visibility{Mode: VisibilityShown})
+		return
+	}
+	if seen := slices.Sorted(maps.Keys(keys)); !slices.Equal(seen, c.vis.Seen) {
+		c.vis.Seen = seen
+		c.saveVisibility()
+	}
+}
+
+func setOf(keys []string) map[string]bool {
+	m := make(map[string]bool, len(keys))
+	for _, k := range keys {
+		m[k] = true
+	}
+	return m
 }
 
 // queueKey tells a queue item from every other: its kind, its task, and its

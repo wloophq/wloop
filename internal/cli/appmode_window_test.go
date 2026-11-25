@@ -224,28 +224,31 @@ func TestTheFloatKeyTurnsTheFloatOn(t *testing.T) {
 			defer func() { cancel(); close(events.release); wg.Wait() }()
 			host := &recHost{}
 			cockpit := func(string) (string, error) { return "http://127.0.0.1:1/", nil }
-			win := config.Window{Enabled: true, Float: float, FloatHotkey: "ctrl+option+f"}
+			win := config.Window{Enabled: true, Float: float, FloatHotkey: "cmd+option+.", FloatMorning: "07:30"}
 			ctl := windowShow(ctx, &wg, host, events, cockpit, win, func(string, ...any) {})
 			synctest.Wait()
 			cfg := withWindow(menubar.Config{Tray: &recTray{}, Notifier: silentNotifier{}}, ctl, host, win)
 			on := float == config.FloatOn
-			if cfg.Float != on || cfg.Window == nil || cfg.ShowFloat == nil || cfg.HideFloat == nil {
+			if cfg.Float != on || cfg.FloatMorning != "07:30" || cfg.Window == nil || cfg.ShowFloat == nil || cfg.HideFloat == nil {
 				t.Fatalf("float %q: menu bar float %v, window %v, show %v, hide %v", float, cfg.Float, cfg.Window != nil, cfg.ShowFloat != nil, cfg.HideFloat != nil)
 			}
 			_, hs := host.state()
-			if want := map[bool]string{true: "ctrl+option+f"}[on]; hs.FloatHotkey != want {
+			if want := map[bool]string{true: "cmd+option+."}[on]; hs.FloatHotkey != want {
 				t.Fatalf("float %q: bound float hotkey %q, want %q", float, hs.FloatHotkey, want)
 			}
 			if !on {
 				return
 			}
-			hookFloat(ctl, menubar.New(cfg))
+			c := menubar.New(cfg)
+			hookFloat(ctl, c)
+			c.StartFloat()
+			hs.OnFloatHotkey()
 			hs.OnFloatHotkey()
 			synctest.Wait()
 			host.mu.Lock()
 			defer host.mu.Unlock()
-			if host.floats != 1 {
-				t.Fatalf("the float hotkey showed the float %d times, want 1", host.floats)
+			if host.floats != 2 {
+				t.Fatalf("shown %d times, want at start and after the hotkey hid and showed it", host.floats)
 			}
 		})
 	}

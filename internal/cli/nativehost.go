@@ -93,7 +93,7 @@ func withWindow(cfg menubar.Config, ctl *window.Controller, host window.Host, wi
 		return cfg
 	}
 	cfg.Window, cfg.ShowFloat, cfg.HideFloat = ctl.Show, ctl.ShowFloat, ctl.HideFloat
-	cfg.Float = win.Float == config.FloatOn
+	cfg.Float, cfg.FloatMorning = win.Float == config.FloatOn, win.FloatMorning
 	cfg.Defaults, _ = host.(window.Defaults)
 	return cfg
 }

@@ -161,7 +161,7 @@ func TestSnoozeUntilTomorrowIsNextLocal0900(t *testing.T) {
 		"the clocks fall back":      {time.Date(2026, 10, 31, 22, 0, 0, 0, ny), time.Date(2026, 11, 1, 9, 0, 0, 0, ny), 12 * time.Hour},
 	} {
 		t.Run(name, func(t *testing.T) {
-			got := nextMorning(c.now)
+			got := nextMorning(c.now, nine)
 			if !got.Equal(c.want) || got.Sub(c.now) != c.wait {
 				t.Fatalf("next morning of %v is %v (%v away), want %v (%v away)", c.now, got, got.Sub(c.now), c.want, c.wait)
 			}
@@ -229,7 +229,7 @@ func TestBannersSuppressedUnlessOff(t *testing.T) {
 		t.Run(fmt.Sprintf("%s float %v", c.mode, c.float), func(t *testing.T) {
 			r, _ := floatRig(t, nil)
 			r.c.cfg.Float = c.float
-			r.c.vis = Visibility{Mode: c.mode}
+			r.c.vis, r.c.started = Visibility{Mode: c.mode}, true
 			r.d.tasks["inbox"] = []api.TaskView{pendingTask(1)}
 			r.c.Refresh(context.Background())
 			r.c.postNotice(api.Notice{ID: "n-1", Workflow: "nudge", Text: "a nudge went out"})
@@ -266,7 +266,7 @@ func TestShowingTheFloatWithdrawsTheNeedsBanners(t *testing.T) {
 
 func TestDigestPostsWhileShown(t *testing.T) {
 	r, _ := floatRig(t, nil)
-	r.c.vis = Visibility{Mode: VisibilityShown}
+	r.c.vis, r.c.started = Visibility{Mode: VisibilityShown}, true
 	day := now.Format(time.DateOnly)
 	r.d.digests[day] = api.Digest{Day: day, Title: "Daily digest", Body: "2 new in Next or Waiting", Tasks: []string{"e-1", "e-2"}}
 	if err := r.c.postDigest(context.Background(), day); err != nil {
@@ -339,7 +339,7 @@ func TestFloatHideModes(t *testing.T) {
 		for mode, want := range map[string]Visibility{
 			HideQuiet:    {Mode: VisibilityQuiet},
 			HideHour:     {Mode: VisibilitySnoozed, Until: time.Now().Add(time.Hour)},
-			HideTomorrow: {Mode: VisibilitySnoozed, Until: nextMorning(time.Now())},
+			HideTomorrow: {Mode: VisibilitySnoozed, Until: nextMorning(time.Now(), nine)},
 		} {
 			r.c.ToggleFloat()
 			r.c.FloatHide(mode)
@@ -479,6 +479,167 @@ func TestARelaunchKeepsTheFloatOff(t *testing.T) {
 		synctest.Wait()
 		if shows, _ := h.counts(); shows != 0 || needsPosted(r.notes) != 1 {
 			t.Fatalf("off at relaunch: shown %d, NEEDS banners %d", shows, needsPosted(r.notes))
+		}
+	})
+}
+
+var nine = clockTime{9, 0}
+
+func TestTheMorningIsTheConfiguredTime(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r, _ := floatRig(t, nil)
+		r.c.cfg.FloatMorning = "07:30"
+		r.d.events = make(chan api.Change)
+		at := time.Date(2026, 11, 25, 22, 0, 0, 0, time.UTC)
+		r.c.cfg.Now = func() time.Time { return at }
+		stop := run(t, r)
+		defer stop()
+		synctest.Wait()
+		r.c.FloatHide(HideTomorrow)
+		synctest.Wait()
+		if v := r.c.visibility(); !v.Until.Equal(time.Date(2026, 11, 26, 7, 30, 0, 0, time.UTC)) {
+			t.Fatalf("until %v, want 07:30 tomorrow", v.Until)
+		}
+	})
+}
+
+func TestAnUnreadableMorningIsNine(t *testing.T) {
+	r, _ := floatRig(t, nil)
+	r.c.cfg.FloatMorning = "9am"
+	if got := r.c.morning(); got != nine {
+		t.Fatalf("morning %v, want 09:00", got)
+	}
+}
+
+// Items that arrived while the app was closed bring a quiet float back.
+func TestARelaunchInQuietComparesWithTheSavedQueue(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDefaults{}
+		r, _ := floatRig(t, d)
+		r.d.events = make(chan api.Change)
+		r.d.queue = queueOf(1)
+		stop := run(t, r)
+		synctest.Wait()
+		r.c.FloatHide(HideQuiet)
+		synctest.Wait()
+		stop()
+
+		r2, h2 := floatRig(t, d)
+		r2.d.events = make(chan api.Change)
+		r2.d.queue = queueOf(2)
+		stop2 := run(t, r2)
+		defer stop2()
+		synctest.Wait()
+		r2.change(queueOf(2))
+		if shows, _ := h2.counts(); shows != 1 || r2.mode() != VisibilityShown {
+			t.Fatalf("relaunched quiet with t-2 new: shown %d, mode %q; want one show", shows, r2.mode())
+		}
+	})
+}
+
+// While quiet, each read keeps the queue the user last saw: an item that left
+// and came back while the app was closed is new.
+func TestQuietKeepsTheLastReadQueue(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDefaults{}
+		r, _ := floatRig(t, d)
+		r.d.events = make(chan api.Change)
+		r.d.queue = queueOf(2)
+		stop := run(t, r)
+		synctest.Wait()
+		r.c.FloatHide(HideQuiet)
+		synctest.Wait()
+		r.change(queueOf(1))
+		stop()
+
+		r2, h2 := floatRig(t, d)
+		r2.d.events = make(chan api.Change)
+		r2.d.queue = queueOf(2)
+		stop2 := run(t, r2)
+		defer stop2()
+		synctest.Wait()
+		if shows, _ := h2.counts(); shows != 1 {
+			t.Fatalf("shown %d times; t-2 left and came back, want one show", shows)
+		}
+	})
+}
+
+// A snooze whose timer stood still, as on a sleeping Mac, ends on the next
+// refresh past its time.
+func TestASnoozeThatSleptPastUntilShowsOnTheNextRefresh(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r, h := floatRig(t, nil)
+		r.d.events = make(chan api.Change)
+		var mu sync.Mutex
+		at := time.Date(2026, 11, 25, 10, 0, 0, 0, time.UTC)
+		r.c.cfg.Now = func() time.Time { mu.Lock(); defer mu.Unlock(); return at }
+		r.c.cfg.After = func(time.Duration) <-chan time.Time { return make(chan time.Time) }
+		stop := run(t, r)
+		defer stop()
+		synctest.Wait()
+		r.c.FloatHide(HideHour)
+		synctest.Wait()
+		mu.Lock()
+		at = at.Add(3 * time.Hour)
+		mu.Unlock()
+		r.d.events <- api.Change{Health: true}
+		synctest.Wait()
+		if shows, _ := h.counts(); shows != 2 || r.mode() != VisibilityShown {
+			t.Fatalf("after waking past the snooze: shown %d, mode %q", shows, r.mode())
+		}
+	})
+}
+
+func TestNothingMovesTheFloatOnceRunEnded(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r, h := floatRig(t, nil)
+		r.d.events = make(chan api.Change)
+		stop := run(t, r)
+		synctest.Wait()
+		stop()
+		r.c.FloatHide(HideHour)
+		r.c.ToggleFloat()
+		synctest.Wait()
+		if shows, hides := h.counts(); shows != 1 || hides != 0 || r.mode() != VisibilityShown {
+			t.Fatalf("after Run ended: shown %d, hidden %d, mode %q", shows, hides, r.mode())
+		}
+	})
+}
+
+func TestNothingMovesTheFloatBeforeItsVisibilityLoaded(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDefaults{}
+		d.SetString(VisibilityKey, `{"mode":"off"}`)
+		r, h := floatRig(t, d)
+		r.c.FloatHide(HideQuiet)
+		r.c.ToggleFloat()
+		r.c.trayFloat()
+		synctest.Wait()
+		if shows, hides := h.counts(); shows != 0 || hides != 0 || r.mode() != "" {
+			t.Fatalf("before the load: shown %d, hidden %d, mode %q", shows, hides, r.mode())
+		}
+		if d.String(VisibilityKey) != `{"mode":"off"}` {
+			t.Fatalf("the saved visibility became %s", d.String(VisibilityKey))
+		}
+	})
+}
+
+// With the daemon down at launch the float shows before Run, so its page can
+// say it is offline.
+func TestTheFloatShowsWhileTheDaemonIsDownAtLaunch(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r, h := floatRig(t, nil)
+		r.d.err = errors.New("connection refused")
+		r.c.StartFloat()
+		r.c.Refresh(context.Background())
+		r.c.StartFloat()
+		synctest.Wait()
+		if shows, hides := h.counts(); shows != 1 || hides != 0 || r.mode() != VisibilityShown {
+			t.Fatalf("daemon down at launch: shown %d, hidden %d, mode %q", shows, hides, r.mode())
+		}
+		r.c.ToggleFloat()
+		if _, hides := h.counts(); hides != 1 {
+			t.Fatalf("the hotkey did nothing while the daemon was down: hidden %d", hides)
 		}
 	})
 }

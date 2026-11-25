@@ -1649,5 +1649,6 @@ config.turns.per_unit_per_day = 5
 config.ui.locale = ""
 config.window.enabled = true
 config.window.float = "off"
-config.window.float_hotkey = "ctrl+option+f"
+config.window.float_hotkey = "cmd+option+."
+config.window.float_morning = "09:00"
 config.window.hotkey = "ctrl+option+space"

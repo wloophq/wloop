@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -10,6 +11,7 @@ type bootApp struct{ calls []string }
 
 func (a *bootApp) Refresh(context.Context)   { a.calls = append(a.calls, "refresh") }
 func (a *bootApp) Run(context.Context) error { a.calls = append(a.calls, "run"); return nil }
+func (a *bootApp) StartFloat()               { a.calls = append(a.calls, "float") }
 
 func TestBootMenubarLoadsOnceWithTheDaemonUp(t *testing.T) {
 	t.Parallel()
@@ -27,7 +29,7 @@ func TestBootMenubarPaintsTheErrorMenuWithTheDaemonDown(t *testing.T) {
 	app := &bootApp{}
 	err := bootMenubar(context.Background(), func(context.Context) error { return errors.New("down") },
 		func(context.Context) error { return nil }, app)
-	if err != nil || len(app.calls) != 2 || app.calls[0] != "refresh" || app.calls[1] != "run" {
-		t.Fatalf("calls %v, err %v: want Refresh then Run", app.calls, err)
+	if err != nil || strings.Join(app.calls, ",") != "float,refresh,run" {
+		t.Fatalf("calls %v, err %v: want the float, Refresh, then Run", app.calls, err)
 	}
 }

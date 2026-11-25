@@ -76,6 +76,9 @@ type Config struct {
 	// Defaults keeps the float's visibility across launches; nil keeps it
 	// for this run only.
 	Defaults window.Defaults
+	// FloatMorning is the local "HH:MM" a snooze until tomorrow ends at;
+	// "" is 09:00.
+	FloatMorning string
 	// Reword gets each catalog of client strings the daemon serves, as the
 	// strings change; nil rewords nothing.
 	Reword func(*texts.Catalog)
@@ -131,12 +134,15 @@ type Controller struct {
 
 	// drawn says the last refresh drew the menu, under refreshMu.
 	drawn bool
-	// seen are the keys of the queue's items on its last read, nil before
-	// the first, under refreshMu.
-	seen map[string]bool
 
 	floatMu sync.Mutex
 	vis     Visibility
+	// seen are the keys of the queue's items on its last read, nil before
+	// the first, under floatMu.
+	seen map[string]bool
+	// started says the saved visibility loaded, running that Run runs, and
+	// stopped that it ended; all under floatMu.
+	started, running, stopped bool
 	// wake stops the timer of the snooze, under floatMu.
 	wake chan struct{}
 	// bg are the goroutines the float starts, which Run waits on.
@@ -216,10 +222,11 @@ func (c *Controller) Run(ctx context.Context) error {
 	c.mu.Lock()
 	c.ctx = ctx
 	c.mu.Unlock()
-	defer c.bg.Wait()
+	defer c.stopFloat()
 	c.cfg.Notifier.WithdrawAll()
 	c.forgetSent()
-	c.startFloat()
+	c.StartFloat()
+	c.runFloat()
 	if c.cfg.DigestAt != "" {
 		go c.digests(ctx)
 	}
@@ -379,9 +386,7 @@ func (c *Controller) refresh(ctx context.Context, health, rows bool) {
 		})
 		return
 	}
-	if rows {
-		c.floatArrivals()
-	}
+	c.floatRefreshed(rows)
 	c.cfg.Tray.SetTitle(c.title())
 	c.cfg.Tray.SetMenu(c.menu(c.health))
 	c.notify()
