@@ -106,7 +106,6 @@ func TestApproveOptionPinsRev(t *testing.T) {
 		{"rev 0", answer(task.ActorPerson, ""), 0, nil},
 		{"a resolver the user does not drive", answer(task.ActorAgent, "s-stranger"), 3, nil},
 		{"a draft on another unit", answer(task.ActorPerson, ""), 3, func(g *gate.Gate) { g.Unit.Key = "acme/api#8" }},
-		{"a draft of another session", answer(task.ActorPerson, ""), 3, func(g *gate.Gate) { g.Session, g.Sessions = "s-other", nil }},
 		{"a rule", gates.Resolution{Intent: "answer", Answer: "x", By: task.ActorWorkflow, Rule: "rule 0"}, 3, nil},
 	} {
 		t.Run(c.name, func(t *testing.T) {
@@ -303,34 +302,25 @@ func TestAnAnswerDoesNotClaimADraftAnotherResolverApproved(t *testing.T) {
 	}
 }
 
-// A session that revised a draft asks the question whose option points to it: picking the option approves the
-// draft, as for the session that proposed it, and a session that neither proposed nor revised it does not.
-func TestAnOptionPointsToADraftItsQuestionsSessionRevised(t *testing.T) {
+// The question's turn chain, which the caller checks, ties the question to its options' drafts, not the session
+// that asks: a session that revised the draft, or one that never touched it, asks the question, and picking the
+// option approves the draft.
+func TestAnOptionsDraftNeedNotBeOfTheQuestionsSession(t *testing.T) {
 	ctx := context.Background()
-	for _, r := range []gates.Resolution{answer(task.ActorPerson, ""), answer(task.ActorAgent, "s-reviser")} {
-		t.Run(string(r.By), func(t *testing.T) {
-			f := newFixture(t, nil, bundled)
-			f.drive("s-reviser")
-			d := f.draftGate(t)
-			q := f.question(t, "s-reviser")
-			if err := f.svc.ApproveOption(ctx, q, r, d, 3); err != nil {
-				t.Fatal(err)
-			}
-			if gq, gd := f.get(t, q.ID), f.get(t, d.ID); gq.Status != gate.Answered || gd.Status != gate.Approved || gd.By != r.By {
-				t.Fatalf("question %+v, draft %+v", gq, gd)
-			}
-		})
+	for _, asker := range []string{"s-reviser", "s-asker"} {
+		for _, r := range []gates.Resolution{answer(task.ActorPerson, ""), answer(task.ActorAgent, asker)} {
+			t.Run(asker+"/"+string(r.By), func(t *testing.T) {
+				f := newFixture(t, nil, bundled)
+				f.drive(asker)
+				d := f.draftGate(t)
+				q := f.question(t, asker)
+				if err := f.svc.ApproveOption(ctx, q, r, d, 3); err != nil {
+					t.Fatal(err)
+				}
+				if gq, gd := f.get(t, q.ID), f.get(t, d.ID); gq.Status != gate.Answered || gd.Status != gate.Approved || gd.By != r.By {
+					t.Fatalf("question %+v, draft %+v", gq, gd)
+				}
+			})
+		}
 	}
-	t.Run("a session that only asked", func(t *testing.T) {
-		f := newFixture(t, nil, bundled)
-		f.drive("s-asker")
-		d := f.draftGate(t)
-		q := f.question(t, "s-asker")
-		if err := f.svc.ApproveOption(ctx, q, answer(task.ActorPerson, ""), d, 3); !errors.Is(err, gates.ErrRefused) {
-			t.Fatalf("ApproveOption = %v, want ErrRefused", err)
-		}
-		if f.get(t, q.ID).Status != gate.Open || f.get(t, d.ID).Status != gate.Open || len(f.cons.Calls) != 0 {
-			t.Fatalf("a refused option resolved something: %+v %+v %v", f.get(t, q.ID), f.get(t, d.ID), f.cons.Calls)
-		}
-	})
 }
