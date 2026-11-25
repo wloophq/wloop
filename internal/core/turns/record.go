@@ -335,25 +335,33 @@ func (s *Service) SessionStarted(ctx context.Context, st SessionStart) error {
 
 // MCPSeen notes an MCP initialize from the process the handle addresses; it
 // may arrive before the SessionStart hook, and before the loop bound the
-// handle of a session it started, which then takes it when bound.
+// handle of a session it started, which then takes it when bound. The lookup
+// and the note share mu with every bind, so a bind cannot slip between them.
 func (s *Service) MCPSeen(ctx context.Context, handle string) error {
 	if handle == "" {
 		return errors.New("an MCP sighting needs a handle")
 	}
+	s.mu.Lock()
 	id, ok, err := s.SessionOfHandle(ctx, handle)
 	if err != nil {
+		s.mu.Unlock()
 		return err
 	}
 	if !ok {
-		s.mu.Lock()
 		s.noteUnboundMCP(handle, s.now())
 		s.mu.Unlock()
 		return nil
 	}
-	return s.saveSession(ctx, id, func(cur *turn.Session, now time.Time) (string, string) {
+	ev, err := s.applySession(ctx, id, func(cur *turn.Session, now time.Time) (string, string) {
 		cur.MCPAt = now
 		return KindMCPSeen, id + ":" + now.Format(time.RFC3339Nano)
 	})
+	s.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	s.publish(ev)
+	return nil
 }
 
 func (s *Service) saveSession(ctx context.Context, handle string, apply func(cur *turn.Session, now time.Time) (kind, key string)) error {
