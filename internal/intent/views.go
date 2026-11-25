@@ -12,6 +12,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/wloophq/wloop/internal/domain/decision"
 	"github.com/wloophq/wloop/internal/domain/duration"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -108,7 +109,12 @@ type ViewDef struct {
 	groupAt  *sheet
 	// Layout is how the cockpit draws the view, one of builtin.ViewLayouts.
 	Layout string
+	// Opens is what a page of the view opens instead of its own; zero for its own.
+	Opens ViewOpens
 }
+
+// ViewOpens is a view another view's page opens, narrowed to a decision kind when Kind is set.
+type ViewOpens struct{ View, Kind string }
 
 func (v ViewDef) groupProblem(format string, args ...any) Problem {
 	if v.groupAt == nil {
@@ -191,6 +197,10 @@ type mView struct {
 	RemoveClean  *bool   `toml:"remove_clean"`
 	Rail         *bool   `toml:"rail"`
 	Layout       *string `toml:"layout"`
+	Opens        *struct {
+		View string `toml:"view"`
+		Kind string `toml:"kind"`
+	} `toml:"opens"`
 }
 
 // HomeView is the cockpit's home route, which no view may be named.
@@ -558,6 +568,13 @@ func (l *viewsLoad) mergeViews(s *sheet, views map[string]mView) {
 			s.oneOf(path+".layout", *m.Layout, builtin.ValuesOf(builtin.SurfaceViews, "views.*.layout"))
 			v.Layout = *m.Layout
 		}
+		if m.Opens != nil {
+			v.Opens = ViewOpens{View: m.Opens.View, Kind: m.Opens.Kind}
+			if v.Opens.Kind != "" && !decision.Valid(decision.Kind(v.Opens.Kind)) {
+				s.add(path+".opens.kind", "%s names no decision kind", v.Opens.Kind)
+				v.Opens.Kind = ""
+			}
+		}
 		switch {
 		case len(s.problems) > n && i < 0:
 		case i < 0:
@@ -643,6 +660,10 @@ func (l *viewsLoad) check(tasks TasksDef) Problems {
 	for i := range l.def.Views {
 		v := &l.def.Views[i]
 		path := "views." + v.ID
+		if v.Opens.View != "" && !slices.Contains(ids, v.Opens.View) {
+			out = append(out, Problem{File: ViewsFile, Field: path + ".opens.view", Msg: fmt.Sprintf("%s names no view", v.Opens.View)})
+			v.Opens = ViewOpens{}
+		}
 		env := ViewEnv(v.Over, tasks)
 		lens := env
 		if v.Layout == builtin.ViewLayoutOutbox {

@@ -1651,4 +1651,5 @@ config.window.enabled = true
 config.window.float = "off"
 config.window.float_hotkey = "cmd+option+."
 config.window.float_morning = "09:00"
+config.window.float_over_full_screen = false
 config.window.hotkey = "ctrl+option+space"

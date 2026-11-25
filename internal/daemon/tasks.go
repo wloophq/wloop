@@ -24,7 +24,6 @@ import (
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/timeline"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -187,20 +186,21 @@ func (s *Server) servedViews() []api.TaskViewSpec {
 	out := []api.TaskViewSpec{}
 	for _, v := range def.Views {
 		out = append(out, api.TaskViewSpec{ID: v.ID, Label: v.Label, Summary: v.Summary, Empty: v.Empty, When: v.WhenText, Sort: v.SortText, Over: v.Over, Group: v.Group, Key: v.Key, Badge: def.Badged(v.ID), HideDisabled: v.HideDisabled,
-			RemoveClean: v.RemoveClean, Rail: v.Rail, Layout: v.Layout, Opens: opens(l, v)})
+			RemoveClean: v.RemoveClean, Rail: v.Rail, Layout: v.Layout, Opens: opens(v)})
 	}
 	return out
 }
 
-// opens is the route a page of view v opens instead of its own: an Outbox's, the queue's view narrowed to the
-// kind draft gates count as; "" when v is no Outbox, or no view draws the queue.
-func opens(l *intentload.Loaded, v intentload.ViewDef) string {
-	queue := l.Views.QueueView()
-	kind, ok := l.Decisions.Map.Gates[gate.KindDraft]
-	if v.Layout != builtin.ViewLayoutOutbox || queue == "" || !ok {
+// opens is the route a page of view v opens instead of its own, as its opens names it; "" for its own.
+func opens(v intentload.ViewDef) string {
+	if v.Opens.View == "" {
 		return ""
 	}
-	return "view=" + url.QueryEscape(queue) + "&kind=" + url.QueryEscape(string(kind))
+	route := "view=" + url.QueryEscape(v.Opens.View)
+	if v.Opens.Kind != "" {
+		route += "&kind=" + url.QueryEscape(v.Opens.Kind)
+	}
+	return route
 }
 
 func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {

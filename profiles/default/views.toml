@@ -513,6 +513,7 @@ over          = "gates"
 when          = "gate.kind == 'draft' && (gate.status == 'open' || gate.delivery in ['sending', 'failed'])"
 hide_disabled = true
 layout        = "outbox"
+opens         = { view = "needs-you", kind = "send-draft" }
 group         = "draft.proposer"
 sort          = "draft.created_at"
 
