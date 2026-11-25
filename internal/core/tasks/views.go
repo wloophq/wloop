@@ -591,6 +591,9 @@ func (n Snapshot) Held(units []unit.Unit) []unit.Unit {
 	return slices.DeleteFunc(slices.Clone(units), func(u unit.Unit) bool { return !n.pass.Holds(u) })
 }
 
+// Within is ctx carrying n's pass, so the reads under it share n.
+func (n Snapshot) Within(ctx context.Context) context.Context { return WithPass(ctx, n.pass) }
+
 // Counts are the counters of the profile's views over area, over the tasks of n.
 func (n Snapshot) Counts(ctx context.Context, area string) (task.Counters, error) {
 	return n.s.counts(WithPass(ctx, n.pass), area, n.pass.Tasks, nil)

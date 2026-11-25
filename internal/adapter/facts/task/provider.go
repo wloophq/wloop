@@ -852,15 +852,7 @@ func (p *Provider) undelivered(ctx context.Context, id task.ID) ([]gate.Gate, er
 		return nil, nil
 	}
 	all, err := coretasks.Once(ctx, passUndelivered, func() (map[task.ID][]gate.Gate, error) {
-		ds, err := p.d.Drafts.List(ctx, outbox.Filter{States: []draft.State{draft.Failed}})
-		if err != nil {
-			return nil, err
-		}
-		ids := make([]int64, len(ds))
-		for i, d := range ds {
-			ids[i] = int64(d.ID)
-		}
-		return gates.Undelivered(ctx, p.d.Gates.Where, ids)
+		return outbox.Undelivered(ctx, p.d.Drafts, p.d.Gates.Where)
 	})
 	return all[id], err
 }

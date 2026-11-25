@@ -385,17 +385,17 @@ func setOf(keys []string) map[string]bool {
 	return m
 }
 
-// queueKey tells a queue item from every other: its kind, its task, and its
-// gate or its situation.
+// queueKey names a queue item across reads, as the float's page does: its
+// gate, else its task's decision of its kind and its situation's kind.
 func queueKey(it api.QueueItem) string {
-	k := it.Kind + "|" + it.Task.ID
 	if it.Gate != nil {
-		k += "|" + strconv.FormatInt(it.Gate.ID, 10)
+		return "gate:" + strconv.FormatInt(it.Gate.ID, 10)
 	}
-	if s := it.Situation; s != nil {
-		k += "|" + s.Provider + "/" + s.Kind + "/" + s.Label
+	situation := ""
+	if it.Situation != nil {
+		situation = it.Situation.Kind
 	}
-	return k
+	return "task:" + it.Task.ID + ":" + it.Kind + ":" + situation
 }
 
 // redraw draws the menu and the banners again after the float moved, unless

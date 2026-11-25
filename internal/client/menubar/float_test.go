@@ -793,3 +793,20 @@ func TestAFloatThatCannotShowLeavesTheNeedsBannersOn(t *testing.T) {
 		}
 	})
 }
+
+// An item is known across reads by its gate, else by its task, its kind and
+// its situation's kind; never by the words the daemon serves for it.
+func TestAQueueItemsKeyNamesItsDecisionNotItsWords(t *testing.T) {
+	gated := api.QueueItem{Kind: "send-draft", Task: api.TaskView{ID: "t-1"}, Gate: &api.GateView{ID: 41}}
+	moved := gated
+	moved.Kind, moved.Task.ID = "answer-question", "t-2"
+	stuck := api.QueueItem{Kind: "fix-checks", Task: api.TaskView{ID: "t-1"}, Situation: &api.QueueSituation{Provider: "github", Kind: "checks-failed", Label: "Checks failed"}}
+	reworded := stuck
+	reworded.Situation = &api.QueueSituation{Provider: "github", Kind: "checks-failed", Label: "As verificações falharam"}
+	if queueKey(gated) != queueKey(moved) || queueKey(stuck) != queueKey(reworded) {
+		t.Fatalf("keys %q %q, %q %q: want a gate's key from its gate, a situation's without its label", queueKey(gated), queueKey(moved), queueKey(stuck), queueKey(reworded))
+	}
+	if queueKey(gated) == queueKey(stuck) {
+		t.Fatalf("a gate and a situation share the key %q", queueKey(gated))
+	}
+}

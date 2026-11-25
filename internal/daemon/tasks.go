@@ -241,6 +241,8 @@ func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
 	if p.Pass != nil {
 		ctx = coretasks.WithPass(ctx, p.Pass)
 	}
+	s.queueCounted(ctx, g, &p.Counters, nil)
+	page.Counters = wireCounters(p.Counters)
 	vs := s.taskViews(ctx, g, false)
 	vs.readRows(ctx, p.Tasks)
 	for _, e := range p.Tasks {
@@ -792,15 +794,21 @@ func (s *Server) handleCounters(w http.ResponseWriter, r *http.Request) {
 	ctx, q := r.Context(), r.URL.Query()
 	var c task.Counters
 	var err error
-	if text := strings.TrimSpace(q.Get(api.CountersQuery)); text == "" {
-		c, err = g.Counts(ctx, q.Get("area"))
-	} else {
-		c, err = g.CountsWhere(ctx, q.Get("area"), s.lensKeep(ctx, g, text))
-	}
+	snap, err := g.Snapshot(ctx)
 	if err != nil {
 		writeTasksError(w, err)
 		return
 	}
+	ctx = snap.Within(ctx)
+	var keep coretasks.Keep
+	if text := strings.TrimSpace(q.Get(api.CountersQuery)); text != "" {
+		keep = s.lensKeep(ctx, g, text)
+	}
+	if c, err = g.CountsWhere(ctx, q.Get("area"), keep); err != nil {
+		writeTasksError(w, err)
+		return
+	}
+	s.queueCounted(ctx, g, &c, keep)
 	writeJSON(w, wireCounters(c))
 }
 
@@ -859,16 +867,51 @@ func (s *Server) counters(ctx context.Context) *api.Counters {
 	if s.deps.Tasks == nil {
 		return nil
 	}
-	return s.countersOf(s.deps.Tasks.Counts(ctx, ""))
+	snap, err := s.deps.Tasks.Snapshot(ctx)
+	if err != nil {
+		return s.countersOf(ctx, task.Counters{}, err)
+	}
+	c, err := snap.Counts(ctx, "")
+	return s.countersOf(snap.Within(ctx), c, err)
 }
 
-func (s *Server) countersOf(c task.Counters, err error) *api.Counters {
+func (s *Server) countersOf(ctx context.Context, c task.Counters, err error) *api.Counters {
 	if err != nil {
 		s.logf("tasks: counters: %v", err)
 		return nil
 	}
+	s.queueCounted(ctx, s.deps.Tasks, &c, nil)
 	out := wireCounters(c)
 	return &out
+}
+
+// queueCounted counts the profile's queue view in c, when c counts it, as the items its queue serves over the
+// tasks keep takes in c's area, so the rail counts what the queue and the floating widget list; it reads inside
+// the pass ctx carries, which the counts were read in.
+func (s *Server) queueCounted(ctx context.Context, g *coretasks.Service, c *task.Counters, keep coretasks.Keep) {
+	l := s.loaded()
+	view := task.View(l.Views.QueueView())
+	if _, counted := c.Views[view]; g == nil || !counted {
+		return
+	}
+	take := keep
+	if area := c.Area; area != "" {
+		take = func(ctx context.Context, e task.Task) (bool, error) {
+			if e.Role(l.Tasks, task.RoleArea).Text != area {
+				return false, nil
+			}
+			if keep == nil {
+				return true, nil
+			}
+			return keep(ctx, e)
+		}
+	}
+	items, err := s.home(g).QueueAll(ctx, l.Decisions.Order, take)
+	if err != nil {
+		s.logf("tasks: counting the queue: %v", err)
+		return
+	}
+	c.Views[view] = len(items)
 }
 
 func wireCounters(c task.Counters) api.Counters {
@@ -1545,7 +1588,8 @@ func (s *Server) publishTasks(ctx context.Context, c, flags port.Change) {
 	if !c.Empty() || all || len(held) > 0 {
 		ch.All = c.All || all || c.Has(port.TopicConfig)
 		if err == nil {
-			ch.Counters = s.countersOf(snap.Counts(ctx, ""))
+			c, err := snap.Counts(ctx, "")
+			ch.Counters = s.countersOf(snap.Within(ctx), c, err)
 		}
 		if !ch.All {
 			units := slices.Concat(c.Units, held)

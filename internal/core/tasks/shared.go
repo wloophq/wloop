@@ -22,9 +22,13 @@ type sharedPass struct {
 	building chan struct{}
 }
 
-// pass is a pass over every stored task: the shared one while the store's generation holds and it is younger
-// than passReuse, else a new one, which the reads that start while it is read wait for and share.
+// pass is a pass over every stored task: the one ctx carries, else the shared one while the store's generation
+// holds and it is younger than passReuse, else a new one, which the reads that start while it is read wait for
+// and share.
 func (s *Service) pass(ctx context.Context) (*Pass, error) {
+	if p, ok := PassOf(ctx); ok {
+		return p, nil
+	}
 	if s.d.Gen == nil {
 		return s.newPass(ctx)
 	}

@@ -11,7 +11,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/outbox"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/decision"
-	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -149,30 +148,28 @@ type taskDecisions struct {
 	undelivered map[task.ID][]gate.Gate
 }
 
-// readUndelivered reads the approved draft gates whose drafts failed to deliver, by task.
+// readUndelivered reads the approved draft gates whose drafts failed to deliver, by task, once per pass.
 func (d *taskDecisions) readUndelivered(ctx context.Context) (map[task.ID][]gate.Gate, error) {
 	o := d.s.deps.Outbox
 	if o == nil {
 		return nil, nil
 	}
-	ds, err := o.List(ctx, outbox.Filter{States: []draft.State{draft.Failed}})
-	if err != nil {
-		return nil, err
-	}
-	ids := make([]int64, len(ds))
-	for i, x := range ds {
-		ids[i] = int64(x.ID)
-	}
-	return gates.Undelivered(ctx, d.gates.Where, ids)
+	return coretasks.Once(ctx, passUndelivered, func() (map[task.ID][]gate.Gate, error) { return outbox.Undelivered(ctx, o, d.gates.Where) })
 }
+
+const passUndelivered = "daemon.undelivered"
 
 func (d *taskDecisions) Of(ctx context.Context, e task.Task) ([]decision.Found, error) {
 	if d.open == nil {
 		d.open = map[task.ID][]gate.Gate{}
 		if d.gates != nil {
-			gs, err := d.gates.Where(ctx, gates.Query{Statuses: []gate.Status{gate.Open}})
+			open, err := d.s.openGates(ctx, d.gates)
 			if err != nil {
 				return nil, err
+			}
+			var gs []gate.Gate
+			for _, g := range open {
+				gs = append(gs, g...)
 			}
 			if svc := d.s.deps.Gates; svc != nil {
 				pinned, err := svc.Pinned(ctx)

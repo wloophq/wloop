@@ -5,7 +5,7 @@ import { FakeDaemon } from "../testing/fakedaemon";
 import { resetStore } from "../testing/reset.svelte";
 import { Reply } from "../testing/fakedaemon";
 import { state } from "./store.svelte";
-import { FLOAT_PEEK_MS, FLOAT_QUIET_MS, FLOAT_RETRY_MS, floatChange, floatDeps, floatFollow, floatLoad, floatState, resetFloat } from "./float.svelte";
+import { FLOAT_PEEK_MS, FLOAT_QUIET_MS, FLOAT_RETRY_MS, floatChange, itemKey, floatDeps, floatFollow, floatLoad, floatState, resetFloat } from "./float.svelte";
 import { connect, DEBOUNCE_MS, stream, type EventSourceLike } from "./sync.svelte";
 
 function gateItem(id: number, title: string): J {
@@ -267,4 +267,10 @@ test("act after a gate event waits for the read it queued and sends nothing agai
   await f.act();
   expect(posts()).toEqual([]);
   expect(f.items[f.current].task.id).toBe("t-2");
+});
+
+test("an item is known by its gate, else its task, kind and situation's kind, as the menu bar knows it", () => {
+  const stuck = { kind: "fix-checks", task: { id: "t-1" }, situation: { provider: "github", kind: "checks-failed", label: "Checks failed" } };
+  expect(itemKey({ ...stuck, situation: { ...stuck.situation, label: "As verificações falharam" } })).toBe("task:t-1:fix-checks:checks-failed");
+  expect(itemKey({ kind: "send-draft", task: { id: "t-1" }, gate: { id: 41 } })).toBe("gate:41");
 });

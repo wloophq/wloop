@@ -115,8 +115,8 @@ func (c *Controller) title() string {
 	return c.words().T("{name} {n}", params)
 }
 
-// needsSection is what waits on the user, as many as the queue holds, and its first items, each opening its
-// task; more opens the queue's view, else the home.
+// needsSection is what waits on the user, as many as the queue holds, and its first items, each worded by its
+// kind and opening its task; more opens the queue's view, else the home.
 func (c *Controller) needsSection() []MenuItem {
 	items := []MenuItem{{Title: fmt.Sprintf("%s (%d)", c.needs.Title, c.needs.Total)}}
 	more := window.HomeRoute
@@ -129,7 +129,11 @@ func (c *Controller) needsSection() []MenuItem {
 			break
 		}
 		e := it.Task
-		items = append(items, MenuItem{Title: taskLabel(e), Enabled: true, Action: c.later(func(context.Context) error { return c.open(taskRoute(e.ID)) })})
+		title := taskLabel(e)
+		if it.Word != "" {
+			title = it.Word + " · " + title
+		}
+		items = append(items, MenuItem{Title: title, Enabled: true, Action: c.later(func(context.Context) error { return c.open(taskRoute(e.ID)) })})
 	}
 	return items
 }

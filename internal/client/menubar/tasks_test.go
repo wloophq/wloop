@@ -267,3 +267,20 @@ func TestTitleIsTheNeedsYouTotal(t *testing.T) {
 		t.Fatalf("title %q, menu %q: want both to read the queue's 3 items", got, menu)
 	}
 }
+
+// A task with two decisions lists twice in Needs you, each line worded by
+// the kind of its decision.
+func TestNeedsYouWordsEachItemByItsKind(t *testing.T) {
+	r := newRig(t)
+	e := plainTask(1)
+	r.d.queue = &api.Queue{Title: "Needs you", View: "needs-you", Total: 2, Items: []api.QueueItem{
+		{Kind: "answer-question", Word: "question", Task: e},
+		{Kind: "send-draft", Word: "draft", Task: e},
+	}}
+	r.c.Refresh(context.Background())
+	got := titles(r.tray.menu)
+	label := taskLabel(e)
+	if index(got, "question · "+label) < 0 || index(got, "draft · "+label) < 0 {
+		t.Fatalf("menu %q, want each item worded by its kind", got)
+	}
+}
