@@ -16,6 +16,7 @@ import (
 // the daemon's API takes: what each is, by literal. Every other single word a client quotes is a catalog key.
 var clientTokens = map[string]string{
 	"Backspace":     "a key's name as the served bindings spell it",
+	"Float":         "the suffix of the floating widget's window property after the brand's command",
 	"Enter":         "a key's name as the served bindings spell it",
 	"Esc":           "a key's name as the served bindings spell it",
 	"Tab":           "a key's name as the served bindings spell it",
@@ -60,7 +61,7 @@ var clientTokens = map[string]string{
 }
 
 // clientTokenUses is how many literals clientTokens lets pass; a new one raises it on purpose, in review.
-const clientTokenUses = 66
+const clientTokenUses = 67
 
 var (
 	singleWord = regexp.MustCompile(`^[\s(·,;:—–-]*\pL[\pL'’…-]*\pL[\s.,:;!?…)·]*$`)
