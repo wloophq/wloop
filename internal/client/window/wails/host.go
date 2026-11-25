@@ -427,9 +427,11 @@ func floatPlaceJS(mode string, p window.FloatPlace) string {
 	name, _ := json.Marshal(window.FloatBridge)
 	m, _ := json.Marshal(mode)
 	place, _ := json.Marshal(struct {
-		Edge string `json:"edge"`
-		Up   bool   `json:"up"`
-	}{p.Edge, p.Up})
+		Edge string  `json:"edge"`
+		Up   bool    `json:"up"`
+		MaxW float64 `json:"maxW"`
+		MaxH float64 `json:"maxH"`
+	}{p.Edge, p.Up, p.MaxW, p.MaxH})
 	return "(function(b){if(b&&b.setMode)b.setMode(" + string(m) + "," + string(place) + ")})(window[" + string(name) + "])"
 }
 

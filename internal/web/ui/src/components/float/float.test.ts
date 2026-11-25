@@ -34,8 +34,8 @@ test("the host bridge sets the mode, and the page posts JSON through the Wails h
   const win: Record<string, unknown> = { webkit: { messageHandlers: { external: { postMessage: (m: string) => sent.push(m) } } } };
   const bridge = installFloat(win);
   expect(win[FLOAT_BRIDGE]).toBe(bridge);
-  bridge.setMode("panel", { edge: "right", up: true });
-  expect([floatState().mode, floatState().place]).toEqual(["panel", { edge: "right", up: true }]);
+  bridge.setMode("panel", { edge: "right", up: true, maxW: 1512, maxH: 911 });
+  expect([floatState().mode, floatState().place]).toEqual(["panel", { edge: "right", up: true, maxW: 1512, maxH: 911 }]);
   floatDeps.post({ type: "float:size", w: 112, h: 32 });
   expect(sent).toEqual(['{"type":"float:size","w":112,"h":32}']);
   expect(() => floatPost({ type: "float:hide", mode: "quiet" }, {})).not.toThrow();

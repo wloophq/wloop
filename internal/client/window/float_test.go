@@ -216,7 +216,7 @@ func TestFloatSizeKeepsAnchorCorner(t *testing.T) {
 		want(t, r.host.taken(), "float-frame {1288 868 112 32}", "float-load "+base+"#"+FloatRoute)
 		r.host.handlers().OnFloat(FloatMessage{Kind: FloatSize, W: 460, H: 600, Mode: ModePanel})
 		r.host.handlers().OnFloat(size(112, 32))
-		want(t, r.host.taken(), "float-frame {940 300 460 600}", `float-place "" true`, "float-frame {1288 868 112 32}")
+		want(t, r.host.taken(), "float-frame {940 300 460 600}", `float-place "" true 1512x911`, "float-frame {1288 868 112 32}")
 	})
 }
 
@@ -252,13 +252,13 @@ func TestTheFloatStartsDockedRight(t *testing.T) {
 			t.Fatalf("host calls %q, want a frame flush with the laptop's right edge", got)
 		}
 		r.host.handlers().OnFloat(size(34, 84))
-		want(t, r.host.taken(), "float-frame {1478 260.75 34 84}", `float-place "right" false`)
+		want(t, r.host.taken(), "float-frame {1478 260.75 34 84}", `float-place "right" false 1512x911`)
 	})
 }
 
 // Unplugging the screen the pill sits on brings it back on the main screen;
 // plugging it back returns the pill where the person left it. Each time the
-// page learns where it sits.
+// page learns where it sits and the size of the screen that now holds it.
 func TestScreensChangingMoveTheFloatBack(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		d := memDefaults{}
@@ -267,8 +267,8 @@ func TestScreensChangingMoveTheFloatBack(t *testing.T) {
 		r.host.handlers().OnScreens([]Screen{laptop})
 		r.host.handlers().OnScreens([]Screen{laptop, wide})
 		want(t, r.host.taken(),
-			"float-frame {1400 912 112 32}", `float-place "" true`,
-			"float-frame {3788 1268 112 32}", `float-place "" true`)
+			"float-frame {1400 912 112 32}", `float-place "" true 1512x911`,
+			"float-frame {3788 1268 112 32}", `float-place "" true 2560x1390`)
 	})
 }
 
@@ -288,7 +288,7 @@ func TestADropIsSavedAndSnapped(t *testing.T) {
 		if want := (FloatPlacement{Edge: EdgeLeft, Corner: CornerBottomLeft, X: 0, Y: 532, W: 112, H: 32}); !ok || got != want {
 			t.Fatalf("saved %+v %v, want %+v", got, ok, want)
 		}
-		want(t, r.host.taken(), "float-frame {0 500 112 32}", `float-place "left" true`)
+		want(t, r.host.taken(), "float-frame {0 500 112 32}", `float-place "left" true 1512x911`)
 	})
 }
 
@@ -302,7 +302,7 @@ func TestASizeDuringADragWaitsForTheDrop(t *testing.T) {
 		r.host.handlers().OnFloat(size(34, 84))
 		want(t, r.host.taken())
 		r.host.handlers().OnFloatDropped(Rect{X: 10, Y: 500, W: 112, H: 32})
-		want(t, r.host.taken(), "float-frame {0 448 34 84}", `float-place "left" true`)
+		want(t, r.host.taken(), "float-frame {0 448 34 84}", `float-place "left" true 1512x911`)
 		if got, _ := LoadPlacement(d); got.W != 34 || got.H != 84 {
 			t.Fatalf("saved %+v, want the size sent during the drag", got)
 		}

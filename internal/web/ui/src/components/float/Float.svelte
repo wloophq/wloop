@@ -14,6 +14,8 @@
   const f = floatState();
   const open = $derived(f.mode === "panel");
   const n = $derived(f.items.length);
+  const maxW = $derived(f.place.maxW || window.screen.availWidth);
+  const maxH = $derived(f.place.maxH || window.screen.availHeight);
 
   let root: HTMLElement | undefined = $state();
   let hover: ReturnType<typeof setTimeout> | undefined;
@@ -28,7 +30,7 @@
   const report = (force = false) => floatSize(root, f.mode, force);
 
   $effect(() => {
-    void [f.mode, f.items.length, f.peeked, f.read, f.place.edge, f.place.up, menu, f.turns];
+    void [f.mode, f.items.length, f.peeked, f.read, f.place.edge, f.place.up, maxW, maxH, menu, f.turns];
     queueMicrotask(() => report());
   });
 
@@ -97,6 +99,8 @@
   class={["fl", open && "open", !f.online && "offline", f.place.up && "up"]}
   data-mode={f.mode}
   data-edge={f.place.edge || undefined}
+  style:--fl-max-w="{maxW}px"
+  style:--fl-max-h="{maxH}px"
   bind:this={root}
   role="presentation"
   onpointerleave={leave}

@@ -26,10 +26,13 @@ export const FLOAT_MODES: readonly FloatMode[] = ["pill", "panel", "peek"];
 export type FloatHide = "quiet" | "hour" | "tomorrow";
 
 // FloatPlace is where the host keeps the pill: docked on a side edge, which stands it upright and opens the panel
-// away from that edge, and whether the panel opens upward, as it does from the screen's bottom half.
+// away from that edge, whether the panel opens upward, as it does from the screen's bottom half, and the size of the
+// visible frame of the screen that holds it, 0 until the host names one.
 export interface FloatPlace {
   edge: "" | "left" | "right";
   up: boolean;
+  maxW: number;
+  maxH: number;
 }
 
 // floatDeps are what the widget reaches beyond its state: resolving an item's gate, running any other primary,
@@ -52,7 +55,7 @@ const fresh = () => ({
   mode: "pill" as FloatMode,
   peeked: null as J,
   pinned: false,
-  place: { edge: "", up: false } as FloatPlace,
+  place: { edge: "", up: false, maxW: 0, maxH: 0 } as FloatPlace,
   read: "ok" as FloatRead,
   turnsFailed: false,
   loaded: false,
@@ -229,7 +232,8 @@ export const floatFollow: Follow = {
 
 function setPlace(p: Partial<FloatPlace> | undefined): void {
   if (!p || typeof p !== "object") return;
-  fl.place = { edge: p.edge === "left" || p.edge === "right" ? p.edge : "", up: !!p.up };
+  const size = (n: unknown) => (typeof n === "number" && n > 0 ? n : 0);
+  fl.place = { edge: p.edge === "left" || p.edge === "right" ? p.edge : "", up: !!p.up, maxW: size(p.maxW), maxH: size(p.maxH) };
 }
 
 // setMode shows the widget as m, at place when the host gives one.

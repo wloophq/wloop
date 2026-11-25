@@ -22,11 +22,13 @@ func (r Rect) bottom() float64 { return r.Y + r.H }
 type Screen struct{ Frame, Visible Rect }
 
 // FloatPlace is what the float's page needs of its placement: the edge it
-// is docked on, and whether its anchor is in the lower half of its screen,
-// so the panel opens upward.
+// is docked on, whether its anchor is in the lower half of its screen, so
+// the panel opens upward, and the size of the visible frame of the screen
+// that holds it, which bounds what the page draws.
 type FloatPlace struct {
-	Edge string
-	Up   bool
+	Edge       string
+	Up         bool
+	MaxW, MaxH float64
 }
 
 // FloatBridge is the page's global the host calls setMode on.
@@ -354,9 +356,11 @@ func (c *Controller) placeFloat() {
 			c.placement.W, c.placement.H = size.W, size.H
 		}
 	}
-	c.cfg.Host.SetFloatFrame(ClampToScreens(c.placement, c.screens))
+	frame := ClampToScreens(c.placement, c.screens)
+	c.cfg.Host.SetFloatFrame(frame)
 	if c.tellPlace && c.pageReady {
-		c.cfg.Host.PlaceFloat(FloatPlace{Edge: c.placement.Edge, Up: strings.HasPrefix(c.placement.Corner, "b")})
+		s := screenOf(frame, c.screens)
+		c.cfg.Host.PlaceFloat(FloatPlace{Edge: c.placement.Edge, Up: strings.HasPrefix(c.placement.Corner, "b"), MaxW: s.W, MaxH: s.H})
 		c.tellPlace = false
 	}
 }

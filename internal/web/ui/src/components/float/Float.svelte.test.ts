@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { cleanup, fireEvent, render } from "@testing-library/svelte";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { J } from "../../lib/util";
@@ -40,6 +41,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   cleanup();
   Object.assign(floatDeps, saved);
   delete (window as J).webkit;
@@ -247,4 +249,36 @@ test("the agents count every turn done today, beyond the ones listed", async () 
   const done = [1, 2, 3].map((seq) => ({ seq, intent: "review", label: "Review", unit: "acme/widgets#" + seq, ended: "2026-11-07T11:00:00Z", duration_ms: 60000 }));
   const c = render(Agents, { props: { turns: { running: [], done, done_today: 25, asked: 0, usual: {} } } }).container;
   expect(c.querySelector(".fl-sum")!.textContent).toBe("25 done today");
+});
+
+const flRoot = (c: Element) => c.querySelector(".fl") as HTMLElement;
+
+test("the panel is bounded by the visible frame of the screen the host names, never by the float window", async () => {
+  await floatLoad();
+  const c = render(Float).container;
+  floatState().setMode("panel", { edge: "right", up: false, maxW: 1400, maxH: 900 });
+  await settle();
+  expect(flRoot(c).style.getPropertyValue("--fl-max-w")).toBe("1400px");
+  expect(flRoot(c).style.getPropertyValue("--fl-max-h")).toBe("900px");
+});
+
+test("before the host names a screen the panel is bounded by the one the page reads", async () => {
+  vi.spyOn(window.screen, "availWidth", "get").mockReturnValue(1280);
+  vi.spyOn(window.screen, "availHeight", "get").mockReturnValue(760);
+  await floatLoad();
+  const c = render(Float).container;
+  floatState().setMode("panel");
+  await settle();
+  expect(flRoot(c).style.getPropertyValue("--fl-max-w")).toBe("1280px");
+  expect(flRoot(c).style.getPropertyValue("--fl-max-h")).toBe("760px");
+});
+
+test("no style of the float reads the viewport, which is the float window sized to its content", () => {
+  const css = readFileSync("../static/app.css", "utf8");
+  const rules = css.match(/[^{}]*(?:\.fl\b|\.fl-|float-page)[^{}]*\{[^}]*\}/g) || [];
+  expect(rules.length).toBeGreaterThan(10);
+  for (const rule of rules) expect(rule).not.toMatch(/\d(?:vh|vw|dvh|dvw|svh|svw|lvh|lvw)\b/);
+  const panel = rules.find((r) => /\.fl-panel\s*\{/.test(r)) || "";
+  expect(panel).toContain("calc(var(--fl-max-w) - 24px)");
+  expect(panel).toContain("calc(var(--fl-max-h) - 48px)");
 });

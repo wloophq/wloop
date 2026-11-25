@@ -1047,7 +1047,9 @@ body.panel-omnibox .omni-keys { cursor: grab; }
    Its shadow and backdrop blur are the one elevation exception design/README.md records. */
 html.float-page, html.float-page body { background: transparent; height: auto; }
 html.float-page body { display: block; overflow: hidden; }
-.fl { display: inline-flex; flex-direction: column; align-items: flex-start; gap: var(--space-6); padding: var(--space-8); font: var(--text-body)/1.4 var(--sans); color: var(--ink); }
+/* --fl-max-w and --fl-max-h are the visible frame of the screen holding the float, which the page sets; the window
+   is sized to what the page draws, so its viewport cannot bound the panel. These are where nothing sets them. */
+.fl { display: inline-flex; flex-direction: column; align-items: flex-start; gap: var(--space-6); padding: var(--space-8); font: var(--text-body)/1.4 var(--sans); color: var(--ink); --fl-max-w: 1440px; --fl-max-h: 900px; }
 .fl.up { flex-direction: column-reverse; }
 .fl[data-edge="left"] { flex-direction: row; align-items: flex-start; }
 .fl[data-edge="right"] { flex-direction: row-reverse; align-items: flex-start; }
@@ -1083,7 +1085,7 @@ html.float-page body { display: block; overflow: hidden; }
 .fl-ring .track { stroke: var(--rule); }
 .fl-ring .arc { stroke: var(--loop); stroke-linecap: round; }
 .fl-panel {
-  display: flex; flex-direction: column; width: min(460px, calc(100vw - 24px)); max-height: calc(100vh - 48px);
+  display: flex; flex-direction: column; width: min(460px, calc(var(--fl-max-w) - 24px)); max-height: calc(var(--fl-max-h) - 48px);
   border: 1px solid var(--rule); border-radius: 14px; background: color-mix(in srgb, var(--panel) 94%, transparent);
   box-shadow: 0 18px 50px #00000040; backdrop-filter: blur(22px) saturate(1.4); -webkit-backdrop-filter: blur(22px) saturate(1.4); overflow: hidden;
 }
