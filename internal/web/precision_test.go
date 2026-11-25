@@ -71,3 +71,22 @@ func TestMotionStopsUnderReducedMotion(t *testing.T) {
 		}
 	}
 }
+
+// The float's window is sized to what its page draws, so the page must not
+// draw at the window's size: a root bounded by the viewport measures one
+// pixel past it on each resize and grows the window a pixel a frame.
+func TestTheFloatsRootSizesToItsContentNotToItsWindow(t *testing.T) {
+	b, err := files.ReadFile("static/app.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range cssRules(string(b)) {
+		if strings.TrimSpace(r[0]) == ".fl" {
+			if !regexp.MustCompile(`(^|;)\s*width:\s*max-content\s*(;|$)`).MatchString(r[1]) {
+				t.Fatalf(".fl is %q, want width: max-content", r[1])
+			}
+			return
+		}
+	}
+	t.Fatal("no .fl rule")
+}
