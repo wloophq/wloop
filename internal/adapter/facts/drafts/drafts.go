@@ -21,8 +21,8 @@ const (
 	FactFailedKind = "draft.failed_kind"
 	// FactFailedRef is the newest of those as <id>:<rev>.
 	FactFailedRef = "draft.failed_ref"
-	// FactHeldRef is an agent's held draft of the unit that states a basis, as <id>:<rev>: the newest
-	// refused as stale, else the newest.
+	// FactHeldRef is a held draft an intent's turn wrote on the unit that states a basis, as <id>:<rev>: the
+	// newest refused as stale, else the newest.
 	FactHeldRef = "draft.held_ref"
 	// FactHeldKind is that draft's kind.
 	FactHeldKind = "draft.held_kind"
@@ -46,10 +46,11 @@ type Provider struct {
 }
 
 // Facts are u's draft facts: whether a draft a turn or a session proposed on u failed, whether one
-// failed stale, and the kind and <id>:<rev> of the newest that failed; and the held draft of theirs that a
-// move of u can make stale, with its basis and whether it was refused as stale. A workflow's or a person's
-// draft is the outbox's to show, not a round's. Nothing here reads the unit's live basis: a workflow
-// compares the held basis with the unit's own facts.
+// failed stale, and the kind and <id>:<rev> of the newest that failed; and the held draft an intent's turn
+// wrote that a move of u can make stale, with its basis and whether it was refused as stale. A workflow's or
+// a person's draft is the outbox's to show, not a round's, and a held draft of the user's own session is
+// theirs to revise. Nothing here reads the unit's live basis: a workflow compares the held basis with the
+// unit's own facts.
 func (p Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, error) {
 	ds, err := p.Drafts.List(ctx, outbox.Filter{Unit: &u, States: States})
 	if err != nil {
@@ -71,7 +72,7 @@ func (p Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, error
 			if failed == nil || newer(d, *failed) {
 				failed = &ds[i]
 			}
-		case d.State == draft.Held && d.Basis != "":
+		case d.State == draft.Held && d.Basis != "" && d.Origin.Kind == draft.OriginTurn:
 			if held == nil || heldFirst(d, *held) {
 				held = &ds[i]
 			}

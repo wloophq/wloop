@@ -13,8 +13,8 @@ GitHub cannot call your laptop, and the events that matter (a push, a reply, an 
 |---|---|---|
 | `review-first-round` | starts a first review round on a pull request that requests your review by name, or that the GitHub plugin's `review_wanted` predicate wants reviewed | runs after a 60 s delay |
 | `review-follow-up` | starts a follow-up round when the author pushed, replied or re-requested you | runs after a 60 s delay |
-| `review-draft-failed` | reopens the review round when its review draft failed to post, refused by GitHub or by a push | runs after a 60 s delay |
-| `review-draft-stale` | reopens the review round when the pull request moved past a review draft that waits for you (`draft.held_basis` is no longer `pr.head`, or its approval was refused as stale) and no turn is running; the round replaces the question that pinned the draft | runs after a 60 s delay |
+| `review-draft-failed` | reopens the review round of an open pull request when its review draft failed to post, refused by GitHub or by a push | runs after a 60 s delay |
+| `review-draft-stale` | reopens the review round of an open pull request when it moved past a review draft a review turn wrote that waits for you (its `draft.held_basis` is among the stored `pr.commits` and is no longer `pr.head`, or its approval was refused as stale) and no turn is running; a basis ahead of the stored head fires nothing; the round replaces the question that pinned the draft | runs after a 60 s delay |
 | `address` | starts an address round on your pull request when reviews arrive, checks fail or it conflicts with its base | runs after a 60 s delay |
 | `nudge-silent-30d` | asks whoever someone else's pull request waits on, after `plugins.github.nudge.silent_days` (30) of silence | waits for you |
 | `session-pr-finished`, `session-duplicate`, `session-worktree-gone`, `session-finished-quiet`, `session-asked-quiet`, `session-close-when-done` | close agent sessions that are finished, duplicated or quiet, whose worktree or transcript is gone, or that their manager closed (a session you archived in Claude Desktop) | runs |

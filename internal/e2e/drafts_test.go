@@ -293,15 +293,19 @@ func TestDrafts(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			basis := "c3"
+			r.pub.push("c4")
+			basis := "c4"
 			revised, err := r.update(api.AgentDraftUpdate{ID: d.ID, Rev: read.Rev, Basis: &basis})
-			if err != nil || revised.State != "held" || revised.Basis != "c3" {
+			if err != nil || revised.State != "held" || revised.Basis != "c4" {
 				t.Fatalf("update %+v %v", revised, err)
 			}
-			r.end(fmt.Sprintf(`{"state":"asked","summary":"approve at c3","resume":"post what the user picks","question":%s}`,
-				choice("Approve the pull request at c3?", draftOption("post", "Approve", revised), `{"id":"hold","label":"Not yet","consequence":"nothing is posted"}`)))
+			r.end(doneOn("APPROVE", revised))
 			r.sweepWithoutRound("review-draft-stale", 2)
-			r.answer("post")
+			r.refresh()
+			r.sweepWithoutRound("review-draft-stale", 2)
+			if err := r.approve(d.ID, revised.Rev); err != nil {
+				t.Fatal(err)
+			}
 			r.send()
 			r.wantPosted(fmt.Sprintf("%d APPROVE", d.ID))
 		})

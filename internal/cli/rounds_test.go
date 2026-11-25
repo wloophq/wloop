@@ -247,6 +247,24 @@ func TestAQuestionOnTheUnitsHeadHoldsATurnDueByItsWhen(t *testing.T) {
 	}
 }
 
+func TestReviewDraftFailedReplacesAQuestionItsPullRequestMovedPast(t *testing.T) {
+	t.Parallel()
+	for name, head := range map[string]string{"the stored head moved": "c-new", "the stored head is the question's": "c-asked"} {
+		r := newStartRig(t, followupScenario(t), string(dintent.Review), "")
+		w := bundledWorkflow(t, r.sc.te, "review-draft-failed")
+		r.st = w.Steps[0]
+		r.units.Set(r.u, "pr.head", head)
+		r.askOn(t, string(dintent.Review), "c-asked")
+		want := "its review turn asks you something"
+		if head != "c-asked" {
+			want = ""
+		}
+		if got := r.check(t, automation.CheckOpts{}); got != want {
+			t.Fatalf("%s: refusal %q, want %q", name, got, want)
+		}
+	}
+}
+
 func TestAQuestionOnThePlannedHeadHoldsTheFollowUp(t *testing.T) {
 	t.Parallel()
 	r := newStartRig(t, followupScenario(t), string(dintent.Review), roundFollowup)

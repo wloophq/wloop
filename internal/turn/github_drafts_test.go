@@ -10,6 +10,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/draft"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
@@ -61,7 +62,7 @@ func TestReviewWorkflowRestartsOnAHeldDraftThePullRequestMovedPast(t *testing.T)
 		if w.Name != "review-draft-stale" {
 			continue
 		}
-		for _, fact := range []string{"draft.held_ref", "draft.held_kind", "draft.held_basis", "draft.held_stale", "pr.head", "pr.open_turn"} {
+		for _, fact := range []string{"draft.held_ref", "draft.held_kind", "draft.held_basis", "draft.held_stale", "pr.head", "pr.commits", "pr.open_turn", "pr.state"} {
 			if !slices.Contains(w.When.Reads(), fact) {
 				t.Errorf("its when reads %v, not %s", w.When.Reads(), fact)
 			}
@@ -76,6 +77,69 @@ func TestReviewWorkflowRestartsOnAHeldDraftThePullRequestMovedPast(t *testing.T)
 		return
 	}
 	t.Fatal("no review-draft-stale workflow")
+}
+
+// bundledWorkflow is the bundled workflow named name.
+func bundledWorkflow(t *testing.T, name string) workflow.Workflow {
+	t.Helper()
+	for _, w := range bundled(t).Workflows {
+		if w.Name == name {
+			return w
+		}
+	}
+	t.Fatalf("no %s workflow", name)
+	return workflow.Workflow{}
+}
+
+// heldReview are the facts of an open pull request at head c3 whose agent's review draft 5:1, read at c2, waits
+// for the user while its turn asks, with edit applied.
+func heldReview(edit func(workflow.Facts)) workflow.Facts {
+	f := workflow.Facts{"pr.state": "OPEN", "pr.head": "c3", "pr.commits": []string{"c1", "c2", "c3"}, "pr.open_turn": "asked",
+		"draft.held_ref": "5:1", "draft.held_kind": "review", "draft.held_basis": "c2", "draft.held_stale": false,
+		"draft.failed": false, "draft.stale": false, "draft.failed_kind": "", "draft.failed_ref": ""}
+	if edit != nil {
+		edit(f)
+	}
+	return f
+}
+
+func TestReviewDraftStaleFiresOnlyWhenTheStoredHeadMovedPastAHeldReview(t *testing.T) {
+	w := bundledWorkflow(t, "review-draft-stale")
+	for _, c := range []struct {
+		name string
+		edit func(workflow.Facts)
+		want bool
+	}{
+		{"basis behind the stored head", nil, true},
+		{"refused as stale at the stored head", func(f workflow.Facts) { f["draft.held_basis"], f["draft.held_stale"] = "c3", true }, true},
+		{"the question dismissed", func(f workflow.Facts) { f["pr.open_turn"] = "dismissed" }, true},
+		{"no open turn", func(f workflow.Facts) { f["pr.open_turn"] = "" }, true},
+		{"a turn sent", func(f workflow.Facts) { f["pr.open_turn"] = "sent" }, false},
+		{"a turn started", func(f workflow.Facts) { f["pr.open_turn"] = "started" }, false},
+		{"basis at the stored head", func(f workflow.Facts) { f["draft.held_basis"] = "c3" }, false},
+		{"basis ahead of the stored head", func(f workflow.Facts) { f["draft.held_basis"] = "c4" }, false},
+		{"merged", func(f workflow.Facts) { f["pr.state"] = "MERGED" }, false},
+		{"closed, refused as stale", func(f workflow.Facts) { f["pr.state"], f["draft.held_stale"] = "CLOSED", true }, false},
+		{"a held reply", func(f workflow.Facts) { f["draft.held_kind"] = "thread_reply" }, false},
+		{"no held draft", func(f workflow.Facts) { f["draft.held_ref"], f["draft.held_kind"], f["draft.held_basis"] = "", "", "" }, false},
+	} {
+		got, err := w.When.Match(workflow.Vars{Facts: heldReview(c.edit)})
+		if err != nil || got != c.want {
+			t.Errorf("%s: %v %v, want %v", c.name, got, err, c.want)
+		}
+	}
+}
+
+func TestReviewDraftFailedPlansNothingOnAnEndedPullRequest(t *testing.T) {
+	w := bundledWorkflow(t, "review-draft-failed")
+	for state, want := range map[string]bool{"OPEN": true, "MERGED": false, "CLOSED": false} {
+		f := heldReview(func(f workflow.Facts) {
+			f["pr.state"], f["draft.failed"], f["draft.stale"], f["draft.failed_kind"], f["draft.failed_ref"] = state, true, true, "review", "5:1"
+		})
+		if got, err := w.When.Match(workflow.Vars{Facts: f}); err != nil || got != want {
+			t.Errorf("%s: %v %v, want %v", state, got, err, want)
+		}
+	}
 }
 
 // writeCommands are the GitHub manifest's commands a session with

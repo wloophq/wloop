@@ -121,7 +121,7 @@ func held(id draft.ID, origin draft.OriginKind, basis string) draft.Draft {
 func TestHeldDraftFactsNameTheDraftAPushCanMakeStale(t *testing.T) {
 	at := func(m int) time.Time { return time.Date(2026, 10, 18, 12, m, 0, 0, time.UTC) }
 	fresh := held(4, draft.OriginTurn, "c2")
-	refused := held(5, draft.OriginSession, "c1")
+	refused := held(5, draft.OriginTurn, "c1")
 	refused.Cause, refused.UpdatedAt = draft.CauseStale, at(1)
 	newer := held(6, draft.OriginTurn, "c2")
 	newer.Rev, newer.UpdatedAt = 2, at(5)
@@ -140,6 +140,11 @@ func TestHeldDraftFactsNameTheDraftAPushCanMakeStale(t *testing.T) {
 		{"the newest of two fresh ones", stored{fresh, newer}, "6:2", "review", "c2", false},
 		{"a held draft of no basis", stored{noBasis}, "", "", "", false},
 		{"a person's held review", stored{held(8, draft.OriginUser, "c1")}, "", "", "", false},
+		{"a held review your own session wrote", stored{func() draft.Draft {
+			d := held(10, draft.OriginSession, "c1")
+			d.Cause = draft.CauseStale
+			return d
+		}()}, "", "", "", false},
 		{"a workflow's held draft", stored{held(9, draft.OriginAuto, "c1")}, "", "", "", false},
 	} {
 		got, err := Provider{Drafts: c.drafts}.Facts(context.Background(), pr7)
