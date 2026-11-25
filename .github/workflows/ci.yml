@@ -2,180 +2,36 @@ name: CI
 
 on:
   pull_request:
-  merge_group:
 
 permissions: {}
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup-go # zizmor: ignore[self-repository] actionlint 1.7.12 rejects the $/ form
-        with:
-          cache: build
-      - run: make fmt-check
-      - run: scripts/test-shard.sh check
-      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
-      - run: make vet-darwin
-      - run: make vet-tags
-      - run: make build-targets
-
-  test-shard:
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [daemon, store, cli, sources, rest]
-    name: test (${{ matrix.shard }})
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup-go # zizmor: ignore[self-repository] actionlint 1.7.12 rejects the $/ form
-        with:
-          cache: test-${{ matrix.shard }}
-      - run: |
-          make test PKGS="$(scripts/test-shard.sh "$SHARD")"
-        env:
-          SHARD: ${{ matrix.shard }}
-
-  test:
-    needs: [build, test-shard, brand, scan-brand, lint, generated, workflows, web]
-    if: always()
-    runs-on: ubuntu-latest
-    permissions: {}
-    steps:
-      - name: Require every job
-        env:
-          NEEDS: ${{ toJSON(needs) }}
-        run: |
-          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<<"$NEEDS"
-          jq -e 'all(.[]; .result == "success")' <<<"$NEEDS" >/dev/null
-
-  test-macos:
+  diag-chrome:
     runs-on: macos-latest
+    timeout-minutes: 60
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-go # zizmor: ignore[self-repository] actionlint 1.7.12 rejects the $/ form
+      - uses: ./.github/actions/setup-go # zizmor: ignore[self-repository]
         with:
           cache: macos
-      - run: go test -timeout 30m ./...
-      - run: make test PKGS="./cmd/... ./internal/client/menubar/macos/"
-      - run: CGO_ENABLED=0 go test ./internal/client/menubar/macos/
-      - run: CGO_ENABLED=0 go test -tags purego ./internal/client/window/...
-      - run: CGO_ENABLED=0 go build -tags purego ./cmd/...
-
-  brand:
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [daemon, store, cli, sources, rest]
-    name: brand (${{ matrix.shard }})
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup-go # zizmor: ignore[self-repository] actionlint 1.7.12 rejects the $/ form
-        with:
-          cache: brand-${{ matrix.shard }}
-      - run: make test-brand SHARD="$SHARD"
-        env:
-          SHARD: ${{ matrix.shard }}
-
-  scan-brand:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup-go # zizmor: ignore[self-repository] actionlint 1.7.12 rejects the $/ form
-        with:
-          cache: brand-rest
-      - run: make scan-brand
-
-  lint:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup-go # zizmor: ignore[self-repository] actionlint 1.7.12 rejects the $/ form
-        with:
-          cache: build
-      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        with:
-          version: v2.15.0
-      - name: Lint the darwin build
-        run: GOOS=darwin golangci-lint run --build-tags purego ./...
-
-  generated:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup-go # zizmor: ignore[self-repository] actionlint 1.7.12 rejects the $/ form
-        with:
-          cache: build
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24
-      - run: go mod tidy
-      - run: make proto
-      - run: make docs-ref
-      - name: Check that the generated files are up to date
-        run: git diff --exit-code
-
-  web:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: internal/web/ui/.nvmrc
-      - run: make web
-      - name: Check that the committed bundle is the build of the sources
-        run: git diff --exit-code
-      - run: make test-web
-
-  workflows:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup-go # zizmor: ignore[self-repository] actionlint 1.7.12 rejects the $/ form
-        with:
-          cache: build
-      - run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
-      - uses: zizmorcore/zizmor-action@45d7276c9ca790aabd705e31ca99c6185c3e76dd # v0.8.1
-        with:
-          version: 1.31.1
-          advanced-security: false
-          annotations: true
+      - run: go test -c -o /tmp/web.test ./internal/web && go test -c -o /tmp/cli.test ./internal/cli && go test -c -o /tmp/e2e.test ./internal/e2e
+      - name: Chrome alone, idle runner
+        run: N=40 OUT=out-idle diag/chrome.sh | tail -12
+      - name: Chrome under load
+        run: |
+          (while true; do (cd internal/cli && /tmp/cli.test >/dev/null 2>&1); done) &
+          (while true; do (cd internal/e2e && /tmp/e2e.test >/dev/null 2>&1); done) &
+          N=60 OUT=out-load diag/chrome.sh | tail -12
+          kill %1 %2 || true
+      - name: Layout tests under load
+        run: |
+          (while true; do (cd internal/cli && /tmp/cli.test >/dev/null 2>&1); done) &
+          (while true; do (cd internal/e2e && /tmp/e2e.test >/dev/null 2>&1); done) &
+          cd internal/web && /tmp/web.test -test.run 'Narrow|UsersRow|FocusOrder|FloatingPanel|Omnibox|PlanGate|HomeSpans' -test.count=15 -test.v 2>&1 | grep -E '^(--- FAIL|    |FAIL|ok|PASS)' | tail -40
+          kill %1 %2 || true
+      - if: always()
+        run: ls out-*; for f in out-*/slow-*.log; do echo "== $f"; tail -60 "$f"; done
