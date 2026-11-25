@@ -147,6 +147,9 @@ type OutboxPage struct {
 	// Heads are what a group head shows under a value's title, which the facet's labels carry, by facet id,
 	// then by value; a value with nothing more to say has none.
 	Heads map[string]map[string]OutboxHead `json:"heads,omitempty"`
+	// Questions are the open question gates that pin a draft the page lists, as their cards serve them; a client
+	// shows such a draft with its question, whose answer decides it.
+	Questions []GateView `json:"questions,omitempty"`
 }
 
 // OutboxHead is what a group of drafts says beside its title, in the served locale: About why they were

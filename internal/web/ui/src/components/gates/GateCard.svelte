@@ -64,6 +64,7 @@
     {#if options.length}
       <div class="opts">
         {#each options as o (o.id)}
+          <div class="opt-col">
           <button type="button" class={"opt" + (o.id === picked ? " on" : "")} aria-pressed={o.id === picked ? "true" : "false"} data-focus={`gate:${gate.id}:option:${o.id}`}
             data-pin={o.draft ? `${o.draft.id}@${o.draft.rev}` : undefined} onclick={() => pickOption(gate, o.id)}>
             <span class="r" aria-hidden="true"></span>
@@ -72,6 +73,7 @@
             {#if o.consequence}<span class="cs">{o.consequence}</span>{/if}
           </button>
           {#if o.draft}<PinnedDraft {subject} ref={o.draft} scope={`gate:${gate.id}:option:${o.id}`} />{/if}
+          </div>
         {/each}
       </div>
     {/if}
