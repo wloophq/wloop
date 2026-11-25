@@ -97,13 +97,18 @@ type QueueItem struct {
 }
 
 // QueueOption is an option of a question an item stands for; Draft is the gate of the held draft picking
-// it approves, nil for an option that pins none.
+// it approves, nil for an option that pins none; Primary is what the button that picks it says, the profile's
+// QueueOptionPrimary filled with the draft's verdict, else the option's label.
 type QueueOption struct {
 	ID          string    `json:"id"`
 	Label       string    `json:"label"`
 	Recommended bool      `json:"recommended,omitempty"`
 	Draft       *GateView `json:"draft,omitempty"`
+	Primary     string    `json:"primary"`
 }
+
+// QueueOptionPrimary is the strings.toml key of an option's button, {option} its word.
+const QueueOptionPrimary = "Post {option}"
 
 // QueueSituation is the situation of a provider's unit that makes the decision.
 type QueueSituation struct {

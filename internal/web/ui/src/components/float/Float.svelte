@@ -127,7 +127,7 @@
         {:else if f.read === "failed"}
           <p class="fl-off">{t("Could not read the queue.")}</p>
         {:else}
-          <Agents turns={f.turns} />
+          <Agents turns={f.turns} failed={f.turnsFailed} />
           <Queue {f} />
         {/if}
       </div>

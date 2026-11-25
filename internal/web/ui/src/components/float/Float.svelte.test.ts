@@ -132,3 +132,40 @@ test("an agent row names its intent by the label the daemon serves", async () =>
 });
 
 vi.setConfig({ testTimeout: 30000 });
+
+test("the primary button says what picking the selected option posts, as the daemon words each one", async () => {
+  const it = { ...item(4, { kind: "answer" }), options: [
+    { id: "a", label: "Request changes", primary: "Post Request changes" },
+    { id: "b", label: "Comment only", recommended: true, primary: "Post Comment" },
+  ] };
+  const c = render(ReviewCard, { props: { f: floatState(), item: it, age: "", late: false } }).container;
+  const label = () => c.querySelector(".act.primary")!.textContent!.trim();
+  expect(label()).toBe("↵ Post Comment");
+  await fireEvent.click(c.querySelectorAll('[role="tab"]')[0]);
+  expect(label()).toBe("↵ Post Request changes");
+});
+
+test("a modified or middle click on a card link is left to the page", async () => {
+  keepRoutes(document);
+  const d = pendingDraft();
+  const c = render(Card, { props: { f: floatState(), item: { ...item(9), gate: draftGate(d) }, age: "", late: false } }).container;
+  const a = [...c.querySelectorAll("a")].find((x) => (x.getAttribute("href") || "").startsWith("#")) as HTMLAnchorElement;
+  let prevented = 0;
+  document.addEventListener("click", (e) => { prevented += e.defaultPrevented ? 1 : 0; e.preventDefault(); });
+  await fireEvent.click(a, { metaKey: true });
+  await fireEvent.click(a, { shiftKey: true });
+  await fireEvent.click(a, { button: 1 });
+  expect(posted).toEqual([]);
+  expect(prevented).toBe(0);
+});
+
+test("agents the daemon cannot read say so, and the queue stays as read", async () => {
+  new FakeDaemon({ "/api/queue": () => served, "/api/turns/live": () => { throw new Error("busy"); } });
+  await floatLoad();
+  const c = render(Float).container;
+  floatState().setPinned(true);
+  await settle();
+  expect([floatState().read, floatState().items.length]).toEqual(["ok", 1]);
+  expect(c.querySelector(".fl-agents-off")).not.toBeNull();
+  expect(c.querySelector(".fl-off")).toBeNull();
+});

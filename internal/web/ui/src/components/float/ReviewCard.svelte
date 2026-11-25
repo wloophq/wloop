@@ -73,7 +73,7 @@
     {/if}
   {/if}
   <div class="fl-acts">
-    <button type="button" class="act primary" disabled={f.busy || undefined} onclick={() => f.act()}><kbd>↵</kbd> {p.label || p.id}</button>
+    <button type="button" class="act primary" disabled={f.busy || undefined} onclick={() => f.act()}><kbd>↵</kbd> {(option && option.primary) || p.label || p.id}</button>
     <button type="button" class="act" onclick={() => f.open()}>{t("Edit")}</button>
     {#each others as x (x.id)}<button type="button" class="act quiet" disabled={f.busy || undefined} onclick={() => f.act(x.id)}>{x.label}</button>{/each}
   </div>

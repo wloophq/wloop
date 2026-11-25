@@ -63,12 +63,13 @@ export function floatDrag(dropped: () => void, win: J = window): void {
   for (const type of ["pointerup", "mouseup"]) win.addEventListener(type, done, true);
 }
 
-// keepRoutes hands every same-origin route a link in the page would follow to the cockpit's main window, so the
-// float window never leaves its own route.
+// keepRoutes hands every same-origin route a plain click on a link would follow to the cockpit's main window, so
+// the float window never leaves its own route; a modified or other-button click keeps its default.
 export function keepRoutes(doc: J): void {
   doc.addEventListener(
     "click",
     (e: MouseEvent) => {
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const t = e.target as Element | null;
       const a = t && t.closest ? t.closest('a[href^="#"]') : null;
       const href = a ? a.getAttribute("href") || "" : "";

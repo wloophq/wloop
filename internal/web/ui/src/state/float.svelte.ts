@@ -54,6 +54,7 @@ const fresh = () => ({
   pinned: false,
   place: { edge: "", up: false } as FloatPlace,
   read: "ok" as FloatRead,
+  turnsFailed: false,
   loaded: false,
   busy: false,
   picked: {} as Record<string, string>,
@@ -147,7 +148,7 @@ function applyQueue(q: J): void {
 // lose forgets what the daemon served, so no count outlives it; what was seen stays, so a recovery peeks only at
 // what is new.
 function lose(read: FloatRead): void {
-  Object.assign(fl, { read, items: [], current: 0, turns: null });
+  Object.assign(fl, { read, items: [], current: 0, turns: null, turnsFailed: false });
   endPeek();
 }
 
@@ -160,16 +161,19 @@ function retry(): void {
 async function read(asked: Reads): Promise<void> {
   const what = fl.read === "ok" ? asked : { queue: true, turns: true };
   const [q, tr] = await Promise.allSettled([what.queue ? getJSON(FLOAT_QUEUE) : null, what.turns ? getJSON(FLOAT_TURNS) : null]);
-  if (q.status === "rejected" || tr.status === "rejected") {
-    const reason = q.status === "rejected" ? q.reason : (tr as PromiseRejectedResult).reason;
-    lose(reason instanceof APIError && reason.status > 0 ? "failed" : "offline");
+  if (q.status === "rejected") {
+    lose(q.reason instanceof APIError && q.reason.status > 0 ? "failed" : "offline");
     return retry();
   }
-  timer.clear(marks.timers.retry);
-  marks.retries = 0;
   fl.read = "ok";
   if (what.queue) applyQueue(q.value);
-  if (what.turns) fl.turns = tr.value;
+  if (tr.status === "rejected") {
+    Object.assign(fl, { turns: null, turnsFailed: true });
+    return retry();
+  }
+  if (what.turns) Object.assign(fl, { turns: tr.value, turnsFailed: false });
+  timer.clear(marks.timers.retry);
+  marks.retries = 0;
 }
 
 // floatLoad reads what reads names, after every read already started.
@@ -315,6 +319,10 @@ export function floatState() {
     },
     get turns(): J {
       return fl.turns;
+    },
+    // turnsFailed says the daemon answers but refused the live turns, which the queue does not wait on.
+    get turnsFailed(): boolean {
+      return fl.turnsFailed;
     },
     get title(): string {
       return fl.title;

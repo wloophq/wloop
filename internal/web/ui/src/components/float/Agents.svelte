@@ -9,7 +9,7 @@
 
   // What the agents do: the turns running, each against its intent's usual duration, how many ask the user, and
   // the turns done today, the last two first.
-  let { turns }: { turns: J } = $props();
+  let { turns, failed = false }: { turns: J; failed?: boolean } = $props();
 
   const SHOWN_DONE = 2;
 
@@ -36,7 +36,9 @@
   <span class="fl-what"><b>{r.label || r.intent}</b>{[r.unit, r.title].filter(Boolean).map((s) => " · " + s).join("")}</span>
 {/snippet}
 
-{#if running.length || done.length || asked}
+{#if failed}
+  <section class="fl-agents" aria-label={t("Agents")}><p class="fl-agents-off">{t("Could not read the agents.")}</p></section>
+{:else if running.length || done.length || asked}
   <section class="fl-agents" aria-label={t("Agents")}>
     <div class="fl-agents-head">
       <span>{t("Agents")}</span>

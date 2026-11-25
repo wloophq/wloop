@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"slices"
@@ -157,7 +158,6 @@ func (s *Server) questionOptions(ctx context.Context, q gate.Gate, pinned map[in
 			{ID: "yes", Label: s.notice(builtin.NoticeNotifyYes, nil), Recommended: m.Recommend == "yes", Draft: yes},
 			{ID: "no", Label: s.notice(builtin.NoticeNotifyNo, nil), Recommended: m.Recommend == "no"},
 		}
-		return out, nil
 	}
 	for _, o := range m.Options {
 		d, err := draftGate(o.Draft)
@@ -166,7 +166,21 @@ func (s *Server) questionOptions(ctx context.Context, q gate.Gate, pinned map[in
 		}
 		out = append(out, api.QueueOption{ID: o.ID, Label: o.Label, Recommended: o.ID == m.Recommend, Draft: d})
 	}
+	for i := range out {
+		out[i].Primary = s.word(api.QueueOptionPrimary, map[string]any{"option": optionWord(out[i])})
+	}
 	return out, nil
+}
+
+// optionWord is what o's button names: its draft's verdict, else its label.
+func optionWord(o api.QueueOption) string {
+	if o.Draft != nil && len(o.Draft.Subject) > 0 {
+		var d api.Draft
+		if json.Unmarshal(o.Draft.Subject, &d) == nil && d.Verdict != "" {
+			return d.Verdict
+		}
+	}
+	return o.Label
 }
 
 // pinsAny says whether message pins a draft of pinned.

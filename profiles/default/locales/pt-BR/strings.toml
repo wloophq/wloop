@@ -816,6 +816,8 @@
 "Hide for 1 hour" = "Ocultar por 1 hora"
 "Hide until tomorrow" = "Ocultar até amanhã"
 "{file}:{line}" = "{file}:{line}"
+"Could not read the agents." = "Não foi possível ler os agentes."
+"Post {option}" = "Publicar {option}"
 "More" = "Mais"
 "Less" = "Menos"
 

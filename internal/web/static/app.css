@@ -1100,6 +1100,7 @@ html.float-page body { display: block; overflow: hidden; }
 .fl-off { margin: var(--space-16) var(--space-12); color: var(--muted); }
 .fl-err { margin: 0; padding: var(--space-6) var(--space-12); border-top: 1px solid var(--rule); color: var(--err); font-size: var(--text-meta); }
 .fl-agents { padding: var(--space-8) var(--space-12); border-bottom: 1px solid var(--rule); }
+.fl-agents-off { margin: 0; font-size: var(--text-meta); color: var(--muted); }
 .fl-agents-head { display: flex; align-items: center; gap: var(--space-8); font-size: var(--text-overline); color: var(--muted); }
 .fl-sum { font: var(--text-overline) var(--mono); font-feature-settings: "tnum"; }
 .fl-turn { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; column-gap: var(--space-8); row-gap: var(--space-2); align-items: center; width: 100%; padding: var(--space-4) 0; background: none; border: 0; text-align: left; cursor: pointer; }

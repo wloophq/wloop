@@ -249,6 +249,9 @@ func TestQueueAllFoldsOptionDraftsIntoQuestion(t *testing.T) {
 	if c.Draft != nil || c.Recommended {
 		t.Errorf("option c %+v, want no draft", c)
 	}
+	if a.Primary != "Post Short" || b.Primary != "Post Long" || c.Primary != "Post Neither" {
+		t.Errorf("primaries %q %q %q, want each option worded by the profile's %q", a.Primary, b.Primary, c.Primary, api.QueueOptionPrimary)
+	}
 	var drafts api.Queue
 	get(t, q.s, queuePath("send-draft"), &drafts)
 	if drafts.Total != 0 {

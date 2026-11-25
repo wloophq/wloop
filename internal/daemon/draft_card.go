@@ -32,6 +32,11 @@ func (s *Server) cardFields(ctx context.Context, d draft.Draft, g gate.Gate, v *
 	if len(d.Payload) > 0 {
 		v.Payload = slices.Clone(d.Payload)
 		v.Fields = s.payloadFields(publisher, string(d.Kind), d.Payload, spec, declared)
+		if declared && spec.Verdict != "" {
+			if f, ok := fieldAt(v.Fields, spec.Verdict); ok {
+				v.Verdict = cmp.Or(f.Shown, f.Value)
+			}
+		}
 	}
 	v.Preview = s.preview(d, publisher, v.Where)
 	if d.State == draft.Held {
@@ -216,6 +221,19 @@ func (w payloadWalk) field(n node, pointer, key string, schema map[string]any) a
 		f.Editable = len(f.Options) > 0
 	}
 	return f
+}
+
+// fieldAt is the field of fs, at any depth, at pointer.
+func fieldAt(fs []api.DraftField, pointer string) (api.DraftField, bool) {
+	for _, f := range fs {
+		if f.Pointer == pointer {
+			return f, true
+		}
+		if g, ok := fieldAt(f.Fields, pointer); ok {
+			return g, true
+		}
+	}
+	return api.DraftField{}, false
 }
 
 func schemaAt(schema map[string]any, key string) map[string]any {

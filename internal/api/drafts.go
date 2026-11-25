@@ -92,6 +92,8 @@ type Draft struct {
 	// it, in the payload's order; both empty for a draft of a kind with no payload.
 	Payload json.RawMessage `json:"payload,omitempty"`
 	Fields  []DraftField    `json:"fields,omitempty"`
+	// Verdict is the value of the field its kind posts as its verdict, as its plugin words it; "" for none.
+	Verdict string `json:"verdict,omitempty"`
 	// Basis is what the draft was written against, such as a pull request's head; Stale says its unit moved
 	// past it, so approving it is refused.
 	Basis string `json:"basis,omitempty"`
