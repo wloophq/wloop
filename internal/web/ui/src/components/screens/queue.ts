@@ -2,6 +2,7 @@ import { t } from "../../lib/i18n.svelte";
 import { readRoute, unitPath, HOME, type Unit } from "../../lib/routes";
 import { safeURL, type J } from "../../lib/util";
 import { act } from "../../state/actions.svelte";
+import { taskAct } from "../../state/verbs";
 import { setNotice } from "../../state/actions.svelte";
 import { getJSON } from "../../state/api";
 import { queueLoad, queueShown } from "../../state/loaders.svelte";
@@ -93,12 +94,13 @@ export async function queueAct(item: J): Promise<void> {
       if (u && (await queueDeps.act(u, p.id)) === false) throw new Error(t("{action} failed", { action: p.id }));
     } else if (p.kind === "open") openTaskSource(item.task, queueUnit(item));
     else if (p.kind === "task") writeHash({ task: item.task.id, pr: "" });
+    else if (p.kind === "verb" && !(await taskAct({ id: p.task, title: item.task.title }, p.id, p.args || {}))) throw new Error(t("{action} failed", { action: p.label || p.id }));
   } catch (err) {
     queueState.error = t("{action} failed: {error}", { action: p.label || p.id, error: (err as Error).message });
   } finally {
     queueState.busy = false;
   }
-  if (p.kind === "gate" || p.kind === "action") await queueLoad(queueRoute());
+  if (p.kind === "gate" || p.kind === "action" || p.kind === "verb") await queueLoad(queueRoute());
 }
 
 // queueDraftKey runs the action of item's draft card that key names, then reloads the queue; false when the card

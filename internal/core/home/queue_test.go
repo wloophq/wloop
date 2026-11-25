@@ -49,13 +49,24 @@ func TestQueueOldestFirstOneItemPerDecision(t *testing.T) {
 func TestQueuePrimaryForGateIsFirstIntent(t *testing.T) {
 	e := task.Task{ID: "t-a"}
 	for intents, want := range map[string]string{"approve,edit": "approve", "edit,send": "send"} {
-		g := &gate.Gate{ID: 9, Kind: gate.KindDraft, Intents: strings.Split(intents, ",")}
+		g := &gate.Gate{ID: 9, Kind: gate.KindDraft, Status: gate.Open, Intents: strings.Split(intents, ",")}
 		d := fakeDecisions{"t-a": {{Kind: decision.SendDraft, Gate: g, Since: t0}}}
 		s := home.Service{Lists: &fakeLists{sets: map[task.View][]task.Task{"decide-send-draft": {e}}}, Decisions: d, Words: queueWords()}
 		q, _ := s.Queue(context.Background(), decision.SendDraft, nil)
 		if p := q.Items[0].Primary; p.Kind != "gate" || p.ID != want {
 			t.Errorf("intents %s: primary %+v, want gate %s", intents, p, want)
 		}
+	}
+}
+
+func TestQueuePrimaryOfAnUndeliveredDraftRetries(t *testing.T) {
+	e := task.Task{ID: "t-a"}
+	g := &gate.Gate{ID: 9, Kind: gate.KindDraft, Status: gate.Approved, Intents: []string{"approve", "discard"}}
+	d := fakeDecisions{"t-a": {{Kind: decision.SendDraft, Gate: g, Since: t0}}}
+	s := home.Service{Lists: &fakeLists{sets: map[task.View][]task.Task{"decide-send-draft": {e}}}, Decisions: d, Words: queueWords()}
+	q, _ := s.Queue(context.Background(), decision.SendDraft, nil)
+	if p := q.Items[0].Primary; p.Kind != home.ActionRetry {
+		t.Fatalf("primary %+v, want a retry: its gate is approved already", p)
 	}
 }
 

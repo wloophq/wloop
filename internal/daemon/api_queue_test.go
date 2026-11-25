@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http/httptest"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -386,6 +387,13 @@ func TestFailedDeliveryIsAQueueItem(t *testing.T) {
 			q.Items[0].Task.ID != "t-0000000000000001" {
 			t.Fatalf("GET %s: items %+v, want the failed delivery as a send-draft item of its own", path, q.Items)
 		}
+		want := api.QueueAction{Kind: "verb", ID: "retry", Task: "draft:" + strconv.FormatInt(int64(d.ID), 10), Label: "Retry", Args: map[string]string{"rev": strconv.FormatInt(d.Rev, 10)}}
+		if got := q.Items[0].Primary; !reflect.DeepEqual(got, want) {
+			t.Fatalf("GET %s: primary %+v, want %+v: its gate is approved already, so it retries through the draft's own verb", path, got, want)
+		}
+	}
+	if rec := post(t, r.s, api.TaskPath("draft:"+strconv.FormatInt(int64(d.ID), 10), "retry"), `{"args":{"rev":"`+strconv.FormatInt(d.Rev, 10)+`"},"source":"cockpit"}`); rec.Code != 200 {
+		t.Fatalf("the primary's request answered %d %s", rec.Code, rec.Body)
 	}
 }
 
@@ -419,5 +427,35 @@ func TestTheHomesNeedsYouSectionIsTheQueueOfEveryKind(t *testing.T) {
 	i := slices.IndexFunc(cat.Views, func(v api.TaskViewSpec) bool { return v.ID == "outbox" })
 	if i < 0 || cat.Views[i].Opens != "view=needs-you&kind=send-draft" {
 		t.Fatalf("the Outbox's view %+v, want it to open Needs you narrowed to the drafts to send", cat.Views)
+	}
+}
+
+func TestNeedsYouIsOneCount(t *testing.T) {
+	t.Parallel()
+	q := newQueueRig(t, nil)
+	var empty api.Home
+	get(t, q.s, api.HomePath, &empty)
+	if s := empty.Sections[0]; s.View != "needs-you" || s.Empty != "Nothing needs you." {
+		t.Fatalf("empty section %+v, want decisions.toml's empty_all", s)
+	}
+	q.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "ship the retries"})
+	q.open(t, "t-0000000000000001", gate.KindQuestion, "7", time.Hour)
+	q.open(t, "t-0000000000000001", gate.KindDraft, "41", 2*time.Hour)
+	var h api.Home
+	get(t, q.s, api.HomePath, &h)
+	i := slices.IndexFunc(h.Briefing.Counters, func(c api.HomeCounter) bool { return c.ID == "needs-you" })
+	if i < 0 {
+		t.Fatalf("counters %+v, want needs-you", h.Briefing.Counters)
+	}
+	all := q.all(t)
+	if counter, section := h.Briefing.Counters[i].Count, h.Sections[0].Total; counter != 2 || section != 2 || all.Total != 2 {
+		t.Fatalf("counter %d, section %d, queue %d: want each to count the task's two items", counter, section, all.Total)
+	}
+	var labels []string
+	for _, it := range h.Sections[0].Items {
+		labels = append(labels, it.Label)
+	}
+	if !slices.Equal(labels, []string{"question", "draft"}) {
+		t.Fatalf("item labels %q, want each item's kind word, so the task's two rows read apart", labels)
 	}
 }

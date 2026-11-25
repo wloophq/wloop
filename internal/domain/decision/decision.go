@@ -69,15 +69,19 @@ type Found struct {
 	Since     time.Time
 }
 
-// Of are the decisions of a task's gates and linked units: one per open mapped gate and per approved draft gate,
-// which a caller passes only for a draft whose delivery failed (gates.Undelivered), and per unit one per kind its
+// Of are the decisions of a task's gates and linked units: one per open mapped gate of open, one per draft gate of
+// undelivered, the approved gates of the task's drafts whose delivery failed, and per unit one per kind its
 // situation or its signals map to, ordered by Since, then kind order.
-func (m Map) Of(gates []gate.Gate, links []Source) []Found {
+func (m Map) Of(open, undelivered []gate.Gate, links []Source) []Found {
 	var out []Found
-	for _, g := range gates {
-		if k, ok := m.Gates[g.Kind]; ok && (g.Status == gate.Open || g.Kind == gate.KindDraft && g.Status == gate.Approved) {
-			open := g
-			out = append(out, Found{Kind: k, Gate: &open, Since: g.OpenedAt})
+	for _, g := range open {
+		if k, ok := m.Gates[g.Kind]; ok && g.Status == gate.Open {
+			out = append(out, Found{Kind: k, Gate: &g, Since: g.OpenedAt})
+		}
+	}
+	for _, g := range undelivered {
+		if k, ok := m.Gates[g.Kind]; ok && g.Kind == gate.KindDraft && g.Status == gate.Approved {
+			out = append(out, Found{Kind: k, Gate: &g, Since: g.OpenedAt})
 		}
 	}
 	for _, l := range links {

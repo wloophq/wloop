@@ -60,7 +60,9 @@ type HomeSection struct {
 	Time  string      `json:"time"`
 	Rows  []TaskView  `json:"rows"`
 	Items []QueueItem `json:"items,omitempty"`
-	Total int         `json:"total"`
+	// Empty is what a queue section says when it lists nothing.
+	Empty string `json:"empty,omitempty"`
+	Total int    `json:"total"`
 }
 
 // HomeCapture is the capture field's hint and key.
@@ -79,9 +81,11 @@ type Queue struct {
 	Items []QueueItem `json:"items"`
 }
 
-// QueueItem is one decision of kind Kind: a task's open gate, or a situation of one of its units.
+// QueueItem is one decision of kind Kind, which Label words: a task's open gate, a failed delivery's approved
+// draft gate, or a situation of one of its units.
 type QueueItem struct {
 	Kind      string          `json:"kind"`
+	Label     string          `json:"label,omitempty"`
 	Task      TaskView        `json:"task"`
 	Gate      *GateView       `json:"gate,omitempty"`
 	Situation *QueueSituation `json:"situation,omitempty"`
@@ -108,9 +112,12 @@ type QueueSituation struct {
 }
 
 // QueueAction is an item's primary action: Kind "gate" (ID a gate intent), "action" (ID a catalog
-// action) or "open" (open the unit at its source).
+// action), "open" (open the unit at its source) or "verb" (run the task verb ID on task Task with Args, as
+// POST TaskPath(Task, ID) does: a failed delivery's retry on its draft's task, its gate approved already).
 type QueueAction struct {
-	Kind  string `json:"kind"`
-	ID    string `json:"id,omitempty"`
-	Label string `json:"label"`
+	Kind  string            `json:"kind"`
+	ID    string            `json:"id,omitempty"`
+	Task  string            `json:"task,omitempty"`
+	Args  map[string]string `json:"args,omitempty"`
+	Label string            `json:"label"`
 }

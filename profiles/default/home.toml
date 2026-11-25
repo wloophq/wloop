@@ -38,12 +38,6 @@ view  = "needs-you"
 limit = 5
 
 [[sections]]
-id    = "blocked"
-view  = "home-blocked"
-limit = 3
-time  = "owed"
-
-[[sections]]
 id    = "stalled"
 view  = "home-stalled"
 limit = 3

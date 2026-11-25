@@ -66,7 +66,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 				writeError(w, http.StatusInternalServerError, err.Error())
 				return
 			}
-			hs.Items = items
+			hs.Items, hs.Empty = items, s.loaded().Decisions.EmptyAll
 		}
 		for _, e := range sec.Tasks {
 			v, err := vs.view(ctx, e)
@@ -109,7 +109,9 @@ func (w homeWords) Profile() home.Profile {
 	p := home.Profile{Template: d.Template, Join: d.Join, LastJoin: d.LastJoin, End: d.End, Count: d.Count, Empty: d.Empty,
 		PerSentence: d.PerSentence, CaptureHint: d.CaptureHint, Order: w.l.Decisions.Order}
 	for _, c := range d.Counters {
-		p.Counters = append(p.Counters, home.Counter{ID: c.ID, Kind: c.Kind, View: task.View(c.View), Noun: home.Forms(c.Noun), Clause: home.Forms(c.Clause)})
+		v, _ := w.l.Views.View(c.View)
+		p.Counters = append(p.Counters, home.Counter{ID: c.ID, Kind: c.Kind, View: task.View(c.View), Noun: home.Forms(c.Noun), Clause: home.Forms(c.Clause),
+			Queue: c.Kind == "" && v.Layout == builtin.ViewLayoutQueue})
 	}
 	for _, sec := range d.Sections {
 		v, _ := w.l.Views.View(sec.View)
@@ -143,10 +145,12 @@ type taskDecisions struct {
 	m     decision.Map
 	gates gates.Reader
 	open  map[task.ID][]gate.Gate
+	// undelivered are the approved draft gates whose drafts failed to deliver, by task.
+	undelivered map[task.ID][]gate.Gate
 }
 
-// undelivered are the approved draft gates whose drafts failed to deliver, by task.
-func (d *taskDecisions) undelivered(ctx context.Context) (map[task.ID][]gate.Gate, error) {
+// readUndelivered reads the approved draft gates whose drafts failed to deliver, by task.
+func (d *taskDecisions) readUndelivered(ctx context.Context) (map[task.ID][]gate.Gate, error) {
 	o := d.s.deps.Outbox
 	if o == nil {
 		return nil, nil
@@ -180,13 +184,11 @@ func (d *taskDecisions) Of(ctx context.Context, e task.Task) ([]decision.Found, 
 			for _, g := range gs {
 				d.open[g.Task] = append(d.open[g.Task], g)
 			}
-			undelivered, err := d.undelivered(ctx)
+			undelivered, err := d.readUndelivered(ctx)
 			if err != nil {
 				return nil, err
 			}
-			for id, gs := range undelivered {
-				d.open[id] = append(d.open[id], gs...)
-			}
+			d.undelivered = undelivered
 		}
 	}
 	var sources []decision.Source
@@ -203,5 +205,5 @@ func (d *taskDecisions) Of(ctx context.Context, e task.Task) ([]decision.Found, 
 			sources = append(sources, decision.Source{Unit: u, Situation: situation, Signals: signals, Since: moved})
 		}
 	}
-	return d.m.Of(d.open[e.ID], sources), nil
+	return d.m.Of(d.open[e.ID], d.undelivered[e.ID], sources), nil
 }

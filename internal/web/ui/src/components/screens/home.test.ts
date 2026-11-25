@@ -87,9 +87,9 @@ describe("the home", () => {
     h.sections.unshift({
       id: "needs-you", view: "needs-you", label: "Needs you", time: "", rows: [], total: 7,
       items: [
-        { kind: "answer", task: fixture("home.json").sections[0].rows[2], primary: { kind: "gate", id: "answer", label: "Answer" } },
-        { kind: "send-draft", task: fixture("home.json").sections[0].rows[0], primary: { kind: "gate", id: "approve", label: "Send" } },
-        { kind: "send-draft", task: fixture("home.json").sections[0].rows[0], primary: { kind: "gate", id: "approve", label: "Send" } },
+        { kind: "answer", label: "question", task: fixture("home.json").sections[0].rows[2], primary: { kind: "gate", id: "answer", label: "Answer" } },
+        { kind: "answer", label: "question", task: fixture("home.json").sections[0].rows[0], primary: { kind: "gate", id: "answer", label: "Answer" } },
+        { kind: "send-draft", label: "draft", task: fixture("home.json").sections[0].rows[0], primary: { kind: "gate", id: "approve", label: "Send" } },
       ],
     });
     homeState.home = h;
@@ -99,6 +99,15 @@ describe("the home", () => {
     expect(needs.querySelector("h2")!.textContent).toBe("Needs you");
     expect(Array.from(needs.querySelectorAll("[data-row]")).map((n) => n.getAttribute("data-row"))).toEqual(["task:t-3", "task:t-1", "task:t-1"]);
     expect(links(c)).toContainEqual({ href: "#view=needs-you", text: "See all 7" });
+    expect(Array.from(needs.querySelectorAll(".item-kind")).map((n) => n.textContent)).toEqual(["question", "question", "draft"]);
+  });
+
+  it("says what the profile says when Needs you is empty", () => {
+    const h = fixture("home.json");
+    h.sections.unshift({ id: "needs-you", view: "needs-you", label: "Needs you", time: "", rows: [], items: [], empty: "Nothing needs you.", total: 0 });
+    homeState.home = h;
+    const c = render(Home).container as HTMLElement;
+    expect(c.querySelector('[data-section="needs-you"] .empty')!.textContent).toBe("Nothing needs you.");
   });
 
   it("says every word through the strings", () => {

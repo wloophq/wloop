@@ -51,16 +51,13 @@ func TestHomeEndpoint(t *testing.T) {
 	for _, s := range h.Sections {
 		sections = append(sections, s.ID)
 	}
-	if !slices.Equal(sections, []string{"needs-you", "blocked", "stalled"}) || h.Sections[0].Label != "Needs you" || h.Sections[1].Label != "Blocked by you" {
+	if !slices.Equal(sections, []string{"needs-you", "stalled"}) || h.Sections[0].Label != "Needs you" {
 		t.Fatalf("sections %+v", h.Sections)
 	}
 	if needs := h.Sections[0]; needs.Total != 1 || len(needs.Items) != 1 || needs.Items[0].Task.ID != "t-0000000000000001" {
 		t.Fatalf("needs you %+v", needs)
 	}
-	if blocked := h.Sections[1]; blocked.Total != 1 || len(blocked.Rows) != 1 || blocked.Rows[0].ID != "t-0000000000000001" {
-		t.Fatalf("blocked %+v", blocked)
-	}
-	if stalled := h.Sections[2]; stalled.Total != 2 || len(stalled.Rows) != 2 {
+	if stalled := h.Sections[1]; stalled.Total != 2 || len(stalled.Rows) != 2 {
 		t.Fatalf("stalled %+v", stalled)
 	}
 	if h.Capture.Hint != "Capture what's on your mind" || h.Capture.Key != "n" {
@@ -95,7 +92,7 @@ func TestHomeInPtBR(t *testing.T) {
 	if got := h.Briefing.Counters[0].Label; got != "1 tarefa" {
 		t.Fatalf("label %q", got)
 	}
-	if h.Sections[0].Label != "Precisa de você" || h.Sections[1].Label != "Bloqueado por você" || h.Capture.Hint != "Anote o que está na sua cabeça" {
+	if h.Sections[0].Label != "Precisa de você" || h.Sections[0].Empty != "Nada precisa de você." || h.Sections[1].Label != "Paradas há mais tempo" || h.Capture.Hint != "Anote o que está na sua cabeça" {
 		t.Fatalf("home %+v", h)
 	}
 }

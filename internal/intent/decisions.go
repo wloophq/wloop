@@ -262,6 +262,37 @@ func (l *decisionsLoad) mergeKind(s *sheet, k decision.Kind, m mKind) {
 
 // check says what of the decisions names what the profile lacks: a kind's view, a kind's primary gate intent,
 // a plugin's primary action.
+// queueViews gives each view of views drawn as the queue of every kind that sets no when of its own the union of
+// the whens of the views the kinds name, so it lists the tasks the queue walks and a profile that edits a kind's
+// view moves it too.
+func (l *decisionsLoad) queueViews(views *ViewsDef, tasks TasksDef) Problems {
+	var out Problems
+	for i := range views.Views {
+		v := &views.Views[i]
+		if v.Layout != builtin.ViewLayoutQueue || v.WhenText != "" {
+			continue
+		}
+		var parts []string
+		for _, k := range decision.Kinds {
+			kv, ok := views.View(l.def.Kinds[k].View)
+			if ok && kv.WhenText != "" && kv.Over == v.Over && !slices.Contains(parts, "("+kv.WhenText+")") {
+				parts = append(parts, "("+kv.WhenText+")")
+			}
+		}
+		if len(parts) == 0 {
+			continue
+		}
+		text := strings.Join(parts, " || ")
+		pred, err := expr.CompileWorkflow(text, ViewEnv(v.Over, tasks))
+		if err != nil {
+			out = append(out, Problem{File: ViewsFile, Field: "views." + v.ID + ".when", Msg: "the union of the kinds' views does not compile: " + err.Error()})
+			continue
+		}
+		v.When, v.WhenText = pred, text
+	}
+	return out
+}
+
 func (l *decisionsLoad) check(views ViewsDef, gates GatesDef, actions map[string]BuiltinAction, offered func(dunit.ProviderID) []string) Problems {
 	var out Problems
 	viewIDs := views.IDs()

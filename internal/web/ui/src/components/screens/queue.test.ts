@@ -289,4 +289,23 @@ describe("Needs you", () => {
     const c = render(Queue).container as HTMLElement;
     expect(rows(c)[0]).toBe("task:t-9");
   });
+
+  it("keeps the area, the contexts and the filter through the Outbox's redirect", async () => {
+    withNeedsYou();
+    input.queues = { "send-draft": { kind: "send-draft", title: "Drafts to send", total: 0, items: [] } };
+    nav.hash = "#view=outbox&area=OSS&ctx=" + encodeURIComponent("@decide") + "&q=retries";
+    await loadTasks();
+    expect(nav.hash).toBe("#view=needs-you&kind=send-draft&area=OSS&ctx=%40decide&q=retries");
+    expect(log.gets).toContain("/api/queues/send-draft?q=retries");
+  });
+
+  it("runs a failed delivery's retry through the draft's own verb", async () => {
+    withNeedsYou();
+    const item = { kind: "send-draft", task: { id: "t-9", title: "thank them", units: [] }, primary: { kind: "verb", id: "retry", task: "draft:5", args: { rev: "3" }, label: "Retry" } };
+    input.queues = { "": { title: "Needs you", total: 1, items: [item] } };
+    await open("#view=needs-you");
+    await queueAct(item);
+    expect(log.posts).toContain("/api/tasks/draft:5/retry");
+    expect(log.bodies[log.posts.indexOf("/api/tasks/draft:5/retry")].args).toEqual({ rev: "3" });
+  });
 });

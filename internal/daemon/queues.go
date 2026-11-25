@@ -14,11 +14,13 @@ import (
 	"github.com/wloophq/wloop/internal/core/home"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/decision"
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/i18n"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
@@ -102,7 +104,12 @@ func (s *Server) queueItems(ctx context.Context, g *coretasks.Service, its []hom
 		if err != nil {
 			return nil, err
 		}
-		qi := api.QueueItem{Kind: string(it.Found.Kind), Task: v, Primary: api.QueueAction{Kind: it.Primary.Kind, ID: it.Primary.ID, Label: primaryLabel(l, it)}}
+		qi := api.QueueItem{Kind: string(it.Found.Kind), Label: kindWord(l, it.Found.Kind), Task: v, Primary: api.QueueAction{Kind: it.Primary.Kind, ID: it.Primary.ID, Label: primaryLabel(l, it)}}
+		if it.Primary.Kind == home.ActionRetry {
+			if qi.Primary, err = s.retryAction(ctx, *it.Found.Gate); err != nil {
+				return nil, err
+			}
+		}
 		if g := it.Found.Gate; g != nil {
 			gv := s.gateView(ctx, *g, byUnit)
 			qi.Gate = &gv
@@ -168,6 +175,32 @@ func (s *Server) questionOptions(ctx context.Context, q gate.Gate, pinned map[in
 	}
 	return out, nil
 }
+
+// retryAction retries the delivery of the draft of approved draft gate g: the verb whose handler retries, on the
+// draft's own task, at the draft's rev, worded as the profile words that verb.
+func (s *Server) retryAction(ctx context.Context, g gate.Gate) (api.QueueAction, error) {
+	if s.deps.Outbox == nil {
+		return api.QueueAction{}, fmt.Errorf("draft gate %d failed to deliver, and the daemon serves no Outbox", g.ID)
+	}
+	id, err := strconv.ParseInt(g.Subject, 10, 64)
+	if err != nil {
+		return api.QueueAction{}, fmt.Errorf("draft gate %d names no draft: %w", g.ID, err)
+	}
+	d, err := s.deps.Outbox.Store.Get(ctx, draft.ID(id))
+	if err != nil {
+		return api.QueueAction{}, fmt.Errorf("the draft of gate %d: %w", g.ID, err)
+	}
+	verb, label := s.handlerVerb(handlerRetry)
+	return api.QueueAction{Kind: queueVerb, ID: string(verb), Task: draftPrefix + g.Subject, Args: map[string]string{"rev": strconv.FormatInt(d.Rev, 10)}, Label: label}, nil
+}
+
+// kindWord is decision kind k's noun in its one form, which words an item of the kind.
+func kindWord(l *intentload.Loaded, k decision.Kind) string {
+	return home.Forms(l.Decisions.Kinds[k].Noun).For(i18n.Form(l.Locale, 1))
+}
+
+// queueVerb is the kind of a QueueAction that runs a task verb.
+const queueVerb = "verb"
 
 // pinsAny says whether message pins a draft of pinned.
 func pinsAny(pinned map[int64]int64, message int64) bool {

@@ -231,3 +231,35 @@ func TestDecisionsOrderRefusesUnknownAndRepeatedKinds(t *testing.T) {
 		t.Fatalf("order = %v", l.Decisions.Order)
 	}
 }
+
+func TestTheQueueViewListsTheTasksOfTheKindsViews(t *testing.T) {
+	union := func(l *intentload.Loaded) string {
+		var parts []string
+		for _, k := range decision.Kinds {
+			v, _ := l.Views.View(l.Decisions.Kinds[k].View)
+			parts = append(parts, "("+v.WhenText+")")
+		}
+		return strings.Join(parts, " || ")
+	}
+	l, problems := loadProfile(t, "en", nil)
+	if len(problems) > 0 {
+		t.Fatal(problems)
+	}
+	if v, _ := l.Views.View("needs-you"); v.When == nil || v.WhenText != union(l) {
+		t.Fatalf("needs-you lists %q, want the union of the kinds' views %q", v.WhenText, union(l))
+	}
+	edited, problems := loadProfile(t, "en", map[string]string{"views.toml": "[views.decide-answer]\nwhen = \"'answer' in task.decisions && task.owed_by == 'me'\"\n"})
+	if len(problems) > 0 {
+		t.Fatal(problems)
+	}
+	if v, _ := edited.Views.View("needs-you"); !strings.Contains(v.WhenText, "('answer' in task.decisions && task.owed_by == 'me')") || v.WhenText != union(edited) {
+		t.Fatalf("needs-you lists %q after the user edited decide-answer, want it to follow", v.WhenText)
+	}
+	own, problems := loadProfile(t, "en", map[string]string{"views.toml": "[views.needs-you]\nwhen = \"task.gates_open > 0\"\n"})
+	if len(problems) > 0 {
+		t.Fatal(problems)
+	}
+	if v, _ := own.Views.View("needs-you"); v.WhenText != "task.gates_open > 0" {
+		t.Fatalf("needs-you lists %q, want the when the user set", v.WhenText)
+	}
+}

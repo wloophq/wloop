@@ -369,12 +369,14 @@ fact  = "draft.created_at"
 label = "Written"
 sort  = "time"
 
+# Needs you is drawn as the queue of every decision kind. With no when of
+# its own it lists the tasks of the views decisions.toml's kinds name, so
+# it lists what the queue walks.
 [views.needs-you]
 label         = "Needs you"
 summary       = "What waits on you, one decision at a time: questions first, then drafts to send, plans, steps and the rest."
 empty         = "Nothing needs you."
 key           = "g q"
-when          = "'answer' in task.decisions || 'send-draft' in task.decisions || 'approve-plan' in task.decisions || 'review-step' in task.decisions || 'act' in task.decisions || (task.owed_by == 'me' && ('pick-someone' in task.decisions || 'last-step' in task.decisions))"
 sort          = "task.decision_since"
 layout        = "queue"
 hide_disabled = true

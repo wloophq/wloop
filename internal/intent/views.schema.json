@@ -755,7 +755,7 @@
           },
           "layout": {
             "default": "list",
-            "description": "How the cockpit draws the view: list, its rows; board, a lane per group, which a person may switch back to the list; outbox, the Outbox's drafts, which the lens filters, groups and sorts over the `draft_facets` and the view's own `group` and `sort` (draft facts), read from the Outbox's own route whatever the view lists, and which a page of its own opens as the queue view narrowed to the kind draft gates count as; queue, what waits on you one decision at a time, the queue of every decision kind in decisions.toml's order, read from its own route whatever the view lists, which the home's section of the view, the menu bar's queue and the Outbox open.",
+            "description": "How the cockpit draws the view: list, its rows; board, a lane per group, which a person may switch back to the list; outbox, the Outbox's drafts, which the lens filters, groups and sorts over the `draft_facets` and the view's own `group` and `sort` (draft facts), read from the Outbox's own route whatever the view lists, and which a page of its own opens as the queue view narrowed to the kind draft gates count as; queue, what waits on you one decision at a time, the queue of every decision kind in decisions.toml's order, read from its own route whatever the view lists, which the home's section and counter of the view, the menu bar and the Outbox open; with no `when` of its own, such a view lists the tasks of the views decisions.toml's kinds name.",
             "enum": [
               "list",
               "board",

@@ -350,6 +350,7 @@ const (
 	handlerDelegate   = "delegate"
 	handlerFinish     = "finish"
 	handlerProject    = "project"
+	handlerRetry      = "retry"
 	handlerReviewed   = "reviewed"
 	handlerSequential = "sequential"
 )

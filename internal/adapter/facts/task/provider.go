@@ -402,7 +402,7 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		if err != nil {
 			return nil, err
 		}
-		if found := p.d.Decisions().Of(append(gates.Unpinned(gs, pinned), undelivered...), sources); len(found) > 0 {
+		if found := p.d.Decisions().Of(gates.Unpinned(gs, pinned), undelivered, sources); len(found) > 0 {
 			f["task.decisions"], f["task.decision_since"] = decision.Names(found), found[0].Since
 		}
 	}

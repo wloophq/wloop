@@ -6048,7 +6048,6 @@
     "label": "Needs you",
     "summary": "What waits on you, one decision at a time: questions first, then drafts to send, plans, steps and the rest.",
     "empty": "Nothing needs you.",
-    "when": "'answer' in task.decisions || 'send-draft' in task.decisions || 'approve-plan' in task.decisions || 'review-step' in task.decisions || 'act' in task.decisions || (task.owed_by == 'me' \u0026\u0026 ('pick-someone' in task.decisions || 'last-step' in task.decisions))",
     "sort": "task.decision_since",
     "over": "tasks",
     "rail": false,

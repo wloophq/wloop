@@ -84,9 +84,9 @@ func TestTheMenubarFollowsARealDaemonsInbox(t *testing.T) {
 	go func() { _ = app.Run(appCtx); close(appDone) }()
 	defer func() { stopApp(); <-appDone }()
 
-	eventually(t, "the Inbox task's notification and badge", func() bool {
+	eventually(t, "the Inbox task's notification and the Needs you count", func() bool {
 		posted, _ := notes.seen()
-		return len(posted) == 1 && tray.title() == brand.Name+" 1" && tray.has("Needs you (0)")
+		return len(posted) == 1 && tray.title() == brand.Name+" 0" && tray.has("Needs you (0)")
 	})
 	posted, _ := notes.seen()
 	n := posted[0]
@@ -106,6 +106,6 @@ func TestTheMenubarFollowsARealDaemonsInbox(t *testing.T) {
 	}
 	eventually(t, "the withdrawal once the task left the Inbox", func() bool {
 		_, withdrawn := notes.seen()
-		return slices.Equal(withdrawn, []string{n.ID}) && tray.title() == brand.Name+" 1"
+		return slices.Equal(withdrawn, []string{n.ID}) && tray.title() == brand.Name+" 0"
 	})
 }

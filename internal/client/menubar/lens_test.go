@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/api"
-	"github.com/wloophq/wloop/internal/brand"
 )
 
 // lensViews are a profile's views the menu bar knows nothing of beforehand: two badged, one not.
@@ -62,24 +61,6 @@ func TestMenubarSectionsComeFromTheProfile(t *testing.T) {
 	}
 	if it, ok := find(r.tray.menu, "acme/api#9 · "); !ok || !strings.HasSuffix(it.Title, "(stale)") {
 		t.Fatalf("a stale row is not marked: %q", got)
-	}
-}
-
-func TestBadgeTitleCountsBadgeViews(t *testing.T) {
-	r := newRig(t)
-	r.d.views = lensViews()
-	r.d.counters = api.Counters{Views: map[string]int{"stalled": 9, "mine": 2, "asks": 3}, Badge: 5}
-	r.c.Refresh(context.Background())
-	if got := r.title(); got != brand.Name+" 5" {
-		t.Fatalf("title %q, want the count of the badge views", got)
-	}
-	r.d.mu.Lock()
-	r.d.views = []api.TaskViewSpec{{ID: "stalled", Label: "Stalled", Badge: true, Rail: true}}
-	r.d.counters = api.Counters{Views: map[string]int{"stalled": 9, "mine": 2, "asks": 3}, Badge: 9}
-	r.d.mu.Unlock()
-	r.c.Refresh(context.Background())
-	if got := r.title(); got != brand.Name+" 9" {
-		t.Fatalf("title %q after the profile badged another view", got)
 	}
 }
 

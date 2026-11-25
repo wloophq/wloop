@@ -651,7 +651,7 @@ func TestMenuShowsBeforeThePermissionIsAnswered(t *testing.T) {
 	r := newRig(t)
 	r.notes.block = make(chan struct{})
 	r.d.rows["loop"] = []api.Row{reviewRow(2)}
-	r.d.counters = api.Counters{Badge: 1}
+	r.d.queue = needsYou(plainTask(1))
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- r.c.Run(ctx) }()

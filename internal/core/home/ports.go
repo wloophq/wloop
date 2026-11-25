@@ -62,12 +62,14 @@ type Profile struct {
 	Order                                       []decision.Kind
 }
 
-// Counter counts a decision kind's decisions (Kind), one per item of its queue, or a view's tasks (View, with its own Noun and Clause).
+// Counter counts a decision kind's decisions (Kind), one per item of its queue, or a view's tasks (View, with its
+// own Noun and Clause); with Queue, its view draws the queue of every decision kind, whose items it counts.
 type Counter struct {
 	ID           string
 	Kind         decision.Kind
 	View         task.View
 	Noun, Clause Forms
+	Queue        bool
 }
 
 // Section is the first Limit rows of View, titled Label, each showing Time; with Queue, the first Limit items of

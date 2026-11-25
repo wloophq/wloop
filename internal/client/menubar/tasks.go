@@ -100,16 +100,15 @@ func (c *Controller) loadingItems() []MenuItem {
 
 func (c *Controller) viewTasks(v string) []api.TaskView { return c.tasks[v] }
 
+// title says how many items Needs you holds, and each view's count for a profile that words it.
 func (c *Controller) title() string {
 	params := map[string]any{}
-	badge := 0
 	if c.counters != nil {
-		badge = c.counters.Badge
 		for view, n := range c.counters.Views {
 			params[view] = n
 		}
 	}
-	params["name"], params["n"] = brand.Name, badge
+	params["name"], params["n"] = brand.Name, c.needs.Total
 	if c.health.Paused {
 		return c.words().T("{name} {n} paused", params)
 	}

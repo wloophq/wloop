@@ -6,7 +6,7 @@ import { keyUnit, PLAN, QUEUE_LIST, readRoute, RECENT, type Route, unitPath, EXP
 import { isSet, unitKey, type J } from "../lib/util";
 import { APIError, getJSON, postJSON } from "./api";
 import { reconcile } from "./reconcile";
-import { currentHash, readHash, replaceHash, viewHash, type Hash } from "./route.svelte";
+import { currentHash, hashString, readHash, replaceHash, viewHash, type Hash } from "./route.svelte";
 import {
   catalog, detailState, homeState, outboxState, queueState, reviewState, state, taskState, tasksState, gateState,
 } from "./store.svelte";
@@ -335,7 +335,8 @@ export async function loadTasks(given?: Hash, units?: string[]): Promise<void> {
 async function loadTaskList(route: Hash): Promise<void> {
   const opens = (viewSpec(route.view) || {}).opens;
   if (opens) {
-    replaceHash(opens);
+    const to = readRoute(opens);
+    replaceHash(hashString({ view: to.view, kind: to.kind, area: route.area, ctx: route.ctx, q: route.q }));
     return loadQueue();
   }
   if (route.view === REVIEW) return loadReview();

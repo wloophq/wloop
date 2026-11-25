@@ -253,3 +253,23 @@ func TestAQueueSectionListsTheQueueOfEveryKindInOrder(t *testing.T) {
 		t.Fatalf("section %+v, want the first two items of the queue of every kind, last-step first, then the oldest question", s)
 	}
 }
+
+func TestAQueueCounterCountsTheQueuesItemsReadOnceWithItsSection(t *testing.T) {
+	w := words()
+	w.profile.Order = []decision.Kind{decision.Answer, decision.LastStep}
+	w.profile.Counters = []home.Counter{{ID: "needs-you", View: "needs-you", Queue: true, Noun: plural("task", "tasks"), Clause: plural("{counter} needs you", "{counter} need you")}}
+	w.profile.Sections = []home.Section{{ID: "needs-you", View: "needs-you", Label: "Needs you", Limit: 1, Queue: true}}
+	twice := tasks("a", 1)
+	lists := &fakeLists{sets: map[task.View][]task.Task{"decide-answer": twice, "needs-you": tasks("x", 9)}}
+	d := fakeDecisions{"a-0": append(foundAt(decision.Answer, "", t0), foundAt(decision.Answer, "", t0.Add(time.Hour))...)}
+	h, err := service(lists, d, w).Home(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c := h.Counts[0]; c.N != 2 || c.Label != "2 tasks" || h.Sections[0].Total != 2 {
+		t.Fatalf("counter %+v, section total %d: want both to count the queue's two items", c, h.Sections[0].Total)
+	}
+	if n := len(lists.asked); n != len(decision.Ordered(w.profile.Order)) {
+		t.Fatalf("Sets called %d times, want once per kind of one queue read and no read of the queue's own view", n)
+	}
+}

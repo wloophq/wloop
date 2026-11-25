@@ -19,7 +19,7 @@ func TestHomeLoadsTheBundledBriefingInEachLocale(t *testing.T) {
 	}
 	h := en.Home
 	if len(h.Counters) != 3 || h.Counters[0].View != "needs-you" || h.Counters[0].ID != "needs-you" || h.Counters[1].View != "in-loop" ||
-		len(h.Sections) != 3 || h.Sections[0].View != "needs-you" || h.Sections[1].View != "home-blocked" || h.Sections[1].Time != "owed" || h.LastJoin != " and " {
+		len(h.Sections) != 2 || h.Sections[0].View != "needs-you" || h.Sections[1].View != "home-stalled" || h.Sections[1].Time != "moved" || h.LastJoin != " and " {
 		t.Fatalf("home = %+v", h)
 	}
 	pt, problems := loadProfile(t, "pt-BR", nil)

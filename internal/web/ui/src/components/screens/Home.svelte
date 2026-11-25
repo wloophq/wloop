@@ -70,12 +70,16 @@
               <h2>{s.label}</h2>
               {#if s.total > rows.length}<a class="see-all" href={"#view=" + encodeURIComponent(s.view)} data-focus={"home:all:" + s.id}>{tn("See all {n}", s.total)}</a>{/if}
             </header>
-            {#if rows.length}
+            {#if s.items && rows.length}
               <div class="rows">
-                {#each rows as e, i (s.items ? i : e.id)}<ScreenRow task={e} view={s.view} />{/each}
+                {#each s.items as it, i (i)}<div class="home-item"><span class="item-kind">{it.label}</span><ScreenRow task={it.task} view={s.view} /></div>{/each}
+              </div>
+            {:else if rows.length}
+              <div class="rows">
+                {#each rows as e (e.id)}<ScreenRow task={e} view={s.view} />{/each}
               </div>
             {:else}
-              <p class="empty">{t("Nothing here right now.")}</p>
+              <p class="empty">{s.empty || t("Nothing here right now.")}</p>
             {/if}
           </section>
         {/each}
