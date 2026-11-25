@@ -24,7 +24,7 @@ Tasks first, because tasks are the user's own system; sources below, because the
 | Section | Views | Notes |
 |---|---|---|
 | *(top)* | Area switcher, Review | the area filters every view; Review walks the profile's review steps |
-| *(no heading)* | the profile's views, in the order of `views.toml` | the first is the landing view; a view the badge counts shows its count in `ink` |
+| *(no heading)* | the profile's views, in the order of `views.toml` | the first is the landing view; each counted view shows its count from the counters in `faint` (`muted` on the current view), the queue view's as its queue's items; plugin views show none |
 | **One section per plugin**, titled with its name | the plugin's perspectives in its catalog order | collapsed past three; GitHub: Needs me, My PRs, In loop, Stalled, Approved, All, Backlog, Explore; Slack: Conversations |
 | **Loop** | Plan, Recent | the profile's workflows and what they did |
 
