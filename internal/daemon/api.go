@@ -131,6 +131,7 @@ func (s *Server) routes() []route {
 		{"GET " + api.StringsPath, s.handleStrings},
 		{"GET " + api.HomePath, s.handleHome},
 		{"GET " + api.QueuePath, s.handleQueue},
+		{"GET " + api.QueueAllPath, s.handleQueueAll},
 		{"GET " + api.SearchPath, s.handleSearch},
 		{"POST " + api.OmniboxResolvePath, s.handleOmniboxResolve},
 		{"POST " + api.OmniboxAskPath, s.handleOmniboxAsk},

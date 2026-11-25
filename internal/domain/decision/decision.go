@@ -30,6 +30,17 @@ var Kinds = []Kind{Answer, ApprovePlan, SendDraft, ReviewStep, LastStep, PickSom
 // Valid says whether k is one of Kinds.
 func Valid(k Kind) bool { return slices.Contains(Kinds, k) }
 
+// Ordered are order's kinds, then the other Kinds in Kinds order.
+func Ordered(order []Kind) []Kind {
+	out := slices.Clone(order)
+	for _, k := range Kinds {
+		if !slices.Contains(out, k) {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
 // Map is how the profile maps gate kinds, and each plugin's situations and link signals, to decision kinds.
 type Map struct {
 	Gates      map[gate.Kind]Kind

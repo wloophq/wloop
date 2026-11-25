@@ -330,6 +330,35 @@ func (s *Service) Decides(ctx context.Context, drafted gate.Gate) error {
 	return fmt.Errorf("%w: question gate %d decides draft gate %d: answer the question", ErrRefused, q.ID, drafted.ID)
 }
 
+// PinnedBy is the open question gate whose message pins open draft gate drafted's draft, in an option or its
+// confirm; false when none does. That question's answer decides the draft, which then waits on no decision of
+// its own.
+func (s *Service) PinnedBy(ctx context.Context, drafted gate.Gate) (gate.Gate, bool, error) {
+	if s.d.Options == nil || drafted.Kind != gate.KindDraft || drafted.Status != gate.Open {
+		return gate.Gate{}, false, nil
+	}
+	q, _, _, ok, err := s.d.Options.Pinning(ctx, drafted)
+	if err != nil || !ok || q.ID == 0 || q.Status != gate.Open {
+		return gate.Gate{}, false, err
+	}
+	return q, true, nil
+}
+
+// Unpinned are gs but the draft gates an open question pins (PinnedBy), in gs's order.
+func (s *Service) Unpinned(ctx context.Context, gs []gate.Gate) ([]gate.Gate, error) {
+	out := make([]gate.Gate, 0, len(gs))
+	for _, g := range gs {
+		_, pinned, err := s.PinnedBy(ctx, g)
+		if err != nil {
+			return nil, err
+		}
+		if !pinned {
+			out = append(out, g)
+		}
+	}
+	return out, nil
+}
+
 // Supersede closes open gate id as superseded by by, its subject gone or
 // replaced, with no consequence: the subject's owner settles the subject.
 // It refuses an agent: no agent closes an open gate. A person supersedes

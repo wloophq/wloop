@@ -3,6 +3,7 @@ package intent_test
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -199,5 +200,34 @@ func TestBundledDecisionViewsCoverEveryKind(t *testing.T) {
 		if v, _ := l.Views.View(id); !v.Rail {
 			t.Errorf("%s left the rail", id)
 		}
+	}
+}
+
+func TestDecisionsOrderTheQueueOfEveryKind(t *testing.T) {
+	l, problems := loadProfile(t, "en", nil)
+	if len(problems) > 0 {
+		t.Fatalf("problems: %v", problems)
+	}
+	d := l.Decisions
+	want := []decision.Kind{"answer", "send-draft", "approve-plan", "review-step", "act", "pick-someone", "last-step"}
+	if !slices.Equal(d.Order, want) || d.QueueAll != "Needs you" || d.EmptyAll != "Nothing needs you." {
+		t.Fatalf("order %v, queue_all %q, empty_all %q", d.Order, d.QueueAll, d.EmptyAll)
+	}
+	pt, _ := loadProfile(t, "pt-BR", nil)
+	if pt.Decisions.QueueAll != "Precisa de você" {
+		t.Fatalf("queue_all in pt-BR = %q", pt.Decisions.QueueAll)
+	}
+}
+
+func TestDecisionsOrderRefusesUnknownAndRepeatedKinds(t *testing.T) {
+	l, problems := loadProfile(t, "en", map[string]string{"decisions.toml": "order = [\"act\", \"anwser\", \"act\"]\n"})
+	if _, ok := problemAt(problems, "order[1]", "answer"); !ok {
+		t.Fatalf("no did-you-mean on the kind: %v", problems)
+	}
+	if _, ok := problemAt(problems, "order[2]", "already"); !ok {
+		t.Fatalf("a repeated kind passes: %v", problems)
+	}
+	if !slices.Equal(l.Decisions.Order, []decision.Kind{decision.Act}) {
+		t.Fatalf("order = %v", l.Decisions.Order)
 	}
 }

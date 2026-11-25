@@ -99,6 +99,9 @@ type Deps struct {
 	// Decisions is how the profile maps gates, situations and signals to decision kinds, for task.decisions;
 	// nil: none.
 	Decisions func() decision.Map
+	// Unpinned drops from a task's open gates the draft gates an open question pins (gates.Service.Unpinned),
+	// which its answer decides; nil drops none.
+	Unpinned func(ctx context.Context, gs []gate.Gate) ([]gate.Gate, error)
 	// Extraction is when the oldest message of units still waiting to be extracted arrived, as their plugins'
 	// extraction health says, for task.extraction_lag; zero when none waits, and nil none ever does.
 	Extraction func(ctx context.Context, units []unit.Unit) (time.Time, error)
@@ -390,7 +393,13 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		sources = nil
 	}
 	if p.d.Decisions != nil {
-		if found := p.d.Decisions().Of(gs, sources); len(found) > 0 {
+		decided := gs
+		if p.d.Unpinned != nil {
+			if decided, err = p.d.Unpinned(ctx, gs); err != nil {
+				return nil, err
+			}
+		}
+		if found := p.d.Decisions().Of(decided, sources); len(found) > 0 {
 			f["task.decisions"], f["task.decision_since"] = decision.Names(found), found[0].Since
 		}
 	}

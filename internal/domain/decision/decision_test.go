@@ -92,3 +92,11 @@ func TestKindsOfFoundsKeepsEachOnceInOrder(t *testing.T) {
 		t.Fatalf("Names = %v", got)
 	}
 }
+
+func TestOrderedPutsTheKindsLeftOutLast(t *testing.T) {
+	got := Ordered([]Kind{SendDraft, Answer})
+	want := []Kind{SendDraft, Answer, ApprovePlan, ReviewStep, LastStep, PickSomeone, Act}
+	if !slices.Equal(got, want) {
+		t.Fatalf("Ordered = %v, want %v", got, want)
+	}
+}

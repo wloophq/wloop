@@ -64,6 +64,8 @@ type env struct {
 	links map[unit.Unit]facttask.Link
 	// decisions maps gates, situations and signals to decision kinds.
 	decisions decision.Map
+	// pins are the question gates whose options pin a draft, by the draft's id.
+	pins map[string]int64
 	// unextracted are when each unit's oldest message not yet extracted arrived.
 	unextracted map[unit.Unit]time.Time
 	// reads counts the store reads by what they read.
@@ -135,6 +137,25 @@ func (c countingGates) Where(ctx context.Context, q gates.Query) ([]gate.Gate, e
 	return c.GateStore.Where(ctx, q)
 }
 
+// envPins report the question gate whose option pins a draft gate's draft, as the store holds it now.
+type envPins struct {
+	r gates.Reader
+	e *env
+}
+
+func (p envPins) OptionDraft(context.Context, gate.Gate, gates.Resolution) (gate.Gate, int64, bool, error) {
+	return gate.Gate{}, 0, false, nil
+}
+
+func (p envPins) Pinning(ctx context.Context, drafted gate.Gate) (gate.Gate, string, int64, bool, error) {
+	id, ok := p.e.pins[drafted.Subject]
+	if !ok {
+		return gate.Gate{}, "", 0, false, nil
+	}
+	q, err := p.r.Get(ctx, id)
+	return q, "", 0, err == nil, err
+}
+
 func newEnv(t *testing.T) *env {
 	t.Helper()
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "s.db"), nil)
@@ -143,7 +164,9 @@ func newEnv(t *testing.T) *env {
 	}
 	t.Cleanup(func() { db.Close() })
 	e := &env{t: t, db: db, clock: &clock{now: monday}, s: facttask.Settings{StaleDays: 2, RenudgeAfter: 72 * time.Hour}, ended: map[unit.Unit]bool{}, turns: map[unit.Unit]int{}, repos: map[unit.Unit]string{}, links: map[unit.Unit]facttask.Link{},
-		unextracted: map[unit.Unit]time.Time{}, reads: map[string]int{}}
+		unextracted: map[unit.Unit]time.Time{}, reads: map[string]int{}, pins: map[string]int64{}}
+	gateStore := db.Gates(func() time.Time { return e.clock.now })
+	pinning := gates.New(gates.Deps{Reader: gateStore, Options: envPins{gateStore, e}})
 	e.p = facttask.New(facttask.Deps{
 		Tasks: db.Tasks(), Items: countingItems{db.Items(), e}, Drafts: countingDrafts{db.Drafts(), e},
 		Cards:    coretasks.CardFacts{Cards: countingCards{db.Cards(), e}},
@@ -179,6 +202,7 @@ func newEnv(t *testing.T) *env {
 			return e.links[u], nil
 		},
 		Decisions: func() decision.Map { return e.decisions },
+		Unpinned:  pinning.Unpinned,
 		Extraction: func(_ context.Context, us []unit.Unit) (time.Time, error) {
 			var oldest time.Time
 			for _, u := range us {

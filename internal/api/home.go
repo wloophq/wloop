@@ -7,6 +7,10 @@ const HomePath = "/api/home"
 // lens query, as CountersPath's does.
 const QueuePath = "/api/queues/{kind}"
 
+// QueueAllPath serves the queue of every decision kind, as Queue with no Kind: the kinds in the order
+// decisions.toml gives, each kind's items oldest decision first. Its query parameter q is QueuePath's.
+const QueueAllPath = "/api/queue"
+
 // Home is the briefing, the home's sections and the capture field.
 type Home struct {
 	Briefing Briefing      `json:"briefing"`
@@ -73,12 +77,25 @@ type Queue struct {
 	Items []QueueItem `json:"items"`
 }
 
-// QueueItem is one decision: a task's open gate, or a situation of one of its units.
+// QueueItem is one decision of kind Kind: a task's open gate, or a situation of one of its units.
 type QueueItem struct {
+	Kind      string          `json:"kind"`
 	Task      TaskView        `json:"task"`
 	Gate      *GateView       `json:"gate,omitempty"`
 	Situation *QueueSituation `json:"situation,omitempty"`
 	Primary   QueueAction     `json:"primary"`
+	// Options are the options of a question gate whose options pin held drafts, the drafts it stands for:
+	// those drafts' own gates make no item. Picking an option answers the question and approves its draft.
+	Options []QueueOption `json:"options,omitempty"`
+}
+
+// QueueOption is an option of a question an item stands for; Draft is the gate of the held draft picking
+// it approves, nil for an option that pins none.
+type QueueOption struct {
+	ID          string    `json:"id"`
+	Label       string    `json:"label"`
+	Recommended bool      `json:"recommended,omitempty"`
+	Draft       *GateView `json:"draft,omitempty"`
 }
 
 // QueueSituation is the situation of a provider's unit that makes the decision.

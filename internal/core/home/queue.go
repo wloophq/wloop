@@ -64,6 +64,20 @@ func (s Service) Queue(ctx context.Context, k decision.Kind, keep coretasks.Keep
 	return q, nil
 }
 
+// QueueAll is the items of every kind that keep takes (every one when nil): the kinds in order, a kind order
+// leaves out after the listed ones, each kind's items as its Queue lists them.
+func (s Service) QueueAll(ctx context.Context, order []decision.Kind, keep coretasks.Keep) ([]Item, error) {
+	var out []Item
+	for _, k := range decision.Ordered(order) {
+		q, err := s.Queue(ctx, k, keep)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, q.Items...)
+	}
+	return out, nil
+}
+
 type taskDecision struct {
 	task  task.Task
 	found decision.Found

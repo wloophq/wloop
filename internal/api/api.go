@@ -169,6 +169,7 @@ var Operations = []Operation{
 	{"GET", StringsPath},
 	{"GET", HomePath},
 	{"GET", QueuePath},
+	{"GET", QueueAllPath},
 	{"GET", SearchPath},
 	{"POST", OmniboxResolvePath},
 	{"POST", OmniboxAskPath},

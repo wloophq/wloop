@@ -2,6 +2,7 @@ package intent
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"maps"
 	"slices"
@@ -28,6 +29,11 @@ type Decisions struct {
 	Primary map[dunit.ProviderID]map[decision.Kind]string
 	// Open is what a queue's button that opens a unit at its source says.
 	Open string
+	// Order is the order of the kinds in the queue of every kind; a kind it leaves out comes after, in
+	// decision.Kinds order.
+	Order []decision.Kind
+	// QueueAll and EmptyAll are the title of the queue of every kind and what it says when it holds nothing.
+	QueueAll, EmptyAll string
 }
 
 // KindTexts are a decision kind's view and words; Primary is the gate intent a queue offers first, "" the
@@ -42,6 +48,9 @@ type KindTexts struct {
 
 type mDecisions struct {
 	Open       *string           `toml:"open"`
+	Order      []string          `toml:"order"`
+	QueueAll   *string           `toml:"queue_all"`
+	EmptyAll   *string           `toml:"empty_all"`
 	Gates      map[string]string `toml:"gates"`
 	Situations map[string]string `toml:"situations"`
 	Signals    map[string]string `toml:"signals"`
@@ -125,6 +134,21 @@ func (l *decisionsLoad) merge(plugin dunit.ProviderID, file string, src []byte, 
 	}
 	if plugin == "" {
 		text(s, "open", m.Open, &l.def.Open)
+		text(s, "queue_all", m.QueueAll, &l.def.QueueAll)
+		text(s, "empty_all", m.EmptyAll, &l.def.EmptyAll)
+		if m.Order != nil {
+			l.def.Order = nil
+			for i, v := range m.Order {
+				path := fmt.Sprintf("order[%d]", i)
+				switch k, ok := kindOf(path, v); {
+				case !ok:
+				case slices.Contains(l.def.Order, k):
+					s.add(path, "%s is in the order already", v)
+				default:
+					l.def.Order = append(l.def.Order, k)
+				}
+			}
+		}
 		for _, section := range []struct {
 			name string
 			set  bool
@@ -156,7 +180,8 @@ func (l *decisionsLoad) merge(plugin dunit.ProviderID, file string, src []byte, 
 		for _, section := range []struct {
 			name string
 			set  bool
-		}{{"gates", m.Gates != nil}, {"kinds", m.Kinds != nil}, {"open", m.Open != nil}} {
+		}{{"gates", m.Gates != nil}, {"kinds", m.Kinds != nil}, {"open", m.Open != nil}, {"order", m.Order != nil},
+			{"queue_all", m.QueueAll != nil}, {"empty_all", m.EmptyAll != nil}} {
 			if section.set {
 				s.add(section.name, "%s belong to the profile's own %s, not a plugin's layer", section.name, DecisionsFile)
 			}

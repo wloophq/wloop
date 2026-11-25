@@ -3,6 +3,10 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "properties": {
+    "empty_all": {
+      "description": "What the queue of every kind says when it holds nothing; only the default layer's file sets it.",
+      "type": "string"
+    },
     "gates": {
       "additionalProperties": {
         "description": "One gate kind's decision kind.",
@@ -132,6 +136,22 @@
       "description": "What a queue's button that opens a unit at its source says; only the default layer's file sets it.",
       "type": "string"
     },
+    "order": {
+      "description": "The order of the decision kinds in the queue of every kind, each once; a kind it leaves out comes after the listed ones. Items of one kind follow, oldest decision first. Only the default layer's file sets it.",
+      "items": {
+        "enum": [
+          "answer",
+          "approve-plan",
+          "send-draft",
+          "review-step",
+          "last-step",
+          "pick-someone",
+          "act"
+        ],
+        "type": "string"
+      },
+      "type": "array"
+    },
     "primary": {
       "additionalProperties": {
         "description": "A catalog action of the plugin's units, or `open`, which opens the unit at its source.",
@@ -139,6 +159,10 @@
       },
       "description": "What a queue offers first on a unit of the plugin, by decision kind; only a plugin's layer sets it.",
       "type": "object"
+    },
+    "queue_all": {
+      "description": "The title of the queue of every kind; only the default layer's file sets it.",
+      "type": "string"
     },
     "signals": {
       "additionalProperties": {
