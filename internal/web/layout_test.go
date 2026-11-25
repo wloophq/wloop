@@ -1,26 +1,14 @@
 package web
 
 import (
-	"context"
+	"bytes"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
-	"time"
 )
-
-// headlessChrome is the path of a Chrome the layout tests drive, "" when none is installed.
-func headlessChrome() string {
-	for _, p := range []string{"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "google-chrome", "chromium"} {
-		if path, err := exec.LookPath(p); err == nil {
-			return path
-		}
-	}
-	return ""
-}
 
 // layoutOf renders rows, the HTML of list rows, in a list width px wide in a window viewport px wide, and
 // returns what probe, a script over the page, writes.
@@ -34,10 +22,6 @@ func layoutOf(t *testing.T, rows string, viewport, width int, probe string) stri
 // viewport px wide, and returns what probe, a script over the page, writes.
 func pageProbe(t *testing.T, body string, viewport int, probe string) string {
 	t.Helper()
-	chrome := headlessChrome()
-	if chrome == "" {
-		t.Skip("no Chrome to lay the page out")
-	}
 	css, err := filepath.Abs("static/app.css")
 	if err != nil {
 		t.Fatal(err)
@@ -49,14 +33,9 @@ func pageProbe(t *testing.T, body string, viewport int, probe string) string {
 	if err := os.WriteFile(file, []byte(page), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-	out, err := exec.CommandContext(ctx, chrome, "--headless=new", "--disable-gpu", "--allow-file-access-from-files", "--user-data-dir="+filepath.Join(dir, "profile"),
+	out := runChrome(t, dumpedHTML, "--headless=new", "--disable-gpu", "--allow-file-access-from-files", "--user-data-dir="+filepath.Join(dir, "profile"),
 		"--window-size="+itoa(viewport)+",800",
-		"--dump-dom", "file://"+file).Output()
-	if err != nil {
-		t.Fatalf("chrome: %v", err)
-	}
+		"--dump-dom", "file://"+file)
 	m := regexp.MustCompile(`(?s)<pre id="probe">(.*?)</pre>`).FindSubmatch(out)
 	if m == nil {
 		t.Fatalf("no probe in %s", out)
@@ -112,12 +91,9 @@ func shotOf(t *testing.T, rows string, viewport, width int, path string) {
 	if err := os.WriteFile(file, []byte(page), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-	if out, err := exec.CommandContext(ctx, headlessChrome(), "--headless=new", "--disable-gpu", "--allow-file-access-from-files", "--hide-scrollbars",
-		"--user-data-dir="+filepath.Join(tmp, "profile"), "--window-size="+itoa(viewport)+",140", "--screenshot="+filepath.Join(dir, path), "file://"+file).CombinedOutput(); err != nil {
-		t.Fatalf("chrome: %v: %s", err, out)
-	}
+	written := func(_, stderr []byte) bool { return bytes.Contains(stderr, []byte("bytes written to file")) }
+	runChrome(t, written, "--headless=new", "--disable-gpu", "--allow-file-access-from-files", "--hide-scrollbars",
+		"--user-data-dir="+filepath.Join(tmp, "profile"), "--window-size="+itoa(viewport)+",140", "--screenshot="+filepath.Join(dir, path), "file://"+file)
 }
 
 // usersRowHTML is the user's row as the cockpit draws it, which the row's vitest suite writes (UPDATE_LAYOUT=1)
