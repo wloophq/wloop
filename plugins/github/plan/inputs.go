@@ -37,11 +37,13 @@ type Inputs struct {
 	Adopted map[pr.Ref]bool
 	// Wanted is the profile's review_wanted, by pull request; one it does
 	// not name is wanted when it requests the viewer's review by name.
-	Wanted  map[pr.Ref]bool
-	Books   map[pr.Ref]src.Book
-	Rounds  map[pr.Ref]src.RoundState
-	Events  map[pr.Ref][]pr.Event
-	Listing src.Listing
+	Wanted map[pr.Ref]bool
+	// Unanswered is why review_wanted has no verdict on a pull request.
+	Unanswered map[pr.Ref]string
+	Books      map[pr.Ref]src.Book
+	Rounds     map[pr.Ref]src.RoundState
+	Events     map[pr.Ref][]pr.Event
+	Listing    src.Listing
 	// Unlisted says the workspaces could not be read: no round is due.
 	Unlisted bool
 	// Git nil reads no checkout.

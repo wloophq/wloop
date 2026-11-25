@@ -116,7 +116,7 @@ func (p *Plugin) Plan(ctx context.Context, u sdk.Unit, st src.RoundState) (src.P
 	if err != nil {
 		return src.Plan{}, err
 	}
-	in.Wanted = r.reviewWanted(ctx, ris)
+	in.Wanted, in.Unanswered = r.reviewWanted(ctx, ris)
 	if in.Details, err = r.db.Details(ctx, []pr.Ref{ref}); err != nil {
 		return src.Plan{}, err
 	}

@@ -234,3 +234,47 @@ func TestAReviewedPullRequestRequestedByNameLeavesItsFollowUpToTheFirstRound(t *
 		t.Fatalf("pr.review.reason = %q", reason)
 	}
 }
+
+func TestEveryFirstRoundNotDueSaysWhy(t *testing.T) {
+	t.Parallel()
+	mine := func(fs []src.Fact) bool { return factIs(fs, "pr.mine") }
+	for name, c := range map[string]struct {
+		wanted func([]src.Fact) bool
+		fails  bool
+		edit   func(*pr.PR, *store.Detail)
+		want   string
+	}{
+		"the profile does not want it": {wanted: requestedByName, want: "the profile's review_wanted does not want my review"},
+		"the profile gives no answer": {wanted: othersInAcme, fails: true,
+			want: "the profile's review_wanted gave no answer (pr.owner has Go type int, want string), and no request names you"},
+		"a draft": {wanted: othersInAcme, edit: func(row *pr.PR, _ *store.Detail) { row.IsDraft = true },
+			want: "it is a draft"},
+		"mine": {wanted: mine, edit: func(row *pr.PR, _ *store.Detail) { row.Author = "ana" }, want: "you opened it"},
+		"closed": {wanted: othersInAcme, edit: func(row *pr.PR, _ *store.Detail) { row.State = pr.StateClosed },
+			want: "it is closed"},
+		"reviewed before": {wanted: othersInAcme, edit: func(_ *pr.PR, d *store.Detail) {
+			d.Reviews = []pr.Review{{ID: "r1", State: pr.ReviewCommented, Author: "ana", SubmittedAt: testAt.Add(-2 * time.Hour), CommitOid: "h6"}}
+		}, want: "you reviewed it before and no request names you"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			h := &fakeHost{listing: apiListing, wanted: c.wanted}
+			if c.fails {
+				h.failOn = func([]src.Fact) bool { return true }
+			}
+			p := started(t, &githubGraphQL{}, h)
+			ref := unrequested(t, p, c.edit)
+			if due, round := firstDue(t, p, h, ref); due {
+				t.Fatalf("first round due: %+v", round)
+			}
+			var reason string
+			for _, f := range h.lastReport(t, ref).Facts {
+				if f.Name == "pr.first.reason" {
+					reason = f.Value.String
+				}
+			}
+			if reason != c.want {
+				t.Fatalf("pr.first.reason = %q, want %q", reason, c.want)
+			}
+		})
+	}
+}
