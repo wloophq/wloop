@@ -252,9 +252,10 @@ func LoadIn(locale string, layers []profile.Layer, bundled fs.FS, base *template
 			stringProblems = append(append(stringProblems, omniboxProblems...), omnibox.check(views)...)
 			stringProblems = append(stringProblems, omnibox.checkVerbs(l.Tasks, l.catalogActions(actions))...)
 			l.Omnibox = omnibox.def
-			var predicateProblems Problems
-			l.Predicates, predicateProblems = loadPredicates(layers, r)
+			var predicateProblems, predicateWarnings Problems
+			l.Predicates, predicateProblems, predicateWarnings = loadPredicates(layers, r)
 			stringProblems = append(stringProblems, predicateProblems...)
+			l.Warnings = append(l.Warnings, predicateWarnings...)
 			l.Actions, l.Tools, l.Views, l.Keys, l.Notices, l.Gates, l.UI = actions, tools, views, keyTexts, notices, gates, ui
 			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems, actionProblems, toolProblems, listProblems, gateProblems, keyProblems, noticeProblems, uiProblems, stringProblems, *r.problems)
 			l.Locale, l.reader = locale, r

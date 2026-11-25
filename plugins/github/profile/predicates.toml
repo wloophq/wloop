@@ -7,11 +7,16 @@
 # "!(pr.owner in ['acme'])", a pull request with no reviewer asked is merge.
 reviewer_required = "true"
 
-# Whether the loop reviews an open, ready pull request I did not open, with
-# no request of my review by name; its first round starts once, under the
-# same trust rules, and no daily cap bounds how many start. "pr.repo ==
-# 'acme/api' && !pr.mine"
+# Whether the loop reviews an open, ready pull request I did not open; its
+# first round starts once, under the same trust rules, and no daily cap
+# bounds how many start. A profile's value replaces this one, so keep the
+# request by name when widening it:
+# "pr.review_requested_me || (pr.repo == 'acme/api' && !pr.mine)" also
 # reviews every pull request of acme/api others open, every open one at
 # once when it starts holding. A fact the author controls, such as
 # pr.labels, lets authors opt themselves in.
 review_wanted = "pr.review_requested_me"
+
+[keep.review_wanted]
+fact = "pr.review_requested_me"
+warning = "does not read pr.review_requested_me, and replaces the bundled review_wanted that does: a pull request that requests your review by name gets no first round unless this predicate holds for it; to widen the bundled one, write `pr.review_requested_me || (...)`"

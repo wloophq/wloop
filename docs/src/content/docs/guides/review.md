@@ -67,19 +67,21 @@ To stop the automatic rounds on one pull request:
 
 ## First rounds on their own
 
-A pull request that requests your review by name, from a trusted author in an allowed owner, gets a first round without your asking. Limit it with `plugins.github.owners` (the GitHub owners automated rounds run for) and widen it with `plugins.github.trusted_authors` (logins such as `github-actions[bot]` whose pull requests count as trusted). `{{command}} plan --unit <url>` says why a requested review got no first round. Turn first rounds off with:
+A pull request that requests your review by name, from a trusted author in an allowed owner, gets a first round without your asking. Limit it with `plugins.github.owners` (the GitHub owners automated rounds run for) and widen it with `plugins.github.trusted_authors` (logins such as `github-actions[bot]` whose pull requests count as trusted). `{{command}} plan --unit <url>` says why a pull request got no first round in `pr.first.reason`: the profile does not want it, it is a draft, closed or yours, you reviewed it before, it fails the trust check, or its workspace exists. Turn first rounds off with:
 
 ```toml
 [workflows.review-first-round]
 enabled = false
 ```
 
-The GitHub plugin's `review_wanted` predicate says which pull requests get one. The bundled one is `pr.review_requested_me`, the request by name. Widen it in your profile to review pull requests nobody asked you to, such as every one of a repository that has no CODEOWNERS:
+The GitHub plugin's `review_wanted` predicate says which pull requests get one. The bundled one is `pr.review_requested_me`, the request by name. Your profile's value replaces it, so keep `pr.review_requested_me` in it when you widen it to review pull requests nobody asked you to, such as every one of a repository that has no CODEOWNERS:
 
 ```toml
 # plugins/github/predicates.toml of your profile
-review_wanted = "pr.repo == 'acme/api' && !pr.mine"
+review_wanted = "pr.review_requested_me || (pr.repo == 'acme/api' && !pr.mine)"
 ```
+
+A value without `pr.review_requested_me`, such as `pr.repo == 'acme/api' && !pr.mine`, drops every review requested by name outside that repository. It still loads, since narrowing on purpose is valid, and `{{command}} profile check` warns about it.
 
 It reads the pull request's [facts](/reference/facts/), and the inventory still decides which pull requests it sees: list the repository in `plugins.github.scope.repos`. A draft, your own pull request and one that fails the trust check above never get a first round, whatever it says; a pull request of a `plugins.github.trusted_authors` bot passes it, and gets one too. One the predicate wants without a request by name gets its first round once: after a review round of the loop or a review of yours on GitHub, only the follow-ups of a review start rounds, so removing its review workspace or a new push does not start a first round again. While it holds, no reviewer is requested and you have not reviewed its head, the pull request waits on your review.
 

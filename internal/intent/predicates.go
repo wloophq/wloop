@@ -48,11 +48,23 @@ func (ps Predicates) Eval(p dunit.ProviderID, name string, sets []map[string]any
 	return holds, errs, nil
 }
 
+// keepKey is the table of a plugin layer's predicates.toml that names, by predicate, a fact a predicate set
+// above it should read, and what loading one that does not says.
+const keepKey = "keep"
+
+// keep is a fact a predicate should read, and the warning a predicate that does not loads with.
+type keep struct {
+	Fact    string `toml:"fact"`
+	Warning string `toml:"warning"`
+}
+
 // loadPredicates reads predicates.toml from each plugin's layers: a higher layer's predicate replaces a lower
-// one's, and one that does not compile over the plugin's facts leaves the lower one in force.
-func loadPredicates(layers []profile.Layer, r layerReader) (Predicates, Problems) {
+// one's, and one that does not compile over the plugin's facts leaves the lower one in force. A predicate that
+// does not read the fact a [keep] entry of its layer or a lower one names loads with that entry's warning.
+func loadPredicates(layers []profile.Layer, r layerReader) (Predicates, Problems, Problems) {
 	out := Predicates{}
-	var problems Problems
+	keeps := map[dunit.ProviderID]map[string]keep{}
+	var problems, warnings Problems
 	for _, l := range layers {
 		id := dunit.ProviderID(l.PluginID())
 		if id == "" {
@@ -72,6 +84,23 @@ func loadPredicates(layers []profile.Layer, r layerReader) (Predicates, Problems
 			continue
 		}
 		s := &sheet{file: res.Path, at: positions(res.Body)}
+		if raw, ok := m[keepKey]; ok {
+			delete(m, keepKey)
+			ks, kps, _, complete := decode[struct {
+				Keep map[string]keep `toml:"keep"`
+			}](res.Path, res.Body)
+			problems = append(problems, kps...)
+			if _, table := raw.(map[string]any); !table {
+				s.add(keepKey, "keep is a table of predicates, each with a fact and a warning")
+			} else if complete {
+				for name, k := range ks.Keep {
+					if keeps[id] == nil {
+						keeps[id] = map[string]keep{}
+					}
+					keeps[id][name] = k
+				}
+			}
+		}
 		var declared []string
 		for _, n := range builtin.PluginPredicates[id] {
 			declared = append(declared, n.Name)
@@ -98,12 +127,16 @@ func loadPredicates(layers []profile.Layer, r layerReader) (Predicates, Problems
 				s.problems[len(s.problems)-1].Snippet = snippet
 				continue
 			}
+			if k, ok := keeps[id][name]; ok && k.Fact != "" && !slices.Contains(prg.Reads(), k.Fact) {
+				s.warn(name, "%s", k.Warning)
+			}
 			if out[id] == nil {
 				out[id] = map[string]*expr.Program{}
 			}
 			out[id][name] = prg
 		}
 		problems = append(problems, s.problems...)
+		warnings = append(warnings, s.warnings...)
 	}
-	return out, problems
+	return out, problems, warnings
 }

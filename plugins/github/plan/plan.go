@@ -341,12 +341,28 @@ func (p *Planner) follows(ref pr.Ref) bool {
 // Requested says whether a first round may review ref: an open, ready pull
 // request I did not open, which the profile's review_wanted holds for and,
 // unless it requests my review by name, that I never reviewed.
-func (p *Planner) Requested(ref pr.Ref) bool {
+func (p *Planner) Requested(ref pr.Ref) bool { return p.unrequested(ref) == "" }
+
+// unrequested is why a first round may not review ref; "" when it may.
+func (p *Planner) unrequested(ref pr.Ref) string {
 	row, ok := p.byRef[ref]
-	if !ok || row.State != pr.StateOpen || row.IsDraft || strings.EqualFold(row.Author, p.in.Viewer) || !p.wanted(row) {
-		return false
+	switch {
+	case !ok:
+		return whyNotStored
+	case row.State != pr.StateOpen:
+		return "it is " + strings.ToLower(row.State)
+	case row.IsDraft:
+		return "it is a draft"
+	case strings.EqualFold(row.Author, p.in.Viewer):
+		return "you opened it"
+	case !p.wanted(row) && p.in.Unanswered[ref] != "":
+		return "the profile's review_wanted gave no answer (" + p.in.Unanswered[ref] + "), and no request names you"
+	case !p.wanted(row):
+		return "the profile's review_wanted does not want my review"
+	case !p.requestedByName(row) && p.reviewedBefore(ref):
+		return "you reviewed it before and no request names you"
 	}
-	return p.requestedByName(row) || !p.reviewedBefore(ref)
+	return ""
 }
 
 func (p *Planner) requestedByName(row pr.PR) bool {
@@ -387,7 +403,8 @@ func (p *Planner) asked(ref pr.Ref) string {
 }
 
 func (p *Planner) first(ref pr.Ref, r *Result) {
-	if !p.Requested(ref) {
+	if why := p.unrequested(ref); why != "" {
+		r.first.reason = why
 		return
 	}
 	asked := p.asked(ref)

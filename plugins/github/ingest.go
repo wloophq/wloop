@@ -271,7 +271,7 @@ func (r *running) snapshots(ctx context.Context, refs []pr.Ref) ([]src.Snapshot,
 	if err != nil {
 		return nil, err
 	}
-	pin.Wanted = in.wanted
+	pin.Wanted, pin.Unanswered = in.wanted, in.unanswered
 	planner := plan.New(ctx, pin)
 	settled := map[pr.Ref]plan.Settlement{}
 	var rev uint64
@@ -328,8 +328,8 @@ func (r *running) rowsWith(ctx context.Context, refs []pr.Ref, at time.Time) ([]
 	if err != nil {
 		return nil, rowInputs{}, err
 	}
-	required := r.holds(ctx, predicateReviewerRequired, ris, func(row.Input) bool { return true })
-	in.wanted = r.reviewWanted(ctx, ris)
+	required, _ := r.holds(ctx, predicateReviewerRequired, ris, func(row.Input) bool { return true })
+	in.wanted, in.unanswered = r.reviewWanted(ctx, ris)
 	out := make([]derived, len(ris))
 	for i, ri := range ris {
 		ri.ReviewerOptional, ri.ReviewWanted = !required[i], in.wanted[ri.PR.Ref]
@@ -391,30 +391,35 @@ const (
 
 // reviewWanted is whether the profile's review_wanted holds over each of
 // ins, by pull request; where the host cannot say, whether it requests the
-// viewer's review by name, as the bundled profile sets it.
-func (r *running) reviewWanted(ctx context.Context, ins []row.Input) map[pr.Ref]bool {
+// viewer's review by name, as the bundled profile sets it. unanswered is the
+// host's error for each pull request it gave no verdict on.
+func (r *running) reviewWanted(ctx context.Context, ins []row.Input) (wanted map[pr.Ref]bool, unanswered map[pr.Ref]string) {
 	byName := func(in row.Input) bool {
 		return in.Viewer != "" && slices.ContainsFunc(in.PR.ReviewRequests, func(l string) bool { return strings.EqualFold(l, in.Viewer) })
 	}
-	holds := r.holds(ctx, predicateReviewWanted, ins, byName)
-	out := make(map[pr.Ref]bool, len(ins))
+	holds, errs := r.holds(ctx, predicateReviewWanted, ins, byName)
+	wanted, unanswered = make(map[pr.Ref]bool, len(ins)), map[pr.Ref]string{}
 	for i, in := range ins {
-		out[in.PR.Ref] = holds[i]
+		wanted[in.PR.Ref] = holds[i]
+		if errs[i] != "" {
+			unanswered[in.PR.Ref] = errs[i]
+		}
 	}
-	return out
+	return wanted, unanswered
 }
 
 // holds says, for each of ins, whether the profile's predicate holds over
 // its pull request's facts; fallback's answer, as the bundled profile sets
 // it, for every one when the host cannot say and for one whose facts it
-// could not evaluate the predicate over.
-func (r *running) holds(ctx context.Context, predicate string, ins []row.Input, fallback func(row.Input) bool) []bool {
-	out := make([]bool, len(ins))
+// could not evaluate the predicate over. errs is the host's error for each
+// one it gave no verdict on; "" where it did, or does not evaluate predicates.
+func (r *running) holds(ctx context.Context, predicate string, ins []row.Input, fallback func(row.Input) bool) (out []bool, errs []string) {
+	out, errs = make([]bool, len(ins)), make([]string, len(ins))
 	for i, in := range ins {
 		out[i] = fallback(in)
 	}
 	if r.host.Services == nil || len(ins) == 0 {
-		return out
+		return out, errs
 	}
 	facts := make([][]src.Fact, len(ins))
 	for i, in := range ins {
@@ -427,17 +432,21 @@ func (r *running) holds(ctx context.Context, predicate string, ins []row.Input, 
 	if err != nil {
 		if !errors.Is(err, src.ErrUnsupported) {
 			r.logOnce(fmt.Sprintf("%s: %v", predicate, err))
+			for i := range errs {
+				errs[i] = err.Error()
+			}
 		}
-		return out
+		return out, errs
 	}
 	for i, h := range holds {
 		if h.Err != "" {
 			r.logOnce(fmt.Sprintf("%s for %s: %s", predicate, ins[i].PR.Ref, h.Err))
+			errs[i] = h.Err
 			continue
 		}
 		out[i] = h.Holds
 	}
-	return out
+	return out, errs
 }
 
 // logOnce logs msg the first time the running plugin meets it.
@@ -462,8 +471,10 @@ type rowInputs struct {
 	events    map[pr.Ref][]pr.Event
 	addressed map[pr.Ref]time.Time
 	books     map[pr.Ref]src.Book
-	// wanted is the profile's review_wanted over the pull requests read.
-	wanted map[pr.Ref]bool
+	// wanted is the profile's review_wanted over the pull requests read;
+	// unanswered why it has no verdict on one.
+	wanted     map[pr.Ref]bool
+	unanswered map[pr.Ref]string
 }
 
 func (in rowInputs) of(ref pr.Ref) row.Input {

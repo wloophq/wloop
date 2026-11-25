@@ -5,6 +5,10 @@ var predsGrammar = []Key{
 	{Path: "*", In: SurfacePreds, Kind: KindPred, Doc: "A predicate the plugin's manifest declares in [[source.predicates]], by name, over the facts its facts list names, the ones the plugin hands with the question; " +
 		"a higher layer's replaces a lower one's, and one that does not compile leaves the lower one in force. The plugin asks whether it holds for a unit with the unit's facts, " +
 		"such as the GitHub plugin's reviewer_required: `!(pr.owner in ['acme'])`."},
+	{Path: "keep", In: SurfacePreds, Kind: KindMap, Doc: "By predicate, a fact a predicate set in this layer or a higher one should read: one that does not loads with the entry's warning, which `profile check` prints."},
+	{Path: "keep.*", In: SurfacePreds, Kind: KindTable, Doc: "The fact the predicate should read, and the warning one that does not loads with."},
+	{Path: "keep.*.fact", In: SurfacePreds, Kind: KindFact, Doc: "The fact, such as the GitHub plugin's pr.review_requested_me for review_wanted."},
+	{Path: "keep.*.warning", In: SurfacePreds, Kind: KindText, Doc: "What `profile check` says of a predicate that does not read the fact: why dropping it misleads, and how to keep it."},
 }
 
 // profileGrammar is the keys of defaults.toml, labels.toml and a judgment

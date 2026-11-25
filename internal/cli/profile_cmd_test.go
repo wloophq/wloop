@@ -233,3 +233,13 @@ func TestAddOnAnExistingBlockNamesWhyFrontMatterIsRefused(t *testing.T) {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 }
+
+func TestProfileCheckWarnsOfAReviewWantedThatDropsTheRequestByName(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, nil)
+	dir := userProfile(t, te, map[string]string{"plugins/github/predicates.toml": `review_wanted = "pr.repo == 'acme/api' && !pr.mine"` + "\n"})
+	if code := te.run("profile", "check", dir); code != 0 || !strings.Contains(te.err.String(), "warning: ") ||
+		!strings.Contains(te.err.String(), "review_wanted: does not read pr.review_requested_me") {
+		t.Fatalf("code %d\n%s", code, te.err.String())
+	}
+}

@@ -119,3 +119,36 @@ func TestAPredicateTheManifestDoesNotDeclareIsAProblem(t *testing.T) {
 		t.Error("Holds answered a predicate the manifest does not declare")
 	}
 }
+
+func TestAReviewWantedThatDropsTheRequestByNameLoadsWithAWarning(t *testing.T) {
+	for name, c := range map[string]struct {
+		src  string
+		warn bool
+	}{
+		"narrows to one repository":  {`pr.repo == 'acme/api' && !pr.mine`, true},
+		"widens the request by name": {`pr.review_requested_me || (pr.repo == 'acme/api' && !pr.mine)`, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			l, problems := loadProfile(t, "en", map[string]string{
+				"plugins/github/predicates.toml": `review_wanted = "` + c.src + `"` + "\n",
+			})
+			if len(problems) > 0 {
+				t.Fatalf("problems: %v", problems)
+			}
+			_, warned := problemAt(l.Warnings, "review_wanted", "pr.review_requested_me")
+			if warned != c.warn {
+				t.Fatalf("warned = %v, want %v; warnings: %v", warned, c.warn, l.Warnings)
+			}
+			if ok, err := l.Predicates.Holds("github", "review_wanted", map[string]any{"pr.repo": "acme/api"}); err != nil || !ok {
+				t.Fatalf("review_wanted = %v, %v; the user's predicate stays in force", ok, err)
+			}
+		})
+	}
+}
+
+func TestTheBundledProfileLoadsWithoutPredicateWarnings(t *testing.T) {
+	l, _ := loadProfile(t, "en", nil)
+	if _, warned := problemAt(l.Warnings, "review_wanted", ""); warned {
+		t.Fatalf("the bundled review_wanted warns: %v", l.Warnings)
+	}
+}
