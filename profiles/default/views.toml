@@ -369,6 +369,16 @@ fact  = "draft.created_at"
 label = "Written"
 sort  = "time"
 
+[views.needs-you]
+label         = "Needs you"
+summary       = "What waits on you, one decision at a time: questions first, then drafts to send, plans, steps and the rest."
+empty         = "Nothing needs you."
+key           = "g q"
+when          = "'answer' in task.decisions || 'send-draft' in task.decisions || 'approve-plan' in task.decisions || 'review-step' in task.decisions || 'act' in task.decisions || (task.owed_by == 'me' && ('pick-someone' in task.decisions || 'last-step' in task.decisions))"
+sort          = "task.decision_since"
+layout        = "queue"
+hide_disabled = true
+
 [views.inbox]
 label         = "Inbox"
 summary       = "What nobody has clarified yet; once clarified, a task leaves for good."
@@ -517,8 +527,9 @@ label         = "Review"
 summary       = "The weekly review: walk each step until the lists are clean."
 key           = "g r"
 
-# The home's sections and the decision queues. The rail leaves
-# them out; decisions.toml names each kind's view.
+# The home's sections and each decision kind's view, which Needs you
+# walks one kind after another. The rail leaves them out;
+# decisions.toml names each kind's view.
 [views.home-blocked]
 label         = "Blocked by you"
 summary       = "Tasks that wait on you: a gate to decide or someone's ask, the longest owed first."

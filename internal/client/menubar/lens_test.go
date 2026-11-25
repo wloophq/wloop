@@ -39,9 +39,8 @@ func TestMenubarSectionsComeFromTheProfile(t *testing.T) {
 	r.d.tasks["stalled"] = []api.TaskView{plainTask(4)}
 	r.c.Refresh(context.Background())
 	got := titles(r.tray.menu)
-	mine, asks := index(got, "Mine (1)"), index(got, "Asks (2)")
-	if mine < 0 || asks < mine || index(got, "Stalled") >= 0 || index(got, "Inbox") >= 0 || index(got, "Focus") >= 0 {
-		t.Fatalf("menu %q, want the profile's badge views in its order", got)
+	if got[0] != "Needs you (0)" || index(got, "Mine") >= 0 || index(got, "Asks") >= 0 || index(got, "Stalled") >= 0 || index(got, "Inbox") >= 0 {
+		t.Fatalf("menu %q, want Needs you first and no section per view", got)
 	}
 	it, ok := find(r.tray.menu, "Open cockpit")
 	if !ok {
@@ -79,8 +78,8 @@ func TestBadgeTitleCountsBadgeViews(t *testing.T) {
 	r.d.counters = api.Counters{Views: map[string]int{"stalled": 9, "mine": 2, "asks": 3}, Badge: 9}
 	r.d.mu.Unlock()
 	r.c.Refresh(context.Background())
-	if got, menu := r.title(), titles(r.tray.menu); got != brand.Name+" 9" || index(menu, "Stalled (0)") < 0 || index(menu, "Mine") >= 0 {
-		t.Fatalf("title %q, menu %q after the profile badged another view", got, menu)
+	if got := r.title(); got != brand.Name+" 9" {
+		t.Fatalf("title %q after the profile badged another view", got)
 	}
 }
 

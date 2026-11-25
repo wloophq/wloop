@@ -7,8 +7,9 @@ const HomePath = "/api/home"
 // lens query, as CountersPath's does.
 const QueuePath = "/api/queues/{kind}"
 
-// QueueAllPath serves the queue of every decision kind, as Queue with no Kind: the kinds in the order
-// decisions.toml gives, each kind's items oldest decision first. Its query parameter q is QueuePath's.
+// QueueAllPath serves the queue of every decision kind, as Queue with no Kind and with View the view drawn as
+// the queue: the kinds in the order decisions.toml gives, each kind's items oldest decision first. Its query
+// parameter q is QueuePath's.
 const QueueAllPath = "/api/queue"
 
 // Home is the briefing, the home's sections and the capture field.
@@ -50,15 +51,16 @@ type PluginNoun struct {
 	Noun   string `json:"noun"`
 }
 
-// HomeSection is the first rows of View; Total counts all of them, Time names the time each row shows
-// ("owed" or "moved").
+// HomeSection is the first rows of View, or, for a view drawn as the queue, the first Items of the queue of
+// every decision kind; Total counts all of them, Time names the time each row shows ("owed" or "moved").
 type HomeSection struct {
-	ID    string     `json:"id"`
-	View  string     `json:"view"`
-	Label string     `json:"label"`
-	Time  string     `json:"time"`
-	Rows  []TaskView `json:"rows"`
-	Total int        `json:"total"`
+	ID    string      `json:"id"`
+	View  string      `json:"view"`
+	Label string      `json:"label"`
+	Time  string      `json:"time"`
+	Rows  []TaskView  `json:"rows"`
+	Items []QueueItem `json:"items,omitempty"`
+	Total int         `json:"total"`
 }
 
 // HomeCapture is the capture field's hint and key.

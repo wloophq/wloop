@@ -10,6 +10,7 @@ import (
 	"io"
 	"maps"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 	"time"
@@ -23,6 +24,7 @@ import (
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/timeline"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -177,13 +179,25 @@ func (s *Server) buildViewsCatalog(l *intentload.Loaded) api.ViewsCatalog {
 
 // servedViews are the profile's views, in its order.
 func (s *Server) servedViews() []api.TaskViewSpec {
-	def := s.loaded().Views
+	l := s.loaded()
+	def := l.Views
 	out := []api.TaskViewSpec{}
 	for _, v := range def.Views {
 		out = append(out, api.TaskViewSpec{ID: v.ID, Label: v.Label, Summary: v.Summary, Empty: v.Empty, When: v.WhenText, Sort: v.SortText, Over: v.Over, Group: v.Group, Key: v.Key, Badge: def.Badged(v.ID), HideDisabled: v.HideDisabled,
-			RemoveClean: v.RemoveClean, Rail: v.Rail, Layout: v.Layout})
+			RemoveClean: v.RemoveClean, Rail: v.Rail, Layout: v.Layout, Opens: opens(l, v)})
 	}
 	return out
+}
+
+// opens is the route a page of view v opens instead of its own: an Outbox's, the queue's view narrowed to the
+// kind draft gates count as; "" when v is no Outbox, or no view draws the queue.
+func opens(l *intentload.Loaded, v intentload.ViewDef) string {
+	queue := l.Views.QueueView()
+	kind, ok := l.Decisions.Map.Gates[gate.KindDraft]
+	if v.Layout != builtin.ViewLayoutOutbox || queue == "" || !ok {
+		return ""
+	}
+	return "view=" + url.QueryEscape(queue) + "&kind=" + url.QueryEscape(string(kind))
 }
 
 func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {

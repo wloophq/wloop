@@ -68,7 +68,7 @@ func (s *Server) handleQueueAll(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, api.Queue{Title: d.QueueAll, Empty: d.EmptyAll, Total: len(items), Items: items})
+	writeJSON(w, api.Queue{View: s.loaded().Views.QueueView(), Title: d.QueueAll, Empty: d.EmptyAll, Total: len(items), Items: items})
 }
 
 // queueKeep is the lens r's query parameter q narrows a queue by; nil when it names none.

@@ -15,6 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/domain/decision"
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	dmessage "github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/record"
@@ -340,5 +341,83 @@ func TestOptionDraftCountsAgainOnceQuestionCloses(t *testing.T) {
 	want := []string{"send-draft:" + strconv.FormatInt(d1.ID, 10), "send-draft:" + strconv.FormatInt(d2.ID, 10)}
 	if !slices.Equal(ids, want) {
 		t.Fatalf("items %v, want the drafts back as %v once their message closed and they can be sent", ids, want)
+	}
+}
+
+// failedOn stores, on task id, a draft a person approved whose delivery failed, with its approved gate.
+func (r *outboxRig) failedOn(t *testing.T, id task.ID, text string) (draft.Draft, gate.Gate) {
+	t.Helper()
+	ctx := context.Background()
+	d, err := r.db.Drafts().Insert(ctx, draft.Draft{Unit: r7u, Task: string(id), Kind: draft.Kind("reply"), Text: text, Original: text, State: draft.Failed,
+		Error: "refused", CreatedAt: r.clock.Now(), UpdatedAt: r.clock.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := r.db.Gates(r.clock.Now)
+	g, err := st.Open(ctx, gate.Gate{Kind: gate.KindDraft, Name: "draft", Intents: []string{"approve", "discard"}, Unit: r7u, Task: id,
+		Subject: strconv.FormatInt(int64(d.ID), 10), ApprovedRev: d.Rev})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g, err = st.Resolve(ctx, g.ID, gates.Resolution{Status: gate.Approved, Intent: "approve", By: task.ActorPerson}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Applied(ctx, g.ID); err != nil {
+		t.Fatal(err)
+	}
+	return d, g
+}
+
+func TestFailedDeliveryIsAQueueItem(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	r.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "thank the reviewer"})
+	d, g := r.failedOn(t, "t-0000000000000001", "Thanks for the review.")
+	var outboxPage api.OutboxPage
+	if code := get(t, r.s, api.OutboxPath+"?view=outbox", &outboxPage); code != 200 || !slices.ContainsFunc(outboxPage.Drafts, func(o api.OutboxDraft) bool { return o.ID == int64(d.ID) }) {
+		t.Fatalf("%d: the Outbox lists %+v, want the failed draft", code, outboxPage.Drafts)
+	}
+	for _, path := range []string{api.QueueAllPath, queuePath("send-draft")} {
+		var q api.Queue
+		if code := get(t, r.s, path, &q); code != 200 {
+			t.Fatalf("GET %s: %d", path, code)
+		}
+		if len(q.Items) != 1 || q.Items[0].Kind != "send-draft" || q.Items[0].Gate == nil || q.Items[0].Gate.ID != g.ID || q.Items[0].Gate.Delivery != "failed" ||
+			q.Items[0].Task.ID != "t-0000000000000001" {
+			t.Fatalf("GET %s: items %+v, want the failed delivery as a send-draft item of its own", path, q.Items)
+		}
+	}
+}
+
+func TestTheHomesNeedsYouSectionIsTheQueueOfEveryKind(t *testing.T) {
+	t.Parallel()
+	q := newQueueRig(t, nil)
+	q.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "send the notes"},
+		task.Task{ID: "t-0000000000000002", State: "next", Category: task.CategoryReady, Title: "pick a name"})
+	q.open(t, "t-0000000000000001", gate.KindDraft, "41", 2*time.Hour)
+	q.open(t, "t-0000000000000002", gate.KindQuestion, "7", time.Hour)
+	var h api.Home
+	if code := get(t, q.s, api.HomePath, &h); code != 200 {
+		t.Fatalf("GET %s: %d", api.HomePath, code)
+	}
+	if len(h.Sections) == 0 || h.Sections[0].View != "needs-you" || h.Sections[0].Label != "Needs you" {
+		t.Fatalf("sections %+v, want Needs you first", h.Sections)
+	}
+	s := h.Sections[0]
+	var kinds []string
+	for _, it := range s.Items {
+		kinds = append(kinds, it.Kind)
+	}
+	if s.Total != 2 || len(s.Rows) != 0 || !slices.Equal(kinds, []string{"answer", "send-draft"}) || s.Items[0].Gate == nil {
+		t.Fatalf("section %+v, want the queue's items in the profile's order", s)
+	}
+	if all := q.all(t); all.View != "needs-you" {
+		t.Fatalf("the queue's view %q, want the view that draws it", all.View)
+	}
+	var cat api.ViewsCatalog
+	get(t, q.s, api.ViewsPath, &cat)
+	i := slices.IndexFunc(cat.Views, func(v api.TaskViewSpec) bool { return v.ID == "outbox" })
+	if i < 0 || cat.Views[i].Opens != "view=needs-you&kind=send-draft" {
+		t.Fatalf("the Outbox's view %+v, want it to open Needs you narrowed to the drafts to send", cat.Views)
 	}
 }

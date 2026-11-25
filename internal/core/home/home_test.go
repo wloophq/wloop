@@ -236,3 +236,20 @@ func TestHomeNamesNoProvider(t *testing.T) {
 		}
 	}
 }
+
+func TestAQueueSectionListsTheQueueOfEveryKindInOrder(t *testing.T) {
+	w := words()
+	w.profile.Order = []decision.Kind{decision.LastStep, decision.Answer}
+	w.profile.Sections = []home.Section{{ID: "needs-you", View: "needs-you", Label: "Needs you", Limit: 2, Queue: true}}
+	asked, stuck := tasks("a", 2), tasks("l", 1)
+	lists := &fakeLists{sets: map[task.View][]task.Task{"decide-answer": asked, "decide-last-step": stuck, "needs-you": tasks("x", 9)}}
+	d := fakeDecisions{"a-0": foundAt(decision.Answer, "", t0.Add(time.Hour)), "a-1": foundAt(decision.Answer, "", t0), "l-0": found(decision.LastStep, "alpha")}
+	h, err := service(lists, d, w).Home(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := h.Sections[0]
+	if len(s.Tasks) != 0 || s.Total != 3 || len(s.Items) != 2 || s.Items[0].Task.ID != "l-0" || s.Items[1].Task.ID != "a-1" {
+		t.Fatalf("section %+v, want the first two items of the queue of every kind, last-step first, then the oldest question", s)
+	}
+}

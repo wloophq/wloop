@@ -7,12 +7,10 @@ func TestNotificationIDRoundTrips(t *testing.T) {
 		cat         Category
 		task, token string
 	}{
-		{CategoryInbox, "t-0123456789abcdef", "k3f9"},
-		{CategoryOutbox, "draft:12", "20261008T100000.000000000"},
-		{CategoryHeld, "t-0123456789abcdef", "2026-10-08"},
+		{CategoryNeeds, "t-0123456789abcdef", "k3f9"},
+		{CategoryNeeds, "draft:12", "20261008T100000.000000000"},
 		{CategoryDigest, "-", "2026-10-08"},
 		{CategoryNote, "t-1", "x"},
-		{QuestionCategory(42), "t-1", "42"},
 	} {
 		id := NotificationID(c.cat, c.task, c.token)
 		cat, task, ok := ParseNotificationID(id)
@@ -28,10 +26,18 @@ func TestNotificationIDRoundTrips(t *testing.T) {
 			t.Errorf("%q parsed as %q %q", id, cat, task)
 		}
 	}
-	if q, ok := QuestionCategory(42).Record(); !ok || q != 42 {
+	if q, ok := Category("Q42").Record(); !ok || q != 42 {
 		t.Errorf("record %d %v", q, ok)
 	}
-	if _, ok := CategoryInbox.Record(); ok {
-		t.Error("INBOX names a record")
+	if _, ok := CategoryNeeds.Record(); ok {
+		t.Error("NEEDS names a record")
+	}
+}
+
+func TestOldCategoriesStillParse(t *testing.T) {
+	for _, id := range []string{"INBOX|t-1|k3f9", "OUTBOX|draft:12|20261008T100000.000000000", "HELD|t-1|2026-10-08", "Q42|t-1|42", "NEEDS|t-1|k3f9"} {
+		if _, task, ok := ParseNotificationID(id); !ok || task == "" {
+			t.Errorf("%q does not parse", id)
+		}
 	}
 }
