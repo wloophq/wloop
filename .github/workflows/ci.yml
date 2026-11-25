@@ -15,14 +15,24 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: ./.github/actions/setup-go # zizmor: ignore[self-repository]
         with:
           cache: macos
-      - run: go test -c -o /tmp/web.test ./internal/web && go test -c -o /tmp/cli.test ./internal/cli && go test -c -o /tmp/e2e.test ./internal/e2e
-      - run: go build -o /tmp/dumptime ./diag/dumptime
-      - name: Dump time under load
+      - run: |
+          go test -c -o /tmp/web-fix.test ./internal/web && go test -c -o /tmp/cli.test ./internal/cli && go test -c -o /tmp/e2e.test ./internal/e2e
+          git fetch --depth=1 origin main && git worktree add /tmp/main FETCH_HEAD && (cd /tmp/main && go test -c -o /tmp/web-main.test ./internal/web)
+      - name: Layout tests under load, main then fix
         run: |
           (while true; do (cd internal/cli && /tmp/cli.test >/dev/null 2>&1); done) &
           (while true; do (cd internal/e2e && /tmp/e2e.test >/dev/null 2>&1); done) &
-          /tmp/dumptime
+          tests='Narrow|UsersRow|FocusOrder|FloatingPanel|Omnibox|PlanGate|HomeSpans'
+          for round in 1 2; do
+            for v in main fix; do
+              if [ $v = main ]; then dir=/tmp/main/internal/web; else dir=internal/web; fi
+              (cd $dir && /tmp/web-$v.test -test.run "$tests" -test.count=10 -test.v 2>&1) > /tmp/$v-$round.txt
+              echo "$v round $round: $(grep -c '^--- PASS' /tmp/$v-$round.txt) passed, $(grep -c '^--- FAIL' /tmp/$v-$round.txt) failed"
+              grep -A1 -E '^\s+layout_test|^--- FAIL' /tmp/$v-$round.txt | grep -E 'chrome|sh:' | sort | uniq -c | head -5
+            done
+          done
           kill %1 %2 || true
