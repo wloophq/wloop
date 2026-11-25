@@ -70,6 +70,7 @@ func Run(name string, cat *texts.Catalog, ready func(window.Host)) {
 		h.do(h.screensChanged)
 	})
 	_ = app.Run()
+	h.stop()
 	os.Exit(0)
 }
 
@@ -117,6 +118,12 @@ type host struct {
 	queue     []func()
 	wake      chan struct{}
 	listening window.Handlers
+	// done stops the worker and every release poll; running is them, which
+	// stop waits for.
+	done    chan struct{}
+	running sync.WaitGroup
+	// native is how the host reads and moves the float in AppKit.
+	native floatNative
 
 	// links orders the deep links handed to the controller; pending are
 	// those that came before it listened.
@@ -140,6 +147,9 @@ type host struct {
 	floatFrame window.Rect
 	floatMode  string
 	dragging   bool
+	// handBackDue says a hand-back of the keyboard waits for the buttons to
+	// be up.
+	handBackDue bool
 	// floatKeyable is read on the main thread, where AppKit asks whether the
 	// float may become key.
 	floatKeyable atomic.Bool
@@ -147,8 +157,28 @@ type host struct {
 
 const floatName = "float"
 
+// floatNative is the float's AppKit side the host reads and acts on.
+type floatNative struct {
+	buttonsUp func() bool
+	frame     func() window.Rect
+	isKey     func() bool
+	handBack  func()
+}
+
+func appKitFloat(w *application.WebviewWindow) floatNative {
+	return floatNative{
+		buttonsUp: mouseButtonsUp,
+		frame: func() (f window.Rect) {
+			application.InvokeSync(func() { f = frameOf(nsWindow(w)) })
+			return f
+		},
+		isKey:    func() bool { return isKey(w) },
+		handBack: func() { application.InvokeSync(func() { handBackKeyboard(nsWindow(w)) }) },
+	}
+}
+
 func newHost(app *application.App, name string) *host {
-	h := &host{app: app, name: name, wake: make(chan struct{}, 1), detached: map[string]*detachedWindow{}}
+	h := &host{app: app, name: name, detached: map[string]*detachedWindow{}}
 	h.main = app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name: "main", Title: name, URL: "about:blank", Width: 1280, Height: 820, Hidden: true,
 		Mac: insetTitleBar,
@@ -177,6 +207,7 @@ func newHost(app *application.App, name string) *host {
 			DisableShadow: true,
 		},
 	})
+	h.native = appKitFloat(h.float)
 	h.float.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) { e.Cancel() })
 	h.float.OnWindowEvent(events.Mac.WindowDidMove, func(*application.WindowEvent) { h.do(h.floatMoved) })
 	h.main.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
@@ -193,17 +224,27 @@ func newHost(app *application.App, name string) *host {
 	h.panel.OnWindowEvent(events.Common.WindowLostFocus, func(*application.WindowEvent) {
 		h.do(func() { h.panelLeft(false) })
 	})
-	go h.work()
+	h.start()
 	return h
 }
 
-// launched restores the main window's frame and lets the float become key
-// only while it is keyable; it runs on the main thread.
+// start runs the worker until stop.
+func (h *host) start() {
+	h.wake, h.done = make(chan struct{}, 1), make(chan struct{})
+	h.running.Go(h.work)
+}
+
+// stop ends the worker and every release poll, and waits for them.
+func (h *host) stop() {
+	close(h.done)
+	h.running.Wait()
+}
+
+// launched restores the main window's frame and readies the float for the
+// mouse and the keyboard; it runs on the main thread.
 func (h *host) launched() {
 	nsWindow(h.main).Send(objc.RegisterName("setFrameAutosaveName:"), nsString(frameAutosaveName))
-	if err := keyOnlyWhen(nsWindow(h.float), h.floatKeyable.Load); err != nil {
-		h.app.Logger.Warn("window: the float may take the keyboard in any mode", "error", err)
-	}
+	floatOnly(nsWindow(h.float), h.floatKeyable.Load, h.app.Logger)
 }
 
 func (h *host) do(fn func()) {
@@ -217,7 +258,12 @@ func (h *host) do(fn func()) {
 }
 
 func (h *host) work() {
-	for range h.wake {
+	for {
+		select {
+		case <-h.done:
+			return
+		case <-h.wake:
+		}
 		for {
 			h.mu.Lock()
 			if len(h.queue) == 0 {
@@ -400,16 +446,30 @@ func sameOrigin(a, b string) bool {
 	return errA == nil && errB == nil && ua.Scheme != "" && ua.Scheme == ub.Scheme && ua.Host == ub.Host
 }
 
-// setFloatMode keeps mode and, leaving the panel while the float holds the
-// keyboard and no mouse button is down, hands the keyboard back.
+// setFloatMode keeps mode and, outside the panel, hands back the keyboard
+// the float holds.
 func (h *host) setFloatMode(mode string) {
 	h.floatMode = mode
-	keyable := window.FloatKeyable(mode)
-	h.floatKeyable.Store(keyable)
-	if keyable || !mouseButtonsUp() || !isKey(h.float) {
+	h.floatKeyable.Store(window.FloatKeyable(mode))
+	h.releaseKeyboard()
+}
+
+// releaseKeyboard hands the keyboard back while the float holds it outside
+// the panel, once no mouse button is down: ordering the float out under a
+// press would drop its mouse-up.
+func (h *host) releaseKeyboard() {
+	if window.FloatKeyable(h.floatMode) || h.handBackDue || !h.native.isKey() {
 		return
 	}
-	application.InvokeSync(func() { handBackKeyboard(nsWindow(h.float)) })
+	if !h.native.buttonsUp() {
+		h.handBackDue = true
+		h.afterRelease(func() {
+			h.handBackDue = false
+			h.releaseKeyboard()
+		})
+		return
+	}
+	h.native.handBack()
 }
 
 // floatMoved starts following a move the person made, a frame other than the
@@ -417,11 +477,10 @@ func (h *host) setFloatMode(mode string) {
 // move AppKit makes itself, as when a screen goes away, is left to the
 // controller's clamp.
 func (h *host) floatMoved() {
-	if !h.floatShown || h.dragging || mouseButtonsUp() {
+	if !h.floatShown || h.dragging || h.native.buttonsUp() {
 		return
 	}
-	var f window.Rect
-	application.InvokeSync(func() { f = frameOf(nsWindow(h.float)) })
+	f := h.native.frame()
 	if sameFrame(f, h.floatFrame) {
 		return
 	}
@@ -429,28 +488,37 @@ func (h *host) floatMoved() {
 	if on := h.handlers().OnFloatMoving; on != nil {
 		on()
 	}
-	go h.awaitDrop()
+	h.afterRelease(h.dropped)
 }
 
-// dropPoll is how often a drag is checked for its end: AppKit sends the
-// window no mouse-up for a drag the window server runs.
+// dropPoll is how often a held button is checked for its release: AppKit
+// sends the window no mouse-up for a drag the window server runs.
 const dropPoll = 30 * time.Millisecond
 
-func (h *host) awaitDrop() {
-	tick := time.NewTicker(dropPoll)
-	defer tick.Stop()
-	for range tick.C {
-		if mouseButtonsUp() {
-			h.do(h.dropped)
-			return
+// afterRelease runs fn on the worker once no mouse button is down. It is
+// called on the worker, which running counts, so its Add never races stop's
+// Wait.
+func (h *host) afterRelease(fn func()) {
+	h.running.Go(func() {
+		tick := time.NewTicker(dropPoll)
+		defer tick.Stop()
+		for {
+			select {
+			case <-h.done:
+				return
+			case <-tick.C:
+				if h.native.buttonsUp() {
+					h.do(fn)
+					return
+				}
+			}
 		}
-	}
+	})
 }
 
 func (h *host) dropped() {
 	h.dragging = false
-	var f window.Rect
-	application.InvokeSync(func() { f = frameOf(nsWindow(h.float)) })
+	f := h.native.frame()
 	h.floatFrame = f
 	if on := h.handlers().OnFloatDropped; on != nil {
 		on(f)

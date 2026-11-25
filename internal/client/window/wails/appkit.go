@@ -3,12 +3,17 @@
 package wails
 
 import (
+	_ "embed"
+	"encoding/json"
 	"runtime"
+	"strconv"
+	"sync"
 
 	"github.com/ebitengine/purego"
 	"github.com/ebitengine/purego/objc"
 	"github.com/wailsapp/wails/v3/pkg/application"
 
+	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/window"
 )
 
@@ -159,21 +164,152 @@ func mouseButtonsUp() bool {
 	return objc.Send[uint](objc.ID(class("NSEvent")), sel("pressedMouseButtons")) == 0
 }
 
-// keyOnlyWhen makes AppKit ask keyable whether win may become key. It
-// replaces canBecomeKeyWindow on win's class, which Wails shares with every
-// panel it makes, keeping the other panels' answer, yes. It runs on the main
-// thread.
-func keyOnlyWhen(win objc.ID, keyable func() bool) error {
-	lib, err := purego.Dlopen("/usr/lib/libobjc.A.dylib", purego.RTLD_NOW|purego.RTLD_GLOBAL)
-	if err != nil {
-		return err
+// The NSTrackingArea options that report the mouse over a window that is
+// not key: entered and exited, moved, always active, over the visible rect.
+const floatTracking = 0x01 | 0x02 | 0x80 | 0x200
+
+var objcRuntime struct {
+	once          sync.Once
+	err           error
+	replaceMethod func(cls objc.Class, name objc.SEL, imp objc.IMP, types string) objc.IMP
+	methodIMP     func(cls objc.Class, name objc.SEL) objc.IMP
+}
+
+func loadObjcRuntime() error {
+	objcRuntime.once.Do(func() {
+		lib, err := purego.Dlopen("/usr/lib/libobjc.A.dylib", purego.RTLD_NOW|purego.RTLD_GLOBAL)
+		if err != nil {
+			objcRuntime.err = err
+			return
+		}
+		purego.RegisterLibFunc(&objcRuntime.replaceMethod, lib, "class_replaceMethod")
+		purego.RegisterLibFunc(&objcRuntime.methodIMP, lib, "class_getMethodImplementation")
+	})
+	return objcRuntime.err
+}
+
+// realClass is obj's own class, under the subclass key-value observing
+// slips in: every Wails window and web view is observed, so swapping an
+// instance's class would undo the observing.
+func realClass(obj objc.ID) objc.Class { return objc.Class(obj.Send(sel("class"))) }
+
+// warner is a logger's warning.
+type warner interface{ Warn(msg string, args ...any) }
+
+// unready logs why the float could not be readied.
+type unready struct{ log warner }
+
+func (u unready) Warn(reason string, args ...any) {
+	u.log.Warn("window: the float may take the keyboard in any mode and miss the mouse while not key", append([]any{"reason", reason}, args...)...)
+}
+
+// answerFor makes s, a method taking at most one object and answering a
+// BOOL, answer answer() for the instance only, and what it answered before
+// for every other instance of cls; types is its type encoding. False when cls
+// has no such method to answer for.
+func answerFor(only objc.ID, cls objc.Class, s objc.SEL, types string, answer func() bool) bool {
+	if cls == 0 {
+		return false
 	}
-	var replace func(cls objc.Class, name objc.SEL, imp objc.IMP, types string) objc.IMP
-	purego.RegisterLibFunc(&replace, lib, "class_replaceMethod")
-	replace(win.Class(), sel("canBecomeKeyWindow"), objc.NewIMP(func(self objc.ID, _ objc.SEL) bool {
-		return self != win || keyable()
-	}), "B@:")
-	return nil
+	before := objcRuntime.methodIMP(cls, s)
+	if before == 0 {
+		return false
+	}
+	var prev func(self objc.ID, cmd objc.SEL, arg objc.ID) bool
+	purego.RegisterFunc(&prev, uintptr(before))
+	objcRuntime.replaceMethod(cls, s, objc.NewIMP(func(self objc.ID, cmd objc.SEL, arg objc.ID) bool {
+		if self == only {
+			return answer()
+		}
+		return prev(self, cmd, arg)
+	}), types)
+	return true
+}
+
+//go:embed float_pointer.js
+var floatPointerScript string
+
+// The pointer's moves floatPointerScript dispatches.
+const (
+	pointerEntered = "entered"
+	pointerMoved   = "moved"
+	pointerExited  = "exited"
+)
+
+// floatPointerJS calls floatPointerScript for kind at x, y in the page's
+// coordinates.
+func floatPointerJS(kind string, x, y float64) string {
+	bridge, _ := json.Marshal(window.FloatBridge)
+	k, _ := json.Marshal(kind)
+	return floatPointerScript + "(" + string(bridge) + "," + string(k) + "," + strconv.FormatFloat(x, 'f', -1, 64) + "," + strconv.FormatFloat(y, 'f', -1, 64) + ")"
+}
+
+// floatTracked is what a tracking area's owner reaches: the float and its
+// web view.
+type floatTracked struct{ win, webview objc.ID }
+
+// trackTargets maps each tracking area's owner to what it tracks.
+var trackTargets sync.Map
+
+// pointerTo dispatches the pointer's kind of move in the float's page while
+// the float is not key: WebKit drops the mouse's moves in a window that is
+// not key, so its page would see no hover, and a key float gets them from
+// WebKit itself. It runs on the main thread.
+func pointerTo(s objc.SEL, kind string) objc.MethodDef {
+	return objc.MethodDef{Cmd: s, Fn: func(self objc.ID, _ objc.SEL, event objc.ID) {
+		v, ok := trackTargets.Load(self)
+		if !ok {
+			return
+		}
+		t := v.(floatTracked)
+		if objc.Send[bool](t.win, sel("isKeyWindow")) {
+			return
+		}
+		at := objc.Send[point](t.webview, sel("convertPoint:fromView:"), objc.Send[point](event, sel("locationInWindow")), objc.ID(0))
+		t.webview.Send(sel("evaluateJavaScript:completionHandler:"), nsString(floatPointerJS(kind, at.X, at.Y)), objc.ID(0))
+	}}
+}
+
+// floatOnly gives the float, and no other window, what a panel that is not
+// key needs: its panel becomes key only while keyable says so, its web view
+// takes the first click, and a tracking area active in any window hands its
+// page the pointer (pointerTo). The first two replace a method on the class
+// the float shares with the omnibox panel and every web view, answering as
+// before for those. Whatever it cannot do it logs to log; it runs on the main
+// thread, once.
+func floatOnly(win objc.ID, keyable func() bool, log warner) {
+	u := unready{log}
+	if win == 0 {
+		u.Warn("no float window")
+		return
+	}
+	content := win.Send(sel("contentView"))
+	webview := findWebView(content)
+	if webview == 0 {
+		u.Warn("the float has no web view")
+		return
+	}
+	if err := loadObjcRuntime(); err != nil {
+		u.Warn("the Objective-C runtime did not load", "error", err)
+		return
+	}
+	if !answerFor(win, realClass(win), sel("canBecomeKeyWindow"), "B@:", keyable) {
+		u.Warn("the float's panel has no class to answer for")
+	}
+	if !answerFor(webview, realClass(webview), sel("acceptsFirstMouse:"), "B@:@", func() bool { return true }) {
+		u.Warn("the float's web view has no class to answer for")
+	}
+	tracker, err := objc.RegisterClass(brand.Name+"FloatTracker", objc.GetClass("NSObject"), nil, nil, []objc.MethodDef{
+		pointerTo(sel("mouseEntered:"), pointerEntered), pointerTo(sel("mouseMoved:"), pointerMoved), pointerTo(sel("mouseExited:"), pointerExited),
+	})
+	if err != nil {
+		u.Warn("the float's tracking did not register", "error", err)
+		return
+	}
+	owner := objc.ID(tracker).Send(sel("new"))
+	trackTargets.Store(owner, floatTracked{win: win, webview: webview})
+	area := class("NSTrackingArea").Send(sel("alloc")).Send(sel("initWithRect:options:owner:userInfo:"), rect{}, uint(floatTracking), owner, objc.ID(0))
+	content.Send(sel("addTrackingArea:"), area)
 }
 
 // userDefaults is the app's standard user defaults, whose domain is its

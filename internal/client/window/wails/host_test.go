@@ -4,9 +4,13 @@ package wails
 
 import (
 	"encoding/json"
+	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/window"
@@ -116,5 +120,162 @@ func TestThePlaceGoesToTheBrandsGlobal(t *testing.T) {
 	}
 	if got := floatPlaceJS(window.ModePanel, window.FloatPlace{}); !strings.Contains(got, `setMode("panel",{"edge":"","up":false})`) {
 		t.Fatalf("js %s", got)
+	}
+}
+
+// fakeFloat is the float's AppKit side: the mouse buttons, the frame, the
+// key status and the hand-backs, each read under mu.
+type fakeFloat struct {
+	mu        sync.Mutex
+	up, key   bool
+	frame     window.Rect
+	handBacks int
+}
+
+func (f *fakeFloat) set(fn func(f *fakeFloat)) { f.mu.Lock(); fn(f); f.mu.Unlock() }
+
+func (f *fakeFloat) handedBack() int { f.mu.Lock(); defer f.mu.Unlock(); return f.handBacks }
+
+func (f *fakeFloat) native() floatNative {
+	read := func(fn func() any) any { f.mu.Lock(); defer f.mu.Unlock(); return fn() }
+	return floatNative{
+		buttonsUp: func() bool { return read(func() any { return f.up }).(bool) },
+		frame:     func() window.Rect { return read(func() any { return f.frame }).(window.Rect) },
+		isKey:     func() bool { return read(func() any { return f.key }).(bool) },
+		handBack:  func() { f.set(func(f *fakeFloat) { f.handBacks++; f.key = false }) },
+	}
+}
+
+// runningHost is a host whose worker runs on f until the test ends, then
+// stops with every release poll awaited.
+func runningHost(t *testing.T, f *fakeFloat, hs window.Handlers) *host {
+	h := &host{native: f.native(), listening: hs}
+	h.start()
+	t.Cleanup(h.stop)
+	return h
+}
+
+// A move made with every button up is AppKit's, not the person's; a move
+// under a held button is a drag, dropped at the first poll that finds the
+// buttons up, with the frame it was dropped at.
+func TestADragIsFollowedUntilTheButtonsAreUp(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		f := &fakeFloat{up: true, frame: window.Rect{X: 600, Y: 300, W: 112, H: 32}}
+		var mu sync.Mutex
+		var moving int
+		var dropped []window.Rect
+		var droppedAt time.Time
+		h := runningHost(t, f, window.Handlers{
+			OnFloatMoving:  func() { mu.Lock(); moving++; mu.Unlock() },
+			OnFloatDropped: func(r window.Rect) { mu.Lock(); dropped = append(dropped, r); droppedAt = time.Now(); mu.Unlock() },
+		})
+		h.do(func() { h.floatShown, h.floatFrame = true, window.Rect{X: 600, Y: 300, W: 112, H: 32} })
+
+		f.set(func(f *fakeFloat) { f.frame = window.Rect{X: 0, Y: 33, W: 112, H: 32} })
+		h.do(h.floatMoved)
+		synctest.Wait()
+		mu.Lock()
+		if moving != 0 {
+			t.Fatalf("a move with the buttons up started a drag")
+		}
+		mu.Unlock()
+
+		f.set(func(f *fakeFloat) { f.up, f.frame = false, window.Rect{X: 650, Y: 320, W: 112, H: 32} })
+		start := time.Now()
+		h.do(h.floatMoved)
+		h.do(h.floatMoved)
+		time.Sleep(dropPoll + dropPoll/2)
+		synctest.Wait()
+		mu.Lock()
+		if moving != 1 || len(dropped) != 0 {
+			t.Fatalf("held: moving %d, dropped %v; want one drag, no drop", moving, dropped)
+		}
+		mu.Unlock()
+		f.set(func(f *fakeFloat) { f.up, f.frame = true, window.Rect{X: 900, Y: 500, W: 112, H: 32} })
+		time.Sleep(dropPoll)
+		synctest.Wait()
+		mu.Lock()
+		defer mu.Unlock()
+		if len(dropped) != 1 || dropped[0] != (window.Rect{X: 900, Y: 500, W: 112, H: 32}) {
+			t.Fatalf("dropped %v, want the frame at the release", dropped)
+		}
+		if took := droppedAt.Sub(start); took != 2*dropPoll {
+			t.Fatalf("dropped after %v, want %v", took, 2*dropPoll)
+		}
+	})
+}
+
+// Leaving the panel under a held button hands the keyboard back once the
+// button is up, not under the press; back in the panel before then, it
+// keeps it.
+func TestTheKeyboardGoesBackOnceTheButtonsAreUp(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		f := &fakeFloat{up: false, key: true}
+		h := runningHost(t, f, window.Handlers{})
+		h.do(func() { h.setFloatMode(window.ModePill) })
+		time.Sleep(3 * dropPoll)
+		synctest.Wait()
+		if f.handedBack() != 0 {
+			t.Fatal("handed the keyboard back under a held button")
+		}
+		f.set(func(f *fakeFloat) { f.up = true })
+		time.Sleep(dropPoll)
+		synctest.Wait()
+		if n := f.handedBack(); n != 1 {
+			t.Fatalf("handed back %d times, want once", n)
+		}
+
+		f.set(func(f *fakeFloat) { f.up, f.key = false, true })
+		h.do(func() { h.setFloatMode(window.ModePeek) })
+		h.do(func() { h.setFloatMode(window.ModePanel) })
+		synctest.Wait()
+		f.set(func(f *fakeFloat) { f.up = true })
+		time.Sleep(dropPoll)
+		synctest.Wait()
+		if n := f.handedBack(); n != 1 {
+			t.Fatalf("handed back %d times after returning to the panel, want still once", n)
+		}
+	})
+}
+
+// Stopping the host ends a poll still waiting for a release.
+func TestStoppingTheHostEndsAWaitingPoll(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		f := &fakeFloat{up: false, key: true}
+		h := &host{native: f.native()}
+		h.start()
+		h.do(func() { h.setFloatMode(window.ModePill) })
+		synctest.Wait()
+		h.stop()
+	})
+}
+
+// The pointer the host tracks reaches the page as DOM events at the point,
+// with its state kept beside the bridge the brand names.
+func TestThePointerGoesToThePageAtItsPoint(t *testing.T) {
+	js := floatPointerJS(pointerMoved, 56, 16)
+	bridge, _ := json.Marshal(window.FloatBridge)
+	for _, want := range []string{`(` + string(bridge) + `,"moved",56,16)`, `bridge + "Pointer"`, "elementFromPoint", "pointerenter", "pointerleave", "pointermove"} {
+		if !strings.Contains(js, want) {
+			t.Errorf("js lacks %s:\n%s", want, js)
+		}
+	}
+	if got := floatPointerJS(pointerExited, 0, 0); !strings.HasSuffix(got, `,"exited",0,0)`) {
+		t.Errorf("exit js %s", got)
+	}
+}
+
+type warnings []string
+
+func (w *warnings) Warn(msg string, args ...any) {
+	*w = append(*w, fmt.Sprint(append([]any{msg}, args...)...))
+}
+
+// A float with no window is logged, not left unready in silence.
+func TestAFloatItCannotReadyIsLogged(t *testing.T) {
+	var w warnings
+	floatOnly(0, func() bool { return false }, &w)
+	if len(w) != 1 || !strings.Contains(w[0], "no float window") {
+		t.Fatalf("logged %q", w)
 	}
 }
