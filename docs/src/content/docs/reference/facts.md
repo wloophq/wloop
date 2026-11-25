@@ -314,6 +314,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `pr.ended` | bool | The pull request merged or closed: the GitHub plugin's word that the unit has ended. |
 | `pr.changed_files` | int | How many files the pull request changes, as GitHub last reported it; 0 when not read. |
 | `pr.head` | string | The head commit's oid. |
+| `pr.commits` | list | The oids of the commits the store has read on the pull request: every push it recorded, and the newest 50 commits of its last full read, merges included. A commit among them that is not pr.head is one the stored head moved past; a commit read elsewhere and not yet stored is not among them. |
 | `pr.conflicting_for` | duration | How long the pull request has conflicted with its base, from when the inventory first saw it; zero when it does not. |
 | `pr.checks` | string | The checks' rollup on the head: success, failure, pending, error or expected; empty with no checks. |
 | `pr.stalled` | bool | The checks stalled on the head. |
@@ -393,6 +394,10 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `draft.stale` | bool | A draft on the unit failed to send because the unit moved past what it was written against, such as a push after a review was read; draft.failed is true too. |
 | `draft.failed_kind` | string | The kind of the unit's newest draft that failed to send, as its plugin's manifest names it, such as review; empty when none failed. A workflow that restarts a round reads it to restart only for its own kind. |
 | `draft.failed_ref` | string | The unit's newest draft that failed to send, as <id>:<rev>; empty when none failed. A workflow keys on it so that each failure, a revised draft's included, runs it again. |
+| `draft.held_ref` | string | A draft an intent's turn wrote on the unit that waits for you, not one your own session wrote, and states the basis it was written against, as <id>:<rev>: the newest refused as stale, else the newest; empty when none. A workflow keys on it so that each such draft, a revised one included, runs it once. |
+| `draft.held_kind` | string | The kind of the draft draft.held_ref names, as its plugin's manifest names it, such as review; empty when none. |
+| `draft.held_basis` | string | The basis the draft draft.held_ref names was written against, such as the head commit a review read; empty when none. Nothing reads the unit's live basis for it: a workflow compares it with the unit's own facts, such as a pull request's head and commits, to tell the unit moved past it. |
+| `draft.held_stale` | bool | The draft draft.held_ref names was refused as stale, its approval or a check finding the unit moved past its basis; true until its content is revised. |
 
 ### Gates (`gate.*`)
 

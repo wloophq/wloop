@@ -107,6 +107,7 @@ func FactsOf(in Input) []src.Fact {
 	add("pr.draft", src.Bool(p.IsDraft))
 	add("pr.changed_files", src.Int(int64(p.ChangedFiles)))
 	add("pr.head", src.String(p.HeadOid))
+	add("pr.commits", src.List(commits(in)...))
 	if p.Mergeable == "CONFLICTING" && !p.MergeableAt.IsZero() {
 		add("pr.conflicting_for", src.Since(p.MergeableAt))
 	} else {
@@ -139,6 +140,25 @@ func FactsOf(in Input) []src.Fact {
 	if !at.IsZero() {
 		add("pr.last_interaction_at", src.Time(at))
 		add("pr.silent_days", src.Int(int64(calendarDays(at, in.Now, in.Location))))
+	}
+	return out
+}
+
+// commits are the oids of in's stored pushes, then those of its full read's commits not among them, merges
+// included: the commits the store has read on the pull request.
+func commits(in Input) []string {
+	out := []string{}
+	for _, e := range in.Events {
+		if e.Kind == pr.KindPush && e.Key != "" && !slices.Contains(out, e.Key) {
+			out = append(out, e.Key)
+		}
+	}
+	if in.Detail != nil {
+		for _, c := range in.Detail.Commits {
+			if c.Oid != "" && !slices.Contains(out, c.Oid) {
+				out = append(out, c.Oid)
+			}
+		}
 	}
 	return out
 }

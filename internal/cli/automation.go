@@ -588,7 +588,7 @@ type unitSet struct {
 	classified *classifiedUnits
 	// briefed adds the brief.* facts; nil adds none.
 	briefed *briefedFacts
-	// drafted adds the facts of the unit's failed drafts, which failed reads once a pass; nil adds none.
+	// drafted adds the facts of the unit's failed and held drafts, which failed reads once a pass; nil adds none.
 	drafted unitFacter
 	failed  *failedDrafts
 	// blocks lifts the answered start blocks first; nil lifts none.
@@ -872,8 +872,8 @@ type draftLister interface {
 	List(ctx context.Context, f outbox.Filter) ([]draft.Draft, error)
 }
 
-// failedDrafts answer the draft facts' reads of a unit's failed drafts from one read of every failed draft
-// a pass, which Refresh starts, read again once the change log notes a draft change.
+// failedDrafts answer the draft facts' reads of a unit's failed and held drafts from one read of every such
+// draft a pass, which Refresh starts, read again once the change log notes a draft change.
 type failedDrafts struct {
 	store   draftLister
 	changes port.Changes
@@ -891,7 +891,7 @@ func (f *failedDrafts) refresh() {
 }
 
 func (f *failedDrafts) List(ctx context.Context, q outbox.Filter) ([]draft.Draft, error) {
-	if q.Unit == nil || !slices.Equal(q.States, []draft.State{draft.Failed}) || q.Task != "" || q.Rule != "" || q.Key != "" || q.Workflow != "" {
+	if q.Unit == nil || !slices.Equal(q.States, draftFactStates) || q.Task != "" || q.Rule != "" || q.Key != "" || q.Workflow != "" {
 		return f.store.List(ctx, q)
 	}
 	f.mu.Lock()
@@ -901,7 +901,7 @@ func (f *failedDrafts) List(ctx context.Context, q outbox.Filter) ([]draft.Draft
 		if f.changes != nil {
 			gen = f.changes.Gen()
 		}
-		all, err := f.store.List(ctx, outbox.Filter{States: []draft.State{draft.Failed}})
+		all, err := f.store.List(ctx, outbox.Filter{States: draftFactStates})
 		if err != nil {
 			return nil, err
 		}

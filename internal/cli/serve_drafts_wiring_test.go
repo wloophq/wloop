@@ -343,7 +343,7 @@ func TestTheFailedDraftsReadOnceAPassSeeANewFailure(t *testing.T) {
 	ctx := context.Background()
 	te, _, log := servedOutboxOf(t, &basingPublisher{})
 	f := &failedDrafts{store: te.db.Drafts(), changes: log}
-	q := outbox.Filter{Unit: &threadUnit, States: []draft.State{draft.Failed}}
+	q := outbox.Filter{Unit: &threadUnit, States: draftFactStates}
 	if got, err := f.List(ctx, q); err != nil || len(got) != 0 {
 		t.Fatalf("before any failure: %v %v", got, err)
 	}
@@ -352,9 +352,43 @@ func TestTheFailedDraftsReadOnceAPassSeeANewFailure(t *testing.T) {
 		t.Fatalf("after a failure the change log noted: %v %v", got, err)
 	}
 	other := unit.Unit{Provider: threadUnit.Provider, Key: "C1 0009"}
-	if got, err := f.List(ctx, outbox.Filter{Unit: &other, States: []draft.State{draft.Failed}}); err != nil || len(got) != 0 {
+	if got, err := f.List(ctx, outbox.Filter{Unit: &other, States: draftFactStates}); err != nil || len(got) != 0 {
 		t.Fatalf("another unit's failures: %v %v", got, err)
 	}
+}
+
+func TestTheDraftsReadOnceAPassSeeANewHeldDraft(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	te, _, log := servedOutboxOf(t, &basingPublisher{})
+	store := &listCounter{draftLister: te.db.Drafts()}
+	f := &failedDrafts{store: store, changes: log}
+	q := outbox.Filter{Unit: &threadUnit, States: draftFactStates}
+	if got, err := f.List(ctx, q); err != nil || len(got) != 0 {
+		t.Fatalf("before any draft: %v %v", got, err)
+	}
+	held := insertDraft(t, te.db, draft.Draft{Unit: threadUnit, Text: "x", State: draft.Held, Basis: "c2", Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 1}})
+	if got, err := f.List(ctx, q); err != nil || len(got) != 1 || got[0].ID != held.ID {
+		t.Fatalf("after a held draft the change log noted: %v %v", got, err)
+	}
+	other := unit.Unit{Provider: threadUnit.Provider, Key: "C1 0009"}
+	if _, err := f.List(ctx, outbox.Filter{Unit: &other, States: draftFactStates}); err != nil {
+		t.Fatal(err)
+	}
+	if store.reads != 2 {
+		t.Fatalf("%d reads of the store, want one before the held draft and one after", store.reads)
+	}
+}
+
+// listCounter count the lists of a draft store.
+type listCounter struct {
+	draftLister
+	reads int
+}
+
+func (c *listCounter) List(ctx context.Context, f outbox.Filter) ([]draft.Draft, error) {
+	c.reads++
+	return c.draftLister.List(ctx, f)
 }
 
 func TestServeEndsTheTurnAFailedOrDroppedDraftHeld(t *testing.T) {
