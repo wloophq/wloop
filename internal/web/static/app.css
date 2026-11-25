@@ -1125,6 +1125,9 @@ html.float-page body { display: block; overflow: hidden; }
 .fl-card-head { display: flex; align-items: center; gap: var(--space-8); }
 .fl-ref { font: var(--text-meta) var(--mono); color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .fl-card-title { margin: var(--space-4) 0 var(--space-8); font-size: 14px; font-weight: 500; }
+.fl-card-open, button.fl-ref.link { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+button.fl-ref.link { font: var(--text-meta) var(--mono); color: var(--faint); }
+.fl-card-open:hover, .fl-card-open[data-hover], button.fl-ref.link:hover, button.fl-ref.link[data-hover] { text-decoration: underline; }
 .fl-text { margin: var(--space-4) 0; white-space: pre-wrap; }
 .fl-text.clamp, .fl-cbody.clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
 .fl-cbody.clamp { -webkit-line-clamp: 2; line-clamp: 2; }

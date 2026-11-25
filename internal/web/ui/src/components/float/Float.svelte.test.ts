@@ -13,10 +13,13 @@ import { settle } from "../../testing/settle";
 import Agents from "./Agents.svelte";
 import Card from "./Card.svelte";
 import Float from "./Float.svelte";
-import { floatRun, keepRoutes, resetFloatSize } from "./float";
+import { floatOpenUnit, floatRun, keepRoutes, resetFloatSize } from "./float";
 import ReviewCard from "./ReviewCard.svelte";
+import { queueDeps } from "../screens/queue";
 
 const saved = { ...floatDeps };
+const savedOpen = queueDeps.open;
+let opened: string[] = [];
 let posted: J[] = [];
 let raw: string[] = [];
 let served: J;
@@ -35,6 +38,9 @@ beforeEach(() => {
   tasksState.catalog = taskCatalog();
   posted = [];
   raw = [];
+  opened = [];
+  queueDeps.open = (url) => opened.push(url);
+  floatDeps.openUnit = floatOpenUnit;
   floatDeps.post = (m) => posted.push(m);
   (window as J).webkit = { messageHandlers: { external: { postMessage: (m: string) => raw.push(m) } } };
   served = { title: "Needs you", items: [item(1)] };
@@ -46,6 +52,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   cleanup();
   Object.assign(floatDeps, saved);
+  queueDeps.open = savedOpen;
   delete (window as J).webkit;
   resetFloat();
 });
@@ -337,4 +344,62 @@ test("a pinned panel stays open when the pointer leaves and when the window lose
   expect(floatState().mode).toBe("panel");
   await fireEvent.keyDown(window, { key: "Escape" });
   expect([floatState().mode, floatState().pinned]).toEqual(["pill", false]);
+});
+
+const PR = { provider: "github", key: "acme/widgets#7" };
+const LINK = "https://github.com/acme/widgets/pull/7";
+const linked = (extra: J = {}, cards: J[] = [{ card: { unit: PR, link: LINK } }]): J =>
+  item(7, { task: { id: "t 7", title: "Ana's change 7", units: [PR], unit_labels: ["acme/widgets#7"], cards }, ...extra });
+const unitItem = (cards?: J[]) => linked({ kind: "unit", gate: undefined, primary: { kind: "open", id: "open", label: "Open" } }, cards);
+const reviewItem = () => linked({ options: [{ id: "a", label: "Option A", primary: "Post A" }], gate: { id: 7, kind: "question", status: "open", text: "Which?", intents: [{ id: "approve", label: "Looks good" }] } });
+const shown = async (it: J) => {
+  served = { title: "Needs you", items: [it] };
+  await floatLoad();
+  const c = render(Float).container;
+  floatState().setPinned(true);
+  floatState().setMode("panel");
+  await settle();
+  return c;
+};
+
+test.each([["a gate", () => linked()], ["a unit", () => unitItem()], ["a question with drafts", () => reviewItem()]])(
+  "the title of %s opens its task in the cockpit and its ref opens the unit at its source",
+  async (_name, make) => {
+    const c = await shown(make());
+    await fireEvent.click(c.querySelector(".fl-card-title button") as HTMLElement);
+    expect(posted.filter((m) => m.type === "float:open")).toEqual([{ type: "float:open", route: "task=t%207" }]);
+    expect(opened).toEqual([]);
+    const ref = c.querySelector(".fl-hand .fl-ref") as HTMLElement;
+    expect(ref.tagName).toBe("BUTTON");
+    expect(ref.textContent).toBe("acme/widgets#7");
+    await fireEvent.click(ref);
+    expect(opened).toEqual([LINK]);
+  },
+);
+
+test("o opens the current task in the cockpit and u its unit at its source", async () => {
+  await shown(linked());
+  await fireEvent.keyDown(window, { key: "o" });
+  expect(posted.filter((m) => m.type === "float:open")).toEqual([{ type: "float:open", route: "task=t%207" }]);
+  expect(opened).toEqual([]);
+  await fireEvent.keyDown(window, { key: "u" });
+  expect(opened).toEqual([LINK]);
+});
+
+test("a unit no card links draws its ref as text, and u opens nothing", async () => {
+  const c = await shown(unitItem([]));
+  const ref = c.querySelector(".fl-hand .fl-ref") as HTMLElement;
+  expect([ref.tagName, ref.textContent]).toEqual(["SPAN", "acme/widgets#7"]);
+  await fireEvent.keyDown(window, { key: "u" });
+  expect(opened).toEqual([]);
+  expect(posted.filter((m) => m.type === "float:open")).toEqual([]);
+});
+
+test("u typed in a text field stays in the field", async () => {
+  const c = await shown(linked());
+  const field = document.createElement("input");
+  c.appendChild(field);
+  field.focus();
+  field.dispatchEvent(new KeyboardEvent("keydown", { key: "u", bubbles: true, cancelable: true }));
+  expect(opened).toEqual([]);
 });

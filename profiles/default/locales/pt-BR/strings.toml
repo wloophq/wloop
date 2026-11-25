@@ -812,6 +812,8 @@
 "All clear" = "Tudo em dia"
 "The loop brings the next thing here." = "O loop traz a próxima coisa para cá."
 "Open in the cockpit" = "Abrir no cockpit"
+"Open at its source" = "Abrir na origem"
+"Open {ref} at its source" = "Abrir {ref} na origem"
 "Could not read the queue." = "Não foi possível ler a fila."
 "Queue unavailable" = "Fila indisponível"
 "Hide until something new" = "Ocultar até chegar algo novo"

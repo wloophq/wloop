@@ -35,11 +35,12 @@ export interface FloatPlace {
   maxH: number;
 }
 
-// floatDeps are what the widget reaches beyond its state: resolving an item's gate, running any other primary,
+// floatDeps are what the widget reaches beyond its state: resolving an item's gate, running any other primary, opening an item's unit at its source,
 // and posting a message to the window that hosts it. The page wires them; each is inert until then.
 export const floatDeps = {
   resolve: async (_item: J, _intent: string, _option?: string): Promise<unknown> => null,
   run: async (_item: J): Promise<unknown> => null,
+  openUnit: (_item: J): void => {},
   post: (_message: J): void => {},
 };
 
@@ -314,6 +315,11 @@ function open(): void {
   if (item && item.task) openRoute(taskRoute(item.task.id));
 }
 
+function openUnit(): void {
+  const item = fl.items[fl.current];
+  if (item) floatDeps.openUnit(item);
+}
+
 // hide asks the host to hide the widget for mode; the page collapses to the pill it comes back as.
 function hide(mode: FloatHide): void {
   setMode("pill");
@@ -392,6 +398,7 @@ export function floatState() {
     pick,
     act,
     open,
+    openUnit,
     hide,
   };
 }

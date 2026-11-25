@@ -54,11 +54,16 @@ function sourceLink(e: J): string {
   return (c && safeURL(c.card.link)) || "";
 }
 
+// unitLink is the link of unit u of task e from its card, else the task's first unit's; empty when no card links it.
+export function unitLink(e: J, u: Unit | null): string {
+  const card = ((e && e.cards) || []).find((x: J) => x.card && u && sameUnit(x.card.unit, u));
+  return (card && safeURL(card.card.link)) || sourceLink(e);
+}
+
 // openTaskSource opens unit u of task e at its source, else the task's first unit's; the unit's detail when no
 // card links it.
 export function openTaskSource(e: J, u: Unit | null): void {
-  const card = ((e && e.cards) || []).find((x: J) => x.card && u && sameUnit(x.card.unit, u));
-  const link = (card && safeURL(card.card.link)) || sourceLink(e);
+  const link = unitLink(e, u);
   if (link) queueDeps.open(link);
   else if (u) writeHash({ pr: u.provider + ":" + u.key, task: "" });
 }

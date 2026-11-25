@@ -4,7 +4,7 @@ import { t } from "../../lib/i18n.svelte";
 import { isSet, safeURL, type J } from "../../lib/util";
 import { floatDeps, floatState, openRoute, taskRoute, type FloatMode, type FloatPlace } from "../../state/float.svelte";
 import { resolveDraft, resolveGate } from "../gates/gates";
-import { queueDeps, queueDraft, queueDraftOf, queueUnit, queueVerb } from "../screens/queue";
+import { queueDeps, queueDraft, queueDraftOf, queueUnit, queueVerb, unitLink } from "../screens/queue";
 
 // The floating widget's ends: resolving an item through the gates endpoint, and the bridge to the window that
 // hosts the page. The host calls window[FLOAT_BRIDGE].setMode, and blur as the float resigns key; the page posts
@@ -122,6 +122,7 @@ export function installFloat(win: J = window): FloatBridge {
   win[FLOAT_BRIDGE] = bridge;
   floatDeps.resolve = floatResolve;
   floatDeps.run = floatRun;
+  floatDeps.openUnit = floatOpenUnit;
   floatDeps.post = (m) => floatPost(m, win);
   return bridge;
 }
@@ -149,17 +150,20 @@ export async function floatRun(item: J): Promise<unknown> {
     return true;
   }
   if (p.kind === "open") {
-    const link = sourceLink(item.task, u);
+    const link = itemLink(item);
     if (link) return queueDeps.open(link);
   }
   openRoute(taskRoute(item.task && item.task.id));
   return true;
 }
 
-function sourceLink(task: J, u: J): string {
-  const cards: J[] = (task && task.cards) || [];
-  const card = cards.find((c) => c.card && u && c.card.unit && c.card.unit.provider === u.provider && c.card.unit.key === u.key) || cards[0];
-  return (card && card.card && safeURL(card.card.link)) || "";
+// itemLink is the link of item's unit at its source, empty when no card of its task links it.
+export const itemLink = (item: J): string => unitLink(item.task, queueUnit(item));
+
+// floatOpenUnit opens item's unit at its source, doing nothing when no card links it.
+export function floatOpenUnit(item: J): void {
+  const link = itemLink(item);
+  if (link) queueDeps.open(link);
 }
 
 // LATE_MS is the age past which an item's age reads as late.

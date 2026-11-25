@@ -3,7 +3,7 @@
   import type { J } from "../../lib/util";
   import { optionOf, type FloatState } from "../../state/float.svelte";
   import { subjectOf } from "../gates/gates";
-  import { draftSummary, itemRef, itemTitle, toneClass } from "./float";
+  import { draftSummary, hovered, itemLink, itemRef, itemTitle, toneClass } from "./float";
 
   // A question whose options pin held drafts, drawn as one card: a tab per option, the recommended one selected
   // until the person picks another, the question, then the selected option's draft: its verdict, its comments
@@ -20,6 +20,8 @@
   const summary = $derived(draft ? draftSummary(draft) : null);
   const question = $derived(subjectOf(item.gate).text || item.gate.text || "");
   const p = $derived(item.primary || {});
+  const ref = $derived(itemRef(item));
+  const link = $derived(itemLink(item));
   const others: J[] = $derived((item.gate.intents || []).filter((x: J) => x.id !== p.id && !x.answer));
 
   function choose(id: string): void {
@@ -32,11 +34,17 @@
 <article class={["fl-hand", "fl-review", toneClass(item.tone)]} aria-label={itemTitle(item)}>
   <header class="fl-card-head">
     <span class="fl-kind">{item.word || item.kind}</span>
-    <span class="fl-ref">{itemRef(item)}</span>
+    {#if link}
+      <button type="button" class="fl-ref link" title={t("Open at its source")} aria-label={t("Open {ref} at its source", { ref })} use:hovered onclick={() => f.openUnit()}>{ref}</button>
+    {:else}
+      <span class="fl-ref">{ref}</span>
+    {/if}
     <span class="fl-sp"></span>
     <span class={["fl-age", late && "late"]}>{age}</span>
   </header>
-  <h3 class="fl-card-title">{itemTitle(item)}</h3>
+  <h3 class="fl-card-title">
+    <button type="button" class="fl-card-open" title={t("Open in the cockpit")} use:hovered onclick={() => f.open()}>{itemTitle(item)}</button>
+  </h3>
   <div class="fl-tabs" role="tablist">
     {#each options as o (o.id)}
       <button type="button" role="tab" class="fl-tab" aria-selected={o.id === picked ? "true" : "false"} onclick={() => choose(o.id)}

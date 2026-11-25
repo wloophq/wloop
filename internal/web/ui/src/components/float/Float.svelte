@@ -82,6 +82,9 @@
     } else if (e.key === "o") {
       e.preventDefault();
       f.open();
+    } else if (e.key === "u") {
+      e.preventDefault();
+      f.openUnit();
     }
   }
 
