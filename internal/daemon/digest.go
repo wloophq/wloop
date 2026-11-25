@@ -34,11 +34,18 @@ func (s *Server) handleDigest(w http.ResponseWriter, r *http.Request) {
 	d := api.Digest{Day: day, Title: s.notice(builtin.NoticeDigestTitle, nil)}
 	def := s.loaded().Views
 	var counts []string
-	c, err := g.Counts(ctx, "")
+	snap, err := g.Snapshot(ctx)
 	if err != nil {
 		writeTasksError(w, err)
 		return
 	}
+	ctx = snap.Within(ctx)
+	c, err := snap.Counts(ctx, "")
+	if err != nil {
+		writeTasksError(w, err)
+		return
+	}
+	s.queueCounted(ctx, g, &c, nil)
 	d.Counts = wireCounters(c)
 	for _, id := range def.Badge {
 		v, _ := def.View(id)

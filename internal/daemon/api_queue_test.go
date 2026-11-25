@@ -21,6 +21,7 @@ import (
 	"github.com/wloophq/wloop/internal/client/menubar"
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/messages"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/decision"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
@@ -595,5 +596,26 @@ func TestTheQueueViewsCounterCountsItsQueuesItems(t *testing.T) {
 	served := q.s.counters(context.Background())
 	if all := q.all(t); view == "" || all.Total != 2 || c.Views[view] != 2 || page.Counters.Views[view] != 2 || served.Views[view] != 2 {
 		t.Fatalf("view %q: queue %d, counters %d, page %d, change %d; want the queue's items counted alike", view, all.Total, c.Views[view], page.Counters.Views[view], served.Views[view])
+	}
+}
+
+// A profile that badges the queue view, and walks it in the review, gets the
+// queue's item count there too.
+func TestTheDigestAndTheReviewCountTheQueueViewByItsItems(t *testing.T) {
+	t.Parallel()
+	l := *bundledLoaded()
+	l.Views.Badge = []string{"needs-you"}
+	l.Views.Review = []intentload.ReviewStepDef{{View: "needs-you", Label: "What waits on you?"}}
+	q := newQueueRig(t, func(d *Deps) { d.Intents = func() *intentload.Loaded { return &l } })
+	q.g.ServeProjects(coretasks.ProjectDeps{Store: q.db.Projects()})
+	q.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "ship the retries"})
+	q.open(t, "t-0000000000000001", gate.KindQuestion, "7", time.Hour)
+	q.open(t, "t-0000000000000001", gate.KindDraft, "41", 2*time.Hour)
+	var d api.Digest
+	get(t, q.s, api.DigestPath+"?day=2026-10-08", &d)
+	var rv api.Review
+	get(t, q.s, api.ReviewPath, &rv)
+	if d.Counts.Views["needs-you"] != 2 || len(rv.Steps) != 1 || rv.Steps[0].Count != 2 {
+		t.Fatalf("digest %d, review %+v; want the queue's two items", d.Counts.Views["needs-you"], rv.Steps)
 	}
 }
