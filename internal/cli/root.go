@@ -10,7 +10,6 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/locale"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/domain/decision"
-	"github.com/wloophq/wloop/internal/domain/gate"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -380,7 +379,7 @@ func (e *Env) taskFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (b
 		Wakes:      db.Wakes(),
 		Links:      e.linkState,
 		Decisions:  func() decision.Map { return e.loadedIntents().Decisions.Map },
-		Unpinned:   e.unpinned,
+		Pinned:     e.pinnedDrafts,
 		Extraction: psource.NewSnapshots(db.Snapshots()).Unextracted,
 		RoleProp: func(r task.Role) string {
 			name, _ := e.loadedIntents().Tasks.PropOf(r)
@@ -399,13 +398,14 @@ func (e *Env) taskFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (b
 	})
 }
 
-// unpinned are gs but the draft gates an open question pins, as the daemon's gates service says; every one
-// before the service is built.
-func (e *Env) unpinned(ctx context.Context, gs []gate.Gate) ([]gate.Gate, error) {
-	if e.gates == nil {
-		return gs, nil
+// pinnedDrafts are the drafts an open message pins, as the daemon's gates service says; none before the
+// service is built.
+func (e *Env) pinnedDrafts(ctx context.Context) (map[int64]int64, error) {
+	svc, _ := e.builtGates()
+	if svc == nil {
+		return nil, nil
 	}
-	return e.gates.Unpinned(ctx, gs)
+	return svc.Pinned(ctx)
 }
 
 // linkState is what the daemon's read model holds of u for the task facts; nothing before the daemon is built.

@@ -16,9 +16,11 @@ import (
 	"github.com/wloophq/wloop/internal/domain/decision"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
@@ -87,6 +89,13 @@ func (s *Server) queueItems(ctx context.Context, g *coretasks.Service, its []hom
 	vs := s.taskViews(ctx, g, false)
 	vs.readRows(ctx, tasks)
 	byUnit := map[unit.Unit][]items.Item{}
+	var pinned map[int64]int64
+	if svc := s.deps.Gates; svc != nil {
+		var err error
+		if pinned, err = svc.Pinned(ctx); err != nil {
+			return nil, err
+		}
+	}
 	out := []api.QueueItem{}
 	for _, it := range its {
 		v, err := vs.view(ctx, it.Task)
@@ -97,7 +106,9 @@ func (s *Server) queueItems(ctx context.Context, g *coretasks.Service, its []hom
 		if g := it.Found.Gate; g != nil {
 			gv := s.gateView(ctx, *g, byUnit)
 			qi.Gate = &gv
-			qi.Options = s.questionOptions(ctx, *g, byUnit)
+			if qi.Options, err = s.questionOptions(ctx, *g, pinned, byUnit); err != nil {
+				return nil, err
+			}
 		} else {
 			qi.Situation = &api.QueueSituation{Provider: string(it.Found.Unit.Provider), Kind: it.Found.Situation, Label: it.Situation}
 		}
@@ -106,44 +117,66 @@ func (s *Server) queueItems(ctx context.Context, g *coretasks.Service, its []hom
 	return out, nil
 }
 
-// questionOptions are the options of question gate q when one pins a held draft q decides (gates.Service.PinnedBy),
-// each with its draft's gate; nil when none does.
-func (s *Server) questionOptions(ctx context.Context, q gate.Gate, byUnit map[unit.Unit][]items.Item) []api.QueueOption {
-	if q.Kind != gate.KindQuestion || s.deps.Gates == nil || s.deps.GateReader == nil {
-		return nil
+// questionOptions are the choices of question gate q when its message pins drafts (pinned, by draft, the message
+// that pins each), each with its draft's gate: an option's, or a confirm's yes and no. Nil when the message pins
+// none. The pinned drafts' own gates make no item, so a message that cannot be read is an error, not a question
+// without its drafts.
+func (s *Server) questionOptions(ctx context.Context, q gate.Gate, pinned map[int64]int64, byUnit map[unit.Unit][]items.Item) ([]api.QueueOption, error) {
+	id, err := strconv.ParseInt(q.Subject, 10, 64)
+	if q.Kind != gate.KindQuestion || err != nil || !pinsAny(pinned, id) {
+		return nil, nil
 	}
-	m, ok := s.messageOf(ctx, q)
-	if !ok {
-		return nil
+	if s.deps.Messages == nil || s.deps.GateReader == nil {
+		return nil, fmt.Errorf("question gate %d pins drafts, and the daemon reads no messages or gates", q.ID)
 	}
-	out := make([]api.QueueOption, len(m.Options))
-	pins := false
-	for i, o := range m.Options {
-		out[i] = api.QueueOption{ID: o.ID, Label: o.Label, Recommended: o.ID == m.Recommend}
-		if o.Draft == nil {
-			continue
+	m, ok, err := s.deps.Messages.Store.Message(ctx, id)
+	switch {
+	case err != nil:
+		return nil, fmt.Errorf("the message of question gate %d, which pins drafts: %w", q.ID, err)
+	case !ok:
+		return nil, fmt.Errorf("the message of question gate %d, which pins drafts, is gone", q.ID)
+	}
+	draftGate := func(ref *record.DraftRef) (*api.GateView, error) {
+		if ref == nil || pinned[ref.ID] != m.ID {
+			return nil, nil
 		}
-		drafted, err := s.deps.GateReader.Where(ctx, gates.Query{Kind: gate.KindDraft, Subjects: []string{strconv.FormatInt(o.Draft.ID, 10)}})
+		gs, err := s.deps.GateReader.Where(ctx, gates.Query{Kind: gate.KindDraft, Subjects: []string{strconv.FormatInt(ref.ID, 10)}})
+		if err != nil || len(gs) == 0 {
+			return nil, err
+		}
+		v := s.gateView(ctx, gs[len(gs)-1], byUnit)
+		return &v, nil
+	}
+	var out []api.QueueOption
+	if m.Confirm {
+		yes, err := draftGate(m.Draft)
 		if err != nil {
-			s.logf("the gate of the draft option %s of question gate %d pins: %v", o.ID, q.ID, err)
-			continue
+			return nil, err
 		}
-		for _, dg := range drafted {
-			by, ok, err := s.deps.Gates.PinnedBy(ctx, dg)
-			if err != nil {
-				s.logf("whether question gate %d pins draft gate %d: %v", q.ID, dg.ID, err)
-			}
-			if ok && by.ID == q.ID {
-				v := s.gateView(ctx, dg, byUnit)
-				out[i].Draft, pins = &v, true
-				break
-			}
+		out = []api.QueueOption{
+			{ID: "yes", Label: s.notice(builtin.NoticeNotifyYes, nil), Recommended: m.Recommend == "yes", Draft: yes},
+			{ID: "no", Label: s.notice(builtin.NoticeNotifyNo, nil), Recommended: m.Recommend == "no"},
+		}
+		return out, nil
+	}
+	for _, o := range m.Options {
+		d, err := draftGate(o.Draft)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, api.QueueOption{ID: o.ID, Label: o.Label, Recommended: o.ID == m.Recommend, Draft: d})
+	}
+	return out, nil
+}
+
+// pinsAny says whether message pins a draft of pinned.
+func pinsAny(pinned map[int64]int64, message int64) bool {
+	for _, m := range pinned {
+		if m == message {
+			return true
 		}
 	}
-	if !pins {
-		return nil
-	}
-	return out
+	return false
 }
 
 // primaryLabel is what the button of item's primary action says: its gate intent's, its catalog action's, or

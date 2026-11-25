@@ -267,6 +267,8 @@ type Env struct {
 	// reads them.
 	gates      *gates.Service
 	gateReader gates.Reader
+	// gatesMu guards gates and gateReader, which newGates builds on first use from more than one goroutine.
+	gatesMu *sync.Mutex
 	// consequences apply the resolved plan and trust gates: the daemon
 	// serve built, nil before it.
 	consequences gateConsequences
@@ -324,6 +326,7 @@ type Env struct {
 // through it.
 func (e *Env) owning() *Env {
 	e.background = &sync.WaitGroup{}
+	e.gatesMu = &sync.Mutex{}
 	e.effectProblems = &effectProblems{}
 	e.budget = &githubBudget{}
 	return e

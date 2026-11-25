@@ -23,6 +23,8 @@ import (
 // gates of db, worded and decided by the profile as it loads now, each on
 // the task of its unit, which the daemon's tasks service opens when none is.
 func (e *Env) newGates(db *sqlite.DB, logf func(string, ...any)) *gates.Service {
+	e.gatesMu.Lock()
+	defer e.gatesMu.Unlock()
 	if e.gates == nil {
 		st := db.Gates(e.Now)
 		e.gateReader = st
@@ -32,6 +34,13 @@ func (e *Env) newGates(db *sqlite.DB, logf func(string, ...any)) *gates.Service 
 			Deliverer: daemonConsequences{e}, Decider: daemonConsequences{e}, Sessions: drivenSessions{e}, Options: messageOptions{e}})
 	}
 	return e.gates
+}
+
+// builtGates are the daemon's gates service and reader once newGates built them; nil before.
+func (e *Env) builtGates() (*gates.Service, gates.Reader) {
+	e.gatesMu.Lock()
+	defer e.gatesMu.Unlock()
+	return e.gates, e.gateReader
 }
 
 // messageOptions are the messages service's option drafts, read at each resolution: a daemon without one
@@ -50,6 +59,13 @@ func (m messageOptions) Pinning(ctx context.Context, drafted gate.Gate) (gate.Ga
 		return gate.Gate{}, "", 0, false, nil
 	}
 	return m.e.messages.Pinning(ctx, drafted)
+}
+
+func (m messageOptions) PinnedDrafts(ctx context.Context) (map[int64]int64, error) {
+	if m.e.messages == nil {
+		return nil, nil
+	}
+	return m.e.messages.PinnedDrafts(ctx)
 }
 
 // drivenSessions are the turns service's sessions, read at each resolution: a daemon without one drives none.
@@ -321,10 +337,11 @@ func (g gateTasks) EndHeld(ctx context.Context, id task.ID, c task.Category) err
 type openGates struct{ e *Env }
 
 func (g openGates) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {
-	if g.e.gateReader == nil {
+	_, reader := g.e.builtGates()
+	if reader == nil {
 		return nil, nil
 	}
-	return g.e.gateReader.Where(ctx, q)
+	return reader.Where(ctx, q)
 }
 
 // proposalText words an item proposal of the ledger as the profile's first proposal gate does, as it loads now.

@@ -37,7 +37,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/core/wakes"
 	"github.com/wloophq/wloop/internal/domain/card"
-	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -104,11 +103,11 @@ func newTasksRig(t testing.TB, edit func(*Deps)) *tasksRig {
 			}
 			signals, situation, moved, _, err := r.s.LinkState(ctx, u)
 			return facttask.Link{Signals: signals, Situation: situation, Moved: moved}, err
-		}, func(ctx context.Context, gs []gate.Gate) ([]gate.Gate, error) {
+		}, func(ctx context.Context) (map[int64]int64, error) {
 			if r.s.deps.Gates == nil {
-				return gs, nil
+				return nil, nil
 			}
-			return r.s.deps.Gates.Unpinned(ctx, gs)
+			return r.s.deps.Gates.Pinned(ctx)
 		})
 		r.g = coretasks.New(withLens(coretasks.Deps{States: loadedHandlers{taskstest.BundledStates, loaded}, Authority: taskstest.BundledStates.Authority, Store: db.Tasks(), Items: r.ledger,
 			Facts: coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled, Me: func() task.Me { return meID }},

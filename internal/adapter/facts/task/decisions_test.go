@@ -84,14 +84,18 @@ func TestDecisionsSkipDraftPinnedByOpenQuestion(t *testing.T) {
 	}
 	open(gate.KindDraft, "101")
 	q := open(gate.KindQuestion, "9")
-	e.pins["101"] = q.ID
+	e.pins[101] = 9
 	if got := e.facts(id)["task.decisions"]; !slices.Equal(got.([]string), []string{"answer"}) {
 		t.Fatalf("task.decisions = %v, want the question alone", got)
 	}
 	if _, err := gs.Resolve(context.Background(), q.ID, gates.Resolution{Status: gate.Answered, Intent: "answer", By: task.ActorPerson}); err != nil {
 		t.Fatal(err)
 	}
+	if got := e.facts(id)["task.decisions"]; len(got.([]string)) != 0 {
+		t.Fatalf("task.decisions = %v while the answered message settles, want none", got)
+	}
+	delete(e.pins, 101)
 	if got := e.facts(id)["task.decisions"]; !slices.Equal(got.([]string), []string{"send-draft"}) {
-		t.Fatalf("task.decisions = %v once the question closed, want the draft back", got)
+		t.Fatalf("task.decisions = %v once the message closed, want the draft back", got)
 	}
 }

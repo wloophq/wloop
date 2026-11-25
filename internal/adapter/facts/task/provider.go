@@ -99,9 +99,9 @@ type Deps struct {
 	// Decisions is how the profile maps gates, situations and signals to decision kinds, for task.decisions;
 	// nil: none.
 	Decisions func() decision.Map
-	// Unpinned drops from a task's open gates the draft gates an open question pins (gates.Service.Unpinned),
-	// which its answer decides; nil drops none.
-	Unpinned func(ctx context.Context, gs []gate.Gate) ([]gate.Gate, error)
+	// Pinned are the drafts an open message pins (gates.Service.Pinned), whose draft gates task.decisions leaves
+	// out; nil: none.
+	Pinned func(ctx context.Context) (map[int64]int64, error)
 	// Extraction is when the oldest message of units still waiting to be extracted arrived, as their plugins'
 	// extraction health says, for task.extraction_lag; zero when none waits, and nil none ever does.
 	Extraction func(ctx context.Context, units []unit.Unit) (time.Time, error)
@@ -393,13 +393,11 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		sources = nil
 	}
 	if p.d.Decisions != nil {
-		decided := gs
-		if p.d.Unpinned != nil {
-			if decided, err = p.d.Unpinned(ctx, gs); err != nil {
-				return nil, err
-			}
+		pinned, err := p.pinned(ctx)
+		if err != nil {
+			return nil, err
 		}
-		if found := p.d.Decisions().Of(decided, sources); len(found) > 0 {
+		if found := p.d.Decisions().Of(gates.Unpinned(gs, pinned), sources); len(found) > 0 {
 			f["task.decisions"], f["task.decision_since"] = decision.Names(found), found[0].Since
 		}
 	}
@@ -835,6 +833,14 @@ func (p *Provider) gates(ctx context.Context, id task.ID) ([]gate.Gate, error) {
 	return slices.DeleteFunc(gs, func(g gate.Gate) bool { return g.Status != gate.Open }), err
 }
 
+// pinned are the drafts an open message pins; in a pass, read once.
+func (p *Provider) pinned(ctx context.Context) (map[int64]int64, error) {
+	if p.d.Pinned == nil {
+		return nil, nil
+	}
+	return coretasks.Once(ctx, passPinned, func() (map[int64]int64, error) { return p.d.Pinned(ctx) })
+}
+
 // wake is task id's wake; in a pass, every task's is read once.
 func (p *Provider) wake(ctx context.Context, id task.ID) (wake.Wake, bool, error) {
 	return coretasks.WakeIn(ctx, p.d.Wakes, id)
@@ -845,6 +851,7 @@ const (
 	passOpenTurns = "facts.open_turns"
 	passTurns     = "facts.turns"
 	passGates     = "facts.gates"
+	passPinned    = "facts.pinned"
 	passSettled   = "facts.settled."
 	passTask      = "facts.task."
 )

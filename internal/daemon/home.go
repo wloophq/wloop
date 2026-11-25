@@ -123,7 +123,7 @@ func (w homeWords) Plugin(p unit.ProviderID) home.PluginWords {
 
 func (w homeWords) Form(n int) string { return i18n.Form(w.l.Locale, float64(n)) }
 
-// taskDecisions are the decisions a task waits on: its open gates but the draft gates an open question pins,
+// taskDecisions are the decisions a task waits on: its open gates but the draft gates an open message pins,
 // read once for every task, and, while it is open, its units' situations and signals as the read model holds
 // them.
 type taskDecisions struct {
@@ -142,9 +142,11 @@ func (d *taskDecisions) Of(ctx context.Context, e task.Task) ([]decision.Found, 
 				return nil, err
 			}
 			if svc := d.s.deps.Gates; svc != nil {
-				if gs, err = svc.Unpinned(ctx, gs); err != nil {
+				pinned, err := svc.Pinned(ctx)
+				if err != nil {
 					return nil, err
 				}
+				gs = gates.Unpinned(gs, pinned)
 			}
 			for _, g := range gs {
 				d.open[g.Task] = append(d.open[g.Task], g)

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 	"sync"
 	"time"
 
@@ -330,33 +331,30 @@ func (s *Service) Decides(ctx context.Context, drafted gate.Gate) error {
 	return fmt.Errorf("%w: question gate %d decides draft gate %d: answer the question", ErrRefused, q.ID, drafted.ID)
 }
 
-// PinnedBy is the open question gate whose message pins open draft gate drafted's draft, in an option or its
-// confirm; false when none does. That question's answer decides the draft, which then waits on no decision of
-// its own.
-func (s *Service) PinnedBy(ctx context.Context, drafted gate.Gate) (gate.Gate, bool, error) {
-	if s.d.Options == nil || drafted.Kind != gate.KindDraft || drafted.Status != gate.Open {
-		return gate.Gate{}, false, nil
+// Pinned are the drafts an open message pins, by draft id, each with the id of the message that pins it. Such a
+// draft waits on that message's question: close refuses approving its own gate until the message closes, settled
+// after its answer, so the draft is no decision of its own until then.
+func (s *Service) Pinned(ctx context.Context) (map[int64]int64, error) {
+	if s.d.Options == nil {
+		return nil, nil
 	}
-	q, _, _, ok, err := s.d.Options.Pinning(ctx, drafted)
-	if err != nil || !ok || q.ID == 0 || q.Status != gate.Open {
-		return gate.Gate{}, false, err
-	}
-	return q, true, nil
+	return s.d.Options.PinnedDrafts(ctx)
 }
 
-// Unpinned are gs but the draft gates an open question pins (PinnedBy), in gs's order.
-func (s *Service) Unpinned(ctx context.Context, gs []gate.Gate) ([]gate.Gate, error) {
+// Unpinned are gs but the draft gates whose draft pinned (Service.Pinned) holds, in gs's order.
+func Unpinned(gs []gate.Gate, pinned map[int64]int64) []gate.Gate {
 	out := make([]gate.Gate, 0, len(gs))
 	for _, g := range gs {
-		_, pinned, err := s.PinnedBy(ctx, g)
-		if err != nil {
-			return nil, err
+		if g.Kind == gate.KindDraft {
+			if id, err := strconv.ParseInt(g.Subject, 10, 64); err == nil {
+				if _, ok := pinned[id]; ok {
+					continue
+				}
+			}
 		}
-		if !pinned {
-			out = append(out, g)
-		}
+		out = append(out, g)
 	}
-	return out, nil
+	return out
 }
 
 // Supersede closes open gate id as superseded by by, its subject gone or
