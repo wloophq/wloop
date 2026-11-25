@@ -600,6 +600,9 @@ func LoadBytes(file string, raw []byte, base Config) (Config, error) {
 	if err := c.validatePluginDrafts(); err != nil {
 		return base, fmt.Errorf("%s: %w", file, err)
 	}
+	if _, err := time.Parse("15:04", c.Window.FloatMorning); err != nil {
+		return base, fmt.Errorf("%s: window.float_morning %q is not HH:MM, such as 09:00", file, c.Window.FloatMorning)
+	}
 	return c, nil
 }
 

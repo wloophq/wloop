@@ -76,8 +76,8 @@ type Config struct {
 	// Defaults keeps the float's visibility across launches; nil keeps it
 	// for this run only.
 	Defaults window.Defaults
-	// FloatMorning is the local "HH:MM" a snooze until tomorrow ends at;
-	// "" is 09:00.
+	// FloatMorning is the local "HH:MM" a snooze until tomorrow ends at,
+	// window.float_morning.
 	FloatMorning string
 	// Reword gets each catalog of client strings the daemon serves, as the
 	// strings change; nil rewords nothing.
@@ -145,7 +145,7 @@ type Controller struct {
 	started, running, stopped bool
 	// wake stops the timer of the snooze, under floatMu.
 	wake chan struct{}
-	// bg are the goroutines the float starts, which Run waits on.
+	// bg are the goroutines Run starts and the float's, which Run waits on.
 	bg sync.WaitGroup
 }
 
@@ -228,7 +228,7 @@ func (c *Controller) Run(ctx context.Context) error {
 	c.StartFloat()
 	c.runFloat()
 	if c.cfg.DigestAt != "" {
-		go c.digests(ctx)
+		c.bg.Go(func() { c.digests(ctx) })
 	}
 	go func() {
 		if _, err := c.cfg.Notifier.Authorize(ctx); err != nil && ctx.Err() == nil {

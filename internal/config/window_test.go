@@ -32,12 +32,14 @@ func TestConfigWindowDefaults(t *testing.T) {
 	}
 }
 
-func TestConfigWindowFloatIsOnOrOff(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := os.WriteFile(path, []byte(`window = {float = "yes"}`), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := LoadFile(path, tools()); err == nil {
-		t.Fatal("window.float = \"yes\" loaded")
+func TestConfigWindowFloatRefusesBadValues(t *testing.T) {
+	for _, raw := range []string{`window = {float = "yes"}`, `window = {float_morning = "9am"}`, `window = {float_morning = ""}`} {
+		path := filepath.Join(t.TempDir(), "config.toml")
+		if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := LoadFile(path, tools()); err == nil {
+			t.Errorf("%s loaded", raw)
+		}
 	}
 }

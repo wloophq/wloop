@@ -75,7 +75,7 @@ It shows in one of four ways, kept with its place on screen in the app's user de
 |---|---|---|
 | shown | on screen | |
 | quiet | hidden | something new arrives in Needs you, while the app was closed included; a burst of arrivals brings it back once |
-| snoozed | hidden; arrivals wait in Needs you | an hour passes, or the next `window.float_morning` (local `09:00`), as you picked; a snooze that ended while the Mac slept shows it on the next refresh, and one that ended while the app was closed shows it at launch |
+| snoozed | hidden; arrivals wait in Needs you | an hour passes, or the next `window.float_morning` (local `09:00`), as you picked; a snooze that ended while the Mac slept shows it within a minute of waking, and one that ended while the app was closed shows it at launch |
 | off | hidden; every pending Needs you banner posts again, at once | you turn it back on |
 
 The panel's menu hides it until something new (quiet), for an hour or until tomorrow (snoozed), and ⌥-click on the pill quiets it. The global shortcut `window.float_hotkey` (`cmd+option+.`; `""` for none; bound only while `window.float` is on) quiets a shown widget and shows a hidden one; its default leaves out `ctrl+option`, the VoiceOver modifier. The menu bar's Floating widget item, checked while the widget is on, hidden for a while included, turns a shown widget off and shows it in any other mode. A shortcut that does not parse, or that the system refuses, is logged as `window.float_hotkey` with the chord.

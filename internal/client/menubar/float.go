@@ -13,11 +13,12 @@ import (
 )
 
 // Visibility is how the floating widget shows: Mode, for a snooze the time
-// it shows again, and while quiet the keys of the queue the user last saw.
+// it shows again, and while quiet the keys of the queue the user last saw;
+// nil Seen is none read yet, an empty one an empty queue.
 type Visibility struct {
 	Mode  string    `json:"mode"`
 	Until time.Time `json:"until,omitzero"`
-	Seen  []string  `json:"seen,omitempty"`
+	Seen  []string  `json:"seen"`
 }
 
 // The float's modes. Quiet hides it until something new arrives in the queue,
@@ -44,24 +45,21 @@ var VisibilityKey = window.PlacementKey + ".visibility"
 // snoozeHour is how long "Hide for 1 hour" hides the float.
 const snoozeHour = time.Hour
 
+// snoozeTick is how often a snooze compares the wall clock with its end, since
+// a timer stands still while the Mac sleeps.
+const snoozeTick = time.Minute
+
 type clockTime struct{ hour, minute int }
 
-// defaultMorning is when "Hide until tomorrow" ends while Config.FloatMorning
-// does not read.
-var defaultMorning = clockTime{9, 0}
-
 // morning is Config.FloatMorning, the local "HH:MM" a snooze until tomorrow
-// ends at.
-func (c *Controller) morning() clockTime {
-	if c.cfg.FloatMorning == "" {
-		return defaultMorning
-	}
+// ends at; false when it does not read.
+func (c *Controller) morning() (clockTime, bool) {
 	t, err := time.Parse("15:04", c.cfg.FloatMorning)
 	if err != nil {
-		c.cfg.Log("float: window.float_morning %q is not HH:MM; using 09:00", c.cfg.FloatMorning)
-		return defaultMorning
+		c.cfg.Log("float: window.float_morning %q is not HH:MM", c.cfg.FloatMorning)
+		return clockTime{}, false
 	}
-	return clockTime{t.Hour(), t.Minute()}
+	return clockTime{t.Hour(), t.Minute()}, true
 }
 
 // nextMorning is the next time at after now, in now's location.
@@ -176,7 +174,9 @@ func (c *Controller) FloatHide(mode string) {
 	case HideHour:
 		c.setVisibility(Visibility{Mode: VisibilitySnoozed, Until: now.Add(snoozeHour)})
 	case HideTomorrow:
-		c.setVisibility(Visibility{Mode: VisibilitySnoozed, Until: nextMorning(now, c.morning())})
+		if at, ok := c.morning(); ok {
+			c.setVisibility(Visibility{Mode: VisibilitySnoozed, Until: nextMorning(now, at)})
+		}
 	default:
 		c.cfg.Log("float: no way to hide %q", mode)
 	}
@@ -230,7 +230,7 @@ func (c *Controller) setVisibility(v Visibility) {
 func (c *Controller) moveFloat(v Visibility) {
 	was := c.vis.Mode
 	if v.Mode == VisibilityQuiet && c.seen != nil {
-		v.Seen = slices.Sorted(maps.Keys(c.seen))
+		v.Seen = sortedKeys(c.seen)
 	}
 	c.vis = v
 	if c.wake != nil {
@@ -263,8 +263,9 @@ func (c *Controller) showFloat() {
 	}
 }
 
-// wakeAt shows the float at until unless it moved before; it runs under
-// floatMu, and starts nothing unless Run runs.
+// wakeAt shows the float at until, or the first tick past it on the wall
+// clock, unless it moved before; it runs under floatMu, and starts nothing
+// unless Run runs.
 func (c *Controller) wakeAt(until time.Time) {
 	if !c.running || c.stopped {
 		return
@@ -274,11 +275,21 @@ func (c *Controller) wakeAt(until time.Time) {
 	ctx := c.runCtx()
 	wait := c.cfg.After(until.Sub(c.cfg.Now()))
 	c.bg.Go(func() {
-		select {
-		case <-ctx.Done():
-		case <-stop:
-		case <-wait:
-			c.snoozeEnded(until)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-stop:
+				return
+			case <-wait:
+				c.snoozeEnded(until)
+				return
+			case <-c.cfg.After(snoozeTick):
+				if !c.cfg.Now().Before(until) {
+					c.snoozeEnded(until)
+					return
+				}
+			}
 		}
 	})
 }
@@ -335,10 +346,17 @@ func (c *Controller) floatRefreshed(queueRead bool) {
 		c.moveFloat(Visibility{Mode: VisibilityShown})
 		return
 	}
-	if seen := slices.Sorted(maps.Keys(keys)); !slices.Equal(seen, c.vis.Seen) {
+	if seen := sortedKeys(keys); c.vis.Seen == nil || !slices.Equal(seen, c.vis.Seen) {
 		c.vis.Seen = seen
 		c.saveVisibility()
 	}
+}
+
+// sortedKeys are m's keys in order, an empty slice for an empty m.
+func sortedKeys(m map[string]bool) []string {
+	keys := slices.AppendSeq(make([]string, 0, len(m)), maps.Keys(m))
+	slices.Sort(keys)
+	return keys
 }
 
 func setOf(keys []string) map[string]bool {

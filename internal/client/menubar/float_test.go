@@ -55,12 +55,13 @@ func floatRig(t *testing.T, d *fakeDefaults) (*rig, *floatHost) {
 	h := &floatHost{}
 	cfg := Config{
 		Daemon: r.d, Tray: r.tray, Notifier: r.notes,
-		OpenURL:    func(u string) error { return nil },
-		CockpitURL: func(route string) (string, error) { return "cockpit#" + route, nil },
-		Quit:       func() {},
-		Float:      true,
-		ShowFloat:  h.show,
-		HideFloat:  h.hide,
+		OpenURL:      func(u string) error { return nil },
+		CockpitURL:   func(route string) (string, error) { return "cockpit#" + route, nil },
+		Quit:         func() {},
+		Float:        true,
+		FloatMorning: "09:00",
+		ShowFloat:    h.show,
+		HideFloat:    h.hide,
 	}
 	if d != nil {
 		cfg.Defaults = d
@@ -503,12 +504,20 @@ func TestTheMorningIsTheConfiguredTime(t *testing.T) {
 	})
 }
 
-func TestAnUnreadableMorningIsNine(t *testing.T) {
-	r, _ := floatRig(t, nil)
-	r.c.cfg.FloatMorning = "9am"
-	if got := r.c.morning(); got != nine {
-		t.Fatalf("morning %v, want 09:00", got)
-	}
+func TestAnUnreadableMorningHidesNothing(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r, h := floatRig(t, nil)
+		r.c.cfg.FloatMorning = "9am"
+		r.d.events = make(chan api.Change)
+		stop := run(t, r)
+		defer stop()
+		synctest.Wait()
+		r.c.FloatHide(HideTomorrow)
+		synctest.Wait()
+		if _, hides := h.counts(); hides != 0 || r.mode() != VisibilityShown {
+			t.Fatalf("an unreadable morning hid the float (%d) into %q", hides, r.mode())
+		}
+	})
 }
 
 // Items that arrived while the app was closed bring a quiet float back.
@@ -640,6 +649,68 @@ func TestTheFloatShowsWhileTheDaemonIsDownAtLaunch(t *testing.T) {
 		r.c.ToggleFloat()
 		if _, hides := h.counts(); hides != 1 {
 			t.Fatalf("the hotkey did nothing while the daemon was down: hidden %d", hides)
+		}
+	})
+}
+
+// Quieted over an empty queue, the float knows after a relaunch that any item
+// is new.
+func TestQuietOverAnEmptyQueueSurvivesARelaunch(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDefaults{}
+		r, _ := floatRig(t, d)
+		r.d.events = make(chan api.Change)
+		stop := run(t, r)
+		synctest.Wait()
+		r.c.FloatHide(HideQuiet)
+		synctest.Wait()
+		stop()
+
+		r2, h2 := floatRig(t, d)
+		r2.d.events = make(chan api.Change)
+		r2.d.queue = queueOf(1)
+		stop2 := run(t, r2)
+		defer stop2()
+		synctest.Wait()
+		if shows, _ := h2.counts(); shows != 1 || r2.mode() != VisibilityShown {
+			t.Fatalf("relaunched quiet over an empty queue, one item served: shown %d, mode %q", shows, r2.mode())
+		}
+	})
+}
+
+// A snooze whose timer stood still while the Mac slept ends within a tick of
+// its time on the wall clock, though nothing refreshes.
+func TestAnIdleSnoozeThatSleptPastUntilShowsWithinATick(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r, h := floatRig(t, nil)
+		r.d.events = make(chan api.Change)
+		var mu sync.Mutex
+		at := time.Date(2026, 11, 25, 10, 0, 0, 0, time.UTC)
+		start := time.Now()
+		r.c.cfg.Now = func() time.Time { mu.Lock(); defer mu.Unlock(); return at.Add(time.Since(start)) }
+		r.c.cfg.After = func(d time.Duration) <-chan time.Time {
+			if d > snoozeTick {
+				return make(chan time.Time)
+			}
+			return time.After(d)
+		}
+		stop := run(t, r)
+		defer stop()
+		synctest.Wait()
+		r.c.FloatHide(HideHour)
+		synctest.Wait()
+		mu.Lock()
+		at = at.Add(2 * time.Hour)
+		mu.Unlock()
+		time.Sleep(snoozeTick - time.Nanosecond)
+		synctest.Wait()
+		if shows, _ := h.counts(); shows != 1 {
+			t.Fatalf("shown %d times before the tick", shows)
+		}
+		time.Sleep(time.Nanosecond)
+		synctest.Wait()
+		if shows, _ := h.counts(); shows != 2 || r.mode() != VisibilityShown {
+			t.Fatalf("a tick after waking past the snooze: shown %d, mode %q", shows, r.mode())
 		}
 	})
 }
