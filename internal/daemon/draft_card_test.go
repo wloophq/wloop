@@ -83,8 +83,11 @@ func TestDraftCardServesEveryPayloadValue(t *testing.T) {
 	if !got["/comments/0/body"].Markdown || got["/comments/0/path"].Markdown {
 		t.Errorf("body markdown %v, path markdown %v: want only the field the plugin words as Markdown", got["/comments/0/body"].Markdown, got["/comments/0/path"].Markdown)
 	}
-	if v.Verdict != "Request changes" {
-		t.Errorf("verdict %q, want the kind's verdict field as its plugin words it", v.Verdict)
+	if v.Verdict != "Request changes" || v.VerdictTone != "err" {
+		t.Errorf("verdict %q in %q, want the kind's verdict field as its plugin words and tones it", v.Verdict, v.VerdictTone)
+	}
+	if v.CommentsAt != "/comments" {
+		t.Errorf("comments at %q, want the list the plugin names as the kind's comments", v.CommentsAt)
 	}
 	if ev.Tone != "err" || ev.Options[0].Tone != "loop" || got["/comments/0/path"].Tone != "" {
 		t.Errorf("verdict tone %q, approve's %q, path's %q: want the plugin's tones of the values", ev.Tone, ev.Options[0].Tone, got["/comments/0/path"].Tone)

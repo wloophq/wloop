@@ -245,3 +245,16 @@ func TestTurnsLiveLabelsEachTurnWithItsIntentsLabel(t *testing.T) {
 		t.Fatalf("running %+v, want review labelled %q and an intent the registry lacks labelled by its name", got.Running, def.Label)
 	}
 }
+
+func TestTurnsLiveCountsEveryTurnDoneTodayBeyondTheListedOnes(t *testing.T) {
+	t.Parallel()
+	var ts []turn.Turn
+	for i := range api.LiveDoneMax + 5 {
+		end := turnsNow.Add(-time.Duration(i+1) * time.Minute)
+		ts = append(ts, liveTurnAt(int64(i+1), "review", turn.Done, end.Add(-time.Minute), end))
+	}
+	got := getTurnsLive(t, turnsLiveServer(t, ts...))
+	if len(got.Done) != api.LiveDoneMax || got.DoneToday != api.LiveDoneMax+5 {
+		t.Errorf("done %d listed, %d today; want %d listed, %d today", len(got.Done), got.DoneToday, api.LiveDoneMax, api.LiveDoneMax+5)
+	}
+}

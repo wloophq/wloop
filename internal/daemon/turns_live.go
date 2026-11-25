@@ -71,6 +71,7 @@ func (s *Server) liveTurns(ctx context.Context, byUnit map[unit.Unit][]turn.Turn
 	}
 	slices.SortFunc(out.Running, func(a, b api.LiveTurn) int { return cmp.Compare(a.Seq, b.Seq) })
 	slices.SortFunc(out.Done, func(a, b api.LiveTurn) int { return cmp.Or(b.Ended.Compare(a.Ended), cmp.Compare(b.Seq, a.Seq)) })
+	out.DoneToday = len(out.Done)
 	out.Done = out.Done[:min(len(out.Done), api.LiveDoneMax)]
 	for intent, ds := range spans {
 		out.Usual[intent] = api.QuantilesOf(ds).P50MS

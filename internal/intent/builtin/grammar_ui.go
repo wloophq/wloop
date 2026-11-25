@@ -73,6 +73,7 @@ var uiGrammar = []Key{
 	{Path: "drafts", In: SurfaceUI, Kind: KindMap, Doc: "The words of a draft's payload on its card, by the draft kind the manifest declares; a field with no word shows as its key, a value with none as itself."},
 	{Path: "drafts.*", In: SurfaceUI, Kind: KindTable, Doc: "One draft kind's words."},
 	{Path: "drafts.*.label", In: SurfaceUI, Localized: true, Kind: KindText, Doc: "What the draft kind is called to a person, such as \"Review\": the Outbox's name for the kind, and the head of its group when drafts group by kind. A kind with no label shows its name."},
+	{Path: "drafts.*.comments", In: SurfaceUI, Kind: KindText, Doc: "The JSON pointer of the payload's list whose records are the draft's comments, such as a review's inline comments, \"/comments\": the floating widget lists and counts them on the draft's card. None when unset."},
 	{Path: "drafts.*.fields", In: SurfaceUI, Kind: KindMap, Doc: "The payload's fields, by the key they have in the payload, at any depth."},
 	{Path: "drafts.*.fields.*", In: SurfaceUI, Kind: KindTable, Doc: "One field's words."},
 	{Path: "drafts.*.fields.*.label", In: SurfaceUI, Localized: true, Kind: KindText, Doc: "The field's name on the card."},

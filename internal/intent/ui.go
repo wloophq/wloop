@@ -58,6 +58,8 @@ type UIDraft struct {
 	// Label is what the kind is called to a person.
 	Label  string                  `toml:"label"`
 	Fields map[string]UIDraftField `toml:"fields"`
+	// Comments is the JSON pointer of the payload's list whose records are the draft's comments.
+	Comments string `toml:"comments"`
 }
 
 // UIDraftField is a payload field's name and its values' words, by value.
@@ -299,6 +301,9 @@ func mergeUI(into, over UITexts) UITexts {
 	into.Drafts = mergeMap(into.Drafts, over.Drafts, func(a, b UIDraft) UIDraft {
 		if b.Label != "" {
 			a.Label = b.Label
+		}
+		if b.Comments != "" {
+			a.Comments = b.Comments
 		}
 		a.Fields = mergeMap(a.Fields, b.Fields, func(x, y UIDraftField) UIDraftField {
 			if y.Label != "" {

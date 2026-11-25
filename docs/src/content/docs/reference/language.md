@@ -1035,6 +1035,7 @@ The fields each notice reads besides `Name` and `Command`:
 - `drafts` (table by name): The words of a draft's payload on its card, by the draft kind the manifest declares; a field with no word shows as its key, a value with none as itself.
 - `drafts.<name>` (table): One draft kind's words.
 - `drafts.<name>.label` (string, localized): What the draft kind is called to a person, such as "Review": the Outbox's name for the kind, and the head of its group when drafts group by kind. A kind with no label shows its name.
+- `drafts.<name>.comments` (string): The JSON pointer of the payload's list whose records are the draft's comments, such as a review's inline comments, "/comments": the floating widget lists and counts them on the draft's card. None when unset.
 - `drafts.<name>.fields` (table by name): The payload's fields, by the key they have in the payload, at any depth.
 - `drafts.<name>.fields.<name>` (table): One field's words.
 - `drafts.<name>.fields.<name>.label` (string, localized): The field's name on the card.

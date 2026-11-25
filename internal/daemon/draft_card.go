@@ -34,7 +34,12 @@ func (s *Server) cardFields(ctx context.Context, d draft.Draft, g gate.Gate, v *
 		v.Fields = s.payloadFields(publisher, string(d.Kind), d.Payload, spec, declared)
 		if declared && spec.Verdict != "" {
 			if f, ok := fieldAt(v.Fields, spec.Verdict); ok {
-				v.Verdict = cmp.Or(f.Shown, f.Value)
+				v.Verdict, v.VerdictTone = cmp.Or(f.Shown, f.Value), f.Tone
+			}
+		}
+		if at := s.loaded().UI[publisher].Drafts[string(d.Kind)].Comments; at != "" {
+			if f, ok := fieldAt(v.Fields, at); ok && len(f.Fields) > 0 {
+				v.CommentsAt = at
 			}
 		}
 	}

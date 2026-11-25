@@ -344,6 +344,7 @@ label = "Edit"
 
 [drafts.review]
 label = "Review"
+comments = "/comments"
 
 [drafts.thread_reply]
 label = "Reply in a thread"

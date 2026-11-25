@@ -87,6 +87,10 @@
         "additionalProperties": false,
         "description": "One draft kind's words.",
         "properties": {
+          "comments": {
+            "description": "The JSON pointer of the payload's list whose records are the draft's comments, such as a review's inline comments, \"/comments\": the floating widget lists and counts them on the draft's card. None when unset.",
+            "type": "string"
+          },
           "fields": {
             "additionalProperties": {
               "additionalProperties": false,

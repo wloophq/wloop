@@ -21,13 +21,14 @@ type LiveTurn struct {
 }
 
 // LiveTurns are the running turns, the turns that ended since the user's local midnight (newest first, at most
-// LiveDoneMax), the number of turns asking the user, and the usual duration in milliseconds of each intent's turns
-// over the last LiveUsualDays days.
+// LiveDoneMax) and how many ended then in all, the number of turns asking the user, and the usual duration in
+// milliseconds of each intent's turns over the last LiveUsualDays days.
 type LiveTurns struct {
-	Running []LiveTurn       `json:"running"`
-	Done    []LiveTurn       `json:"done"`
-	Asked   int              `json:"asked"`
-	Usual   map[string]int64 `json:"usual"`
+	Running   []LiveTurn       `json:"running"`
+	Done      []LiveTurn       `json:"done"`
+	DoneToday int              `json:"done_today"`
+	Asked     int              `json:"asked"`
+	Usual     map[string]int64 `json:"usual"`
 }
 
 const (
