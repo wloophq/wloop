@@ -69,13 +69,15 @@ func runAppClient(ctx context.Context, e *Env) error {
 	e.RunNative(win, appWords(ctx, client.New(e.Socket)), func(tray menubar.Tray, notes menubar.Notifier, host window.Host) {
 		dc := client.New(e.Socket)
 		cockpit := func(route string) (string, error) { return cockpitURL(e.StateDir, route) }
+		show, showFloat := windowShow(ctx, &wg, host, dc, cockpit, win, logf)
 		c := menubar.New(menubar.Config{
 			Daemon:     dc,
 			Tray:       tray,
 			Notifier:   notes,
 			OpenURL:    func(u string) error { return e.openInBrowser(context.Background(), u) },
 			CockpitURL: cockpit,
-			Window:     windowShow(ctx, &wg, host, dc, cockpit, win, logf),
+			Window:     show,
+			ShowFloat:  showFloat,
 			Reword:     rewordOf(host),
 			Quit:       cancel,
 			Copy:       copyToClipboard,

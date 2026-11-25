@@ -4,9 +4,13 @@ package wails
 
 import (
 	"encoding/json"
+	"math"
+	"net/url"
 	"os"
 	"runtime"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/ebitengine/purego/objc"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -33,15 +37,21 @@ func Available() bool { return true }
 // thread, and never returns: quitting the app ends the process.
 func Run(name string, cat *texts.Catalog, ready func(window.Host)) {
 	runtime.LockOSThread()
+	var h *host
 	app := application.New(application.Options{
 		Name: name,
 		Mac: application.MacOptions{
 			ActivationPolicy: application.ActivationPolicyAccessory,
 			ApplicationShouldTerminateAfterLastWindowClosed: false,
 		},
+		RawMessageHandler: func(w application.Window, message string, origin *application.OriginInfo) {
+			if origin != nil {
+				h.pageMessage(w.Name(), message, origin.Origin, origin.IsMainFrame)
+			}
+		},
 	})
 	app.Menu.Set(wailsMenu(menuOf(name, cat)))
-	h := newHost(app, name)
+	h = newHost(app, name)
 	app.Event.OnApplicationEvent(events.Mac.ApplicationDidFinishLaunching, func(*application.ApplicationEvent) {
 		go application.InvokeSync(func() {
 			h.launched()
@@ -56,7 +66,11 @@ func Run(name string, cat *texts.Catalog, ready func(window.Host)) {
 	app.Event.OnApplicationEvent(events.Common.ApplicationLaunchedWithUrl, func(e *application.ApplicationEvent) {
 		h.openURL(e.Context().URL())
 	})
+	app.Event.OnApplicationEvent(events.Mac.ApplicationDidChangeScreenParameters, func(*application.ApplicationEvent) {
+		h.do(h.screensChanged)
+	})
 	_ = app.Run()
+	h.stop()
 	os.Exit(0)
 }
 
@@ -95,14 +109,21 @@ var wailsRole = map[role]application.Role{
 // host runs every request in order on its own goroutine, so a caller never
 // waits on the main thread.
 type host struct {
-	app         *application.App
-	name        string
-	main, panel *application.WebviewWindow
+	userDefaults
+	app                *application.App
+	name               string
+	main, panel, float *application.WebviewWindow
 
 	mu        sync.Mutex
 	queue     []func()
 	wake      chan struct{}
 	listening window.Handlers
+	// done stops the worker and every release poll; running is them, which
+	// stop waits for.
+	done    chan struct{}
+	running sync.WaitGroup
+	// native is how the host reads and moves the float in AppKit.
+	native floatNative
 
 	// links orders the deep links handed to the controller; pending are
 	// those that came before it listened.
@@ -118,10 +139,46 @@ type host struct {
 	// focus loss is the person leaving it, not a late event of an earlier
 	// show.
 	panelKey bool
+	floatURL string
+	// floatShown, floatFrame, the frame last set or dropped, floatMode, the
+	// mode the float's page last said it draws in, and dragging, from the
+	// first move the person made to the drop.
+	floatShown bool
+	floatFrame window.Rect
+	floatMode  string
+	dragging   bool
+	// handBackDue says a hand-back of the keyboard waits for the buttons to
+	// be up.
+	handBackDue bool
+	// floatKeyable is read on the main thread, where AppKit asks whether the
+	// float may become key.
+	floatKeyable atomic.Bool
+}
+
+const floatName = "float"
+
+// floatNative is the float's AppKit side the host reads and acts on.
+type floatNative struct {
+	buttonsUp func() bool
+	frame     func() window.Rect
+	isKey     func() bool
+	handBack  func()
+}
+
+func appKitFloat(w *application.WebviewWindow) floatNative {
+	return floatNative{
+		buttonsUp: mouseButtonsUp,
+		frame: func() (f window.Rect) {
+			application.InvokeSync(func() { f = frameOf(nsWindow(w)) })
+			return f
+		},
+		isKey:    func() bool { return isKey(w) },
+		handBack: func() { application.InvokeSync(func() { handBackKeyboard(nsWindow(w)) }) },
+	}
 }
 
 func newHost(app *application.App, name string) *host {
-	h := &host{app: app, name: name, wake: make(chan struct{}, 1), detached: map[string]*detachedWindow{}}
+	h := &host{app: app, name: name, detached: map[string]*detachedWindow{}}
 	h.main = app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name: "main", Title: name, URL: "about:blank", Width: 1280, Height: 820, Hidden: true,
 		Mac: insetTitleBar,
@@ -137,6 +194,22 @@ func newHost(app *application.App, name string) *host {
 				application.MacWindowCollectionBehaviorFullScreenAuxiliary,
 		},
 	})
+	h.float = app.Window.NewWithOptions(application.WebviewWindowOptions{
+		Name: floatName, Title: name, URL: "about:blank", Width: 112, Height: 32, Hidden: true, Frameless: true,
+		DisableResize: true, BackgroundType: application.BackgroundTypeTransparent,
+		Mac: application.MacWindow{
+			WindowClass:      application.MacWindowClassPanel,
+			PanelPreferences: application.MacPanelPreferences{NonActivating: true, FloatingPanel: true},
+			WindowLevel:      application.MacWindowLevelFloating,
+			CollectionBehavior: application.MacWindowCollectionBehaviorCanJoinAllSpaces |
+				application.MacWindowCollectionBehaviorStationary | application.MacWindowCollectionBehaviorIgnoresCycle,
+			Backdrop:      application.MacBackdropTransparent,
+			DisableShadow: true,
+		},
+	})
+	h.native = appKitFloat(h.float)
+	h.float.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) { e.Cancel() })
+	h.float.OnWindowEvent(events.Mac.WindowDidMove, func(*application.WindowEvent) { h.do(h.floatMoved) })
 	h.main.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
 		e.Cancel()
 		h.do(h.hideMain)
@@ -151,13 +224,27 @@ func newHost(app *application.App, name string) *host {
 	h.panel.OnWindowEvent(events.Common.WindowLostFocus, func(*application.WindowEvent) {
 		h.do(func() { h.panelLeft(false) })
 	})
-	go h.work()
+	h.start()
 	return h
 }
 
-// launched restores the main window's frame; it runs on the main thread.
+// start runs the worker until stop.
+func (h *host) start() {
+	h.wake, h.done = make(chan struct{}, 1), make(chan struct{})
+	h.running.Go(h.work)
+}
+
+// stop ends the worker and every release poll, and waits for them.
+func (h *host) stop() {
+	close(h.done)
+	h.running.Wait()
+}
+
+// launched restores the main window's frame and readies the float for the
+// mouse and the keyboard; it runs on the main thread.
 func (h *host) launched() {
 	nsWindow(h.main).Send(objc.RegisterName("setFrameAutosaveName:"), nsString(frameAutosaveName))
+	floatOnly(nsWindow(h.float), h.floatKeyable.Load, h.app.Logger)
 }
 
 func (h *host) do(fn func()) {
@@ -171,7 +258,12 @@ func (h *host) do(fn func()) {
 }
 
 func (h *host) work() {
-	for range h.wake {
+	for {
+		select {
+		case <-h.done:
+			return
+		case <-h.wake:
+		}
 		for {
 			h.mu.Lock()
 			if len(h.queue) == 0 {
@@ -281,6 +373,172 @@ func (h *host) OpenExternal(url string) {
 	}
 }
 
+func (h *host) ShowFloat(url string) {
+	h.do(func() {
+		navigate(h.float, &h.floatURL, url)
+		h.floatShown = true
+		h.float.Show()
+	})
+}
+
+func (h *host) HideFloat() {
+	h.do(func() {
+		h.floatShown = false
+		h.float.Hide()
+	})
+}
+
+func (h *host) SetFloatFrame(r window.Rect) {
+	h.do(func() {
+		h.floatFrame = r
+		application.InvokeSync(func() { setFrame(nsWindow(h.float), r) })
+	})
+}
+
+// PlaceFloat tells the float's page where it sits, in the mode it draws in.
+func (h *host) PlaceFloat(p window.FloatPlace) {
+	h.do(func() { evalJS(h.float, floatPlaceJS(h.floatMode, p)) })
+}
+
+// floatPlaceJS calls the page's bridge with mode, the pill when the page has
+// said none, and p.
+func floatPlaceJS(mode string, p window.FloatPlace) string {
+	if mode == "" {
+		mode = window.ModePill
+	}
+	name, _ := json.Marshal(window.FloatBridge)
+	m, _ := json.Marshal(mode)
+	place, _ := json.Marshal(struct {
+		Edge string `json:"edge"`
+		Up   bool   `json:"up"`
+	}{p.Edge, p.Up})
+	return "(function(b){if(b&&b.setMode)b.setMode(" + string(m) + "," + string(place) + ")})(window[" + string(name) + "])"
+}
+
+// pageMessage hands the controller a message the float's page sent from the
+// cockpit's origin, in its main frame, keeping the mode it says it draws in;
+// any other message is dropped.
+func (h *host) pageMessage(windowName, message, origin string, mainFrame bool) {
+	if windowName != floatName || !mainFrame {
+		return
+	}
+	m, ok := window.ParseFloatMessage(message)
+	if !ok {
+		return
+	}
+	h.do(func() {
+		if !sameOrigin(origin, h.floatURL) {
+			return
+		}
+		if m.Kind == window.FloatSize && m.Mode != "" {
+			h.setFloatMode(m.Mode)
+		}
+		if on := h.handlers().OnFloat; on != nil {
+			on(m)
+		}
+	})
+}
+
+// sameOrigin says whether two addresses share their scheme, host and port.
+func sameOrigin(a, b string) bool {
+	ua, errA := url.Parse(a)
+	ub, errB := url.Parse(b)
+	return errA == nil && errB == nil && ua.Scheme != "" && ua.Scheme == ub.Scheme && ua.Host == ub.Host
+}
+
+// setFloatMode keeps mode and, outside the panel, hands back the keyboard
+// the float holds.
+func (h *host) setFloatMode(mode string) {
+	h.floatMode = mode
+	h.floatKeyable.Store(window.FloatKeyable(mode))
+	h.releaseKeyboard()
+}
+
+// releaseKeyboard hands the keyboard back while the float holds it outside
+// the panel, once no mouse button is down: ordering the float out under a
+// press would drop its mouse-up.
+func (h *host) releaseKeyboard() {
+	if window.FloatKeyable(h.floatMode) || h.handBackDue || !h.native.isKey() {
+		return
+	}
+	if !h.native.buttonsUp() {
+		h.handBackDue = true
+		h.afterRelease(func() {
+			h.handBackDue = false
+			h.releaseKeyboard()
+		})
+		return
+	}
+	h.native.handBack()
+}
+
+// floatMoved starts following a move the person made, a frame other than the
+// one the host last set while a mouse button is down, until they let go; a
+// move AppKit makes itself, as when a screen goes away, is left to the
+// controller's clamp.
+func (h *host) floatMoved() {
+	if !h.floatShown || h.dragging || h.native.buttonsUp() {
+		return
+	}
+	f := h.native.frame()
+	if sameFrame(f, h.floatFrame) {
+		return
+	}
+	h.dragging = true
+	if on := h.handlers().OnFloatMoving; on != nil {
+		on()
+	}
+	h.afterRelease(h.dropped)
+}
+
+// dropPoll is how often a held button is checked for its release: AppKit
+// sends the window no mouse-up for a drag the window server runs.
+const dropPoll = 30 * time.Millisecond
+
+// afterRelease runs fn on the worker once no mouse button is down. It is
+// called on the worker, which running counts, so its Add never races stop's
+// Wait.
+func (h *host) afterRelease(fn func()) {
+	h.running.Go(func() {
+		tick := time.NewTicker(dropPoll)
+		defer tick.Stop()
+		for {
+			select {
+			case <-h.done:
+				return
+			case <-tick.C:
+				if h.native.buttonsUp() {
+					h.do(fn)
+					return
+				}
+			}
+		}
+	})
+}
+
+func (h *host) dropped() {
+	h.dragging = false
+	f := h.native.frame()
+	h.floatFrame = f
+	if on := h.handlers().OnFloatDropped; on != nil {
+		on(f)
+	}
+}
+
+// sameFrame allows the rounding AppKit applies to a frame it was given.
+func sameFrame(a, b window.Rect) bool {
+	near := func(x, y float64) bool { return math.Abs(x-y) < 1 }
+	return near(a.X, b.X) && near(a.Y, b.Y) && near(a.W, b.W) && near(a.H, b.H)
+}
+
+func (h *host) screensChanged() {
+	var s []window.Screen
+	application.InvokeSync(func() { s = screens() })
+	if on := h.handlers().OnScreens; on != nil && len(s) > 0 {
+		on(s)
+	}
+}
+
 func (h *host) HidePanel() {
 	h.do(func() {
 		h.panelShown, h.panelKey = false, false
@@ -288,14 +546,20 @@ func (h *host) HidePanel() {
 	})
 }
 
-// Listen binds the reopen and, unless h.Hotkey is empty, the hotkey; call it
-// after the app launched, off the main thread, so a refused chord comes back
-// as the error.
+// Listen binds the reopen, the float's messages and the screens and, unless
+// h.Hotkey is empty, the hotkey; call it after the app launched, off the main
+// thread, so a refused chord comes back as the error.
 func (h *host) Listen(hs window.Handlers) error {
 	h.links.Lock()
 	h.mu.Lock()
 	h.listening = hs
 	h.mu.Unlock()
+	if hs.FloatOverFullScreen {
+		application.InvokeSync(func() {
+			addCollectionBehavior(nsWindow(h.float), application.MacWindowCollectionBehaviorFullScreenAuxiliary)
+		})
+	}
+	h.do(h.screensChanged)
 	if hs.OnOpenURL != nil {
 		for _, link := range h.pending {
 			hs.OnOpenURL(link)
