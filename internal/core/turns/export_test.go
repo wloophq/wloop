@@ -16,3 +16,12 @@ func (s *Service) Routing(id int64) {
 	}
 	s.delivering[id] = struct{}{}
 }
+
+// Locked reports whether some caller holds the service's mutex.
+func (s *Service) Locked() bool {
+	if s.mu.TryLock() {
+		s.mu.Unlock()
+		return false
+	}
+	return true
+}
