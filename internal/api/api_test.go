@@ -48,12 +48,13 @@ func TestMergeKeepsEveryNotice(t *testing.T) {
 	}
 }
 
-func TestMergeOrsThePlanAndGatesFlags(t *testing.T) {
+func TestMergeOrsThePlanGatesAndTurnsFlags(t *testing.T) {
 	c := Change{Type: "changed", Epoch: "e", Rev: 2}
 	c.Merge(Change{Type: "changed", Epoch: "e", Rev: 2, Plan: true})
 	c.Merge(Change{Type: "changed", Epoch: "e", Rev: 2, Gates: true})
+	c.Merge(Change{Type: "changed", Epoch: "e", Rev: 2, Turns: true})
 	c.Merge(Change{Type: "changed", Epoch: "e", Rev: 3})
-	if !c.Plan || !c.Gates || c.Health || c.All {
+	if !c.Plan || !c.Gates || !c.Turns || c.Health || c.All {
 		t.Fatalf("merged %+v", c)
 	}
 }

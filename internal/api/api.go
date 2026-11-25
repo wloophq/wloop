@@ -197,6 +197,7 @@ var Operations = []Operation{
 	{"GET", AdminTurn},
 	{"POST", AdminProbe},
 	{"POST", AdminGitAccess},
+	{"GET", TurnsLivePath},
 	{"GET", AdminTimings},
 	{"GET", AdminFacts},
 	{"GET", AdminMeter},

@@ -68,6 +68,12 @@ type Store interface {
 	Open(ctx context.Context) ([]unit.Unit, error)
 }
 
+// Timeline is a capability of a Store: the turns of every unit that are open or were sent at or after since,
+// in ascending Seq, withdrawn and replaced ones included.
+type Timeline interface {
+	Timeline(ctx context.Context, since time.Time) (map[unit.Unit][]turn.Turn, error)
+}
+
 type Reports interface {
 	// WithTurns lists the units with at least one turn of i that is not
 	// withdrawn.

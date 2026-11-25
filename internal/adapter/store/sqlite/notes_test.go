@@ -514,7 +514,7 @@ var reads = []string{
 	"DB.Snapshots", "snapshotStore.Get", "snapshotStore.Revs", "snapshotStore.Units",
 	"DB.Close", "DB.R", "reader.QueryContext", "reader.QueryRowContext", "DB.Read", "DB.Snapshot", "DB.Write", "DB.Intakes", "DB.Usage", "DB.HeadlessSpent", "DB.AutomatedTurns", "DB.CallSpent", "DB.UnitEventKeys", "DB.AgentWorktrees",
 	"DB.AllSkips", "DB.EventsOf", "DB.Records", "DB.UnitsOf", "DB.MergedInto", "DB.TasksHolding", "DB.ItemsHeld",
-	"Store.Books", "Store.TurnCounts", "Store.BookOf", "Store.UnitsOf", "Store.UnitOfTurn", "Store.Open", "Store.OpenTurns", "Store.WithTurns", "Store.Applied", "Store.Session", "Store.Sessions",
+	"Store.Books", "Store.TurnCounts", "Store.BookOf", "Store.UnitsOf", "Store.UnitOfTurn", "Store.Open", "Store.OpenTurns", "Store.Timeline", "Store.WithTurns", "Store.Applied", "Store.Session", "Store.Sessions",
 	"Store.LastStops", "Store.SessionOf", "Store.SessionOfHandle",
 	"DB.Worktrees", "Worktrees.Worktree", "Worktrees.Worktrees",
 	"Rounds.AgentHome", "Rounds.Load", "Rounds.Pause",

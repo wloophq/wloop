@@ -105,7 +105,7 @@ func waiting(d dinv.TimingsData, since, now time.Time, m me) map[string]api.Wait
 		for _, d := range spans[party] {
 			total += d
 		}
-		out[party] = api.WaitShare{TotalMS: total.Milliseconds(), OpenMS: open[party].Milliseconds(), PRs: n, Spans: quantiles(spans[party])}
+		out[party] = api.WaitShare{TotalMS: total.Milliseconds(), OpenMS: open[party].Milliseconds(), PRs: n, Spans: api.QuantilesOf(spans[party])}
 	}
 	return out
 }

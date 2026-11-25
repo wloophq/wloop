@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/storetest"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -66,4 +67,61 @@ func TestOpenTurnsAreTheBooksOpenTurns(t *testing.T) {
 	if want == 0 || n != want {
 		t.Fatalf("%d open turns, the books have %d", n, want)
 	}
+}
+
+func TestTimelineIsTheBooksTurnsWithTheirTimes(t *testing.T) {
+	t.Parallel()
+	f := storetest.Seeded(t, storetest.Live)
+	ctx := context.Background()
+	books, err := f.Turns.Books(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := f.Turns.Timeline(ctx, time.Time{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := 0
+	for u, b := range books {
+		for i, tr := range b.Turns {
+			want++
+			if i >= len(got[u]) {
+				t.Fatalf("%s: turn %d missing from the timeline", u, tr.Seq)
+			}
+			g := got[u][i]
+			if g.Seq != tr.Seq || g.State != tr.State || !g.SentAt.Equal(tr.SentAt) || !g.StartedAt.Equal(tr.StartedAt) || !g.EndedAt.Equal(tr.EndedAt) {
+				t.Errorf("%s: timeline turn %+v, the book has %+v", u, g, tr)
+			}
+		}
+	}
+	n := 0
+	for _, ts := range got {
+		n += len(ts)
+	}
+	if want == 0 || n != want {
+		t.Fatalf("%d turns in the timeline, the books have %d", n, want)
+	}
+	if later, err := f.Turns.Timeline(ctx, time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC)); err != nil {
+		t.Fatal(err)
+	} else if open := countOpen(later); open == 0 || open != len(flatten(later)) {
+		t.Fatalf("a timeline since the far future holds %d turns, %d open, want only the open ones", len(flatten(later)), open)
+	}
+}
+
+func flatten(m map[unit.Unit][]turn.Turn) []turn.Turn {
+	var out []turn.Turn
+	for _, ts := range m {
+		out = append(out, ts...)
+	}
+	return out
+}
+
+func countOpen(m map[unit.Unit][]turn.Turn) int {
+	n := 0
+	for _, tr := range flatten(m) {
+		if tr.State.Open() {
+			n++
+		}
+	}
+	return n
 }

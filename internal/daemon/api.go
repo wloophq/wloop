@@ -159,6 +159,7 @@ func (s *Server) routes() []route {
 		{"GET " + api.AdminTurn, s.handleTurnShow},
 		{"POST " + api.AdminProbe, s.handleProbe},
 		{"POST " + api.AdminGitAccess, s.handleGitAccess},
+		{"GET " + api.TurnsLivePath, s.handleTurnsLive},
 		{"GET " + api.AdminTimings, s.handleTimings},
 		{"GET " + api.AdminFacts, s.handleFacts},
 		{"GET " + api.AdminMeter, s.handleMeter},

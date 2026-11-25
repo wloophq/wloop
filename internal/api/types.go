@@ -66,7 +66,9 @@ type Change struct {
 	// Plan says what GET /api/plan serves moved.
 	Plan bool `json:"plan,omitempty"`
 	// Gates says what GET /api/gates serves moved: a gate, or the draft, item, message or plan item one shows.
-	Gates   bool     `json:"gates,omitempty"`
+	Gates bool `json:"gates,omitempty"`
+	// Turns says what GET /api/turns/live serves moved: a turn was sent, started, asked, answered or ended.
+	Turns   bool     `json:"turns,omitempty"`
 	Notices []Notice `json:"notices,omitempty"`
 	// Counters are the Area "" counters, on every "changed" change after a note of what a view reads: the tasks,
 	// their gates, wakes, drafts, records, links, placements or the profile.

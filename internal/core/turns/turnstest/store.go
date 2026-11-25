@@ -124,6 +124,24 @@ func (s *Store) Books(_ context.Context, refs ...unit.Unit) (map[unit.Unit]turn.
 	return out, nil
 }
 
+// Timeline is the turns that are open or were sent at or after since.
+func (s *Store) Timeline(_ context.Context, since time.Time) (map[unit.Unit][]turn.Turn, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := map[unit.Unit][]turn.Turn{}
+	for u, b := range s.books {
+		for _, t := range b.Turns {
+			if t.State.Open() || !t.SentAt.Before(since) {
+				out[u] = append(out[u], t)
+			}
+		}
+	}
+	for _, ts := range out {
+		slices.SortFunc(ts, func(a, b turn.Turn) int { return cmp.Compare(a.Seq, b.Seq) })
+	}
+	return out, nil
+}
+
 func (s *Store) book(r unit.Unit) turn.Book {
 	b, ok := s.books[r]
 	if !ok {

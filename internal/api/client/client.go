@@ -408,7 +408,7 @@ func (c *Client) Events(ctx context.Context, client string, since api.Since) (<-
 				}
 				var c api.Change
 				if err := json.Unmarshal([]byte(strings.TrimSpace(data)), &c); err != nil {
-					c = api.Change{Type: "changed", All: true, Health: true, Plan: true, Gates: true}
+					c = api.Change{Type: "changed", All: true, Health: true, Plan: true, Gates: true, Turns: true}
 				}
 				if pending == nil {
 					pending = &c
