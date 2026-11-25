@@ -256,4 +256,54 @@ func TestDrafts(t *testing.T) {
 		r.send()
 		r.wantPosted(fmt.Sprintf("%d REQUEST_CHANGES", d.ID))
 	})
+
+	for name, approvedFirst := range map[string]bool{"S9 a push past a held review": false, "S9 its approval refused as stale": true} {
+		t.Run(name, func(t *testing.T) {
+			r := newDraftsRig(t)
+			r.refresh()
+			if b := r.sweepPastTheWindow(1); len(b.Turns) != 1 || b.Turns[0].Workflow != "review-first-round" {
+				t.Fatalf("the requested review started no first round: turns %+v", b.Turns)
+			}
+			r.s = r.d.Launched(t, draftsPR)
+			d := r.propose("APPROVE", "", "c2", true)
+			r.end(fmt.Sprintf(`{"state":"asked","summary":"approve","resume":"post what the user picks","question":%s}`,
+				choice("Approve the pull request?", draftOption("post", "Approve", d), `{"id":"hold","label":"Not yet","consequence":"nothing is posted"}`)))
+			r.pinned(d.ID)
+			r.pub.push("c3")
+			if approvedFirst {
+				if err := r.approve(d.ID, d.Rev); err == nil {
+					t.Fatal("a stale draft was approved")
+				}
+			}
+			r.refresh()
+			b := r.sweepPastTheWindow(2)
+			if len(b.Turns) != 2 || b.Turns[1].Workflow != "review-draft-stale" || b.Turns[0].State != dturn.Replaced || b.Turns[0].ReplacedBy != b.Turns[1].Seq {
+				t.Fatalf("the push past the held review reopened no round that replaces its question: turns %+v", b.Turns)
+			}
+			if r.questionOpen() {
+				t.Fatal("the question pinning the stale draft is still open")
+			}
+			r.unpinned(d.ID)
+			r.sweepWithoutRound("review-draft-stale", 2)
+			r.s = r.d.Launched(t, draftsPR)
+			if text := r.instructions(); !strings.Contains(text, fmt.Sprintf("`draft.held_ref`: `%d:%d`", d.ID, d.Rev)) || !strings.Contains(text, "Approve the pull request?") {
+				t.Fatalf("the round's instructions carry no pointer to draft %d or its question:\n%s", d.ID, text)
+			}
+			read, err := r.c.ReadDraft(r.ctx, r.s.Handle, d.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			basis := "c3"
+			revised, err := r.update(api.AgentDraftUpdate{ID: d.ID, Rev: read.Rev, Basis: &basis})
+			if err != nil || revised.State != "held" || revised.Basis != "c3" {
+				t.Fatalf("update %+v %v", revised, err)
+			}
+			r.end(fmt.Sprintf(`{"state":"asked","summary":"approve at c3","resume":"post what the user picks","question":%s}`,
+				choice("Approve the pull request at c3?", draftOption("post", "Approve", revised), `{"id":"hold","label":"Not yet","consequence":"nothing is posted"}`)))
+			r.sweepWithoutRound("review-draft-stale", 2)
+			r.answer("post")
+			r.send()
+			r.wantPosted(fmt.Sprintf("%d APPROVE", d.ID))
+		})
+	}
 }

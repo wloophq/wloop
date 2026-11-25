@@ -63,6 +63,9 @@ func testAgents() map[string]turns.Agent { return map[string]turns.Agent{"echo":
 // failedDraftFacts are the facts of a unit's failed drafts, over drafts.
 func failedDraftFacts(drafts draftLister) unitFacter { return factdrafts.Provider{Drafts: drafts} }
 
+// draftFactStates are the states of the drafts failedDraftFacts lists.
+var draftFactStates = factdrafts.States
+
 func defaultAgents() map[string]agentEntry {
 	return map[string]agentEntry{"claude": {
 		Kind:     claude.Agent{Sh: claude.Shell, AskSh: claude.Exec, UserHome: config.Home()},

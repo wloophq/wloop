@@ -55,6 +55,29 @@ func TestReviewWorkflowRestartsOnFailedOrStaleDraft(t *testing.T) {
 	t.Fatal("no review-draft-failed workflow")
 }
 
+func TestReviewWorkflowRestartsOnAHeldDraftThePullRequestMovedPast(t *testing.T) {
+	l := bundled(t)
+	for _, w := range l.Workflows {
+		if w.Name != "review-draft-stale" {
+			continue
+		}
+		for _, fact := range []string{"draft.held_ref", "draft.held_kind", "draft.held_basis", "draft.held_stale", "pr.head", "pr.open_turn"} {
+			if !slices.Contains(w.When.Reads(), fact) {
+				t.Errorf("its when reads %v, not %s", w.When.Reads(), fact)
+			}
+		}
+		if !slices.Equal(w.Key, []string{"draft.held_ref"}) {
+			t.Errorf("its key is %v: each held draft rev gets one round", w.Key)
+		}
+		if len(w.Steps) != 1 || w.Steps[0].Use != "turn.start" || w.Steps[0].Args["intent"] != "review" ||
+			w.Steps[0].Args["due"] != "when" || w.Steps[0].Args["open_question"] != "replace_if_moved" {
+			t.Errorf("it runs %+v, want one turn.start of review, due when, that replaces a moved question", w.Steps)
+		}
+		return
+	}
+	t.Fatal("no review-draft-stale workflow")
+}
+
 // writeCommands are the GitHub manifest's commands a session with
 // source_writes = false may not run, each split in words.
 func writeCommands(t *testing.T) [][]string {

@@ -1,0 +1,16 @@
+summary = "Reopen the review round when the pull request moved past a review draft that waits for you"
+provider = "github"
+when = 'draft.held_kind == "review" && draft.held_ref != "" && pr.head != "" && (draft.held_stale || draft.held_basis != pr.head) && !(pr.open_turn in ["sent", "started"])'
+order = 15
+key = ["draft.held_ref"]
+
+[[step]]
+use = "turn.start"
+intent = "review"
+due = "when"
+open_question = "replace_if_moved"
+
+[[gates.approval.rule]]
+when = 'gate.kind == "plan"'
+mode = "delay"
+window = "60s"

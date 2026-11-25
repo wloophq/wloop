@@ -283,6 +283,10 @@ var otherFacts = []Fact{
 	unitDraftFact("stale", expr.Bool, "A draft on the unit failed to send because the unit moved past what it was written against, such as a push after a review was read; draft.failed is true too."),
 	unitDraftFact("failed_kind", expr.String, "The kind of the unit's newest draft that failed to send, as its plugin's manifest names it, such as review; empty when none failed. A workflow that restarts a round reads it to restart only for its own kind."),
 	unitDraftFact("failed_ref", expr.String, "The unit's newest draft that failed to send, as <id>:<rev>; empty when none failed. A workflow keys on it so that each failure, a revised draft's included, runs it again."),
+	unitDraftFact("held_ref", expr.String, "A draft a turn or a session wrote on the unit that waits for you and states the basis it was written against, as <id>:<rev>: the newest refused as stale, else the newest; empty when none. A workflow keys on it so that each such draft, a revised one included, runs it once."),
+	unitDraftFact("held_kind", expr.String, "The kind of the draft draft.held_ref names, as its plugin's manifest names it, such as review; empty when none."),
+	unitDraftFact("held_basis", expr.String, "The basis the draft draft.held_ref names was written against, such as the head commit a review read; empty when none. Nothing reads the unit's live basis for it: a workflow compares it with the unit's own facts, such as pr.head, to tell the unit moved past it."),
+	unitDraftFact("held_stale", expr.Bool, "The draft draft.held_ref names was refused as stale, its approval or a check finding the unit moved past its basis; true until its content is revised."),
 	enum(viewToo(approvalFact("delivery", expr.String, "How the unit's plugin posts the draft: message, reaction or comment. A plugin that posts every text as a comment makes each draft that is not a reaction a comment, whatever its proposer asked for.")), enumOf(DraftDeliveries...)),
 	viewToo(approvalFact("proposer", expr.String, "What proposed the draft: workflow:<name> for a workflow's draft.propose, intent:<name> for a turn's or a session's, rule:<name> for a plugin rule's, user for one you wrote, session for one a session wrote outside any intent's turn.")),
 	approvalFact("effects", expr.List, "The effects the draft applies once sent when the loop named them, a workflow's draft.propose or a plugin rule; empty for a turn's or a session's draft, whose agent names them. A workflow's rules and the configuration's read it; an intent's do not."),
@@ -357,9 +361,10 @@ func Narrow(env expr.Env, providers []unit.ProviderID) {
 	}
 }
 
-// UnitDraftFacts are the facts of a unit whose draft failed to send, which every plugin's unit slot reads: a
-// plugin publishes drafts.
-var UnitDraftFacts = []string{DraftSlot + ".failed", DraftSlot + ".stale", DraftSlot + ".failed_kind", DraftSlot + ".failed_ref"}
+// UnitDraftFacts are the facts of a unit's drafts that failed to send or wait for you, which every plugin's unit
+// slot reads: a plugin publishes drafts.
+var UnitDraftFacts = []string{DraftSlot + ".failed", DraftSlot + ".stale", DraftSlot + ".failed_kind", DraftSlot + ".failed_ref",
+	DraftSlot + ".held_ref", DraftSlot + ".held_kind", DraftSlot + ".held_basis", DraftSlot + ".held_stale"}
 
 // unitDraftFact is a fact of a unit's drafts, named draft.<name>, which Merge gives every plugin's unit slot to
 // read.
