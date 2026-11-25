@@ -35,7 +35,7 @@ func (k reviewKinds) Lookup(provider, kind string) (draft.KindSpec, bool) {
 		return draft.KindSpec{}, false
 	}
 	return draft.KindSpec{Provider: "github", Name: "review", Delivery: "review", Schema: "drafts/review/schema.json", Basis: draft.BasisAgent,
-		Editable: []string{"text", "/event"}, SchemaJSON: schema}, true
+		Editable: []string{"text", "/event"}, Verdict: "/event", SchemaJSON: schema}, true
 }
 
 func reviewDraftOf(state draft.State) draft.Draft {
@@ -82,6 +82,12 @@ func TestDraftCardServesEveryPayloadValue(t *testing.T) {
 	}
 	if !got["/comments/0/body"].Markdown || got["/comments/0/path"].Markdown {
 		t.Errorf("body markdown %v, path markdown %v: want only the field the plugin words as Markdown", got["/comments/0/body"].Markdown, got["/comments/0/path"].Markdown)
+	}
+	if v.Verdict != "Request changes" {
+		t.Errorf("verdict %q, want the kind's verdict field as its plugin words it", v.Verdict)
+	}
+	if ev.Tone != "err" || ev.Options[0].Tone != "loop" || got["/comments/0/path"].Tone != "" {
+		t.Errorf("verdict tone %q, approve's %q, path's %q: want the plugin's tones of the values", ev.Tone, ev.Options[0].Tone, got["/comments/0/path"].Tone)
 	}
 	if ev.Label != "Verdict" || ev.Shown != "Request changes" || got["/comments/1/extra"].Label != "extra" {
 		t.Errorf("event worded %q %q, extra %q: want the plugin's words, an unworded key as itself", ev.Label, ev.Shown, got["/comments/1/extra"].Label)

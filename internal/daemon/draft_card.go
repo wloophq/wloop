@@ -32,6 +32,11 @@ func (s *Server) cardFields(ctx context.Context, d draft.Draft, g gate.Gate, v *
 	if len(d.Payload) > 0 {
 		v.Payload = slices.Clone(d.Payload)
 		v.Fields = s.payloadFields(publisher, string(d.Kind), d.Payload, spec, declared)
+		if declared && spec.Verdict != "" {
+			if f, ok := fieldAt(v.Fields, spec.Verdict); ok {
+				v.Verdict = cmp.Or(f.Shown, f.Value)
+			}
+		}
 	}
 	v.Preview = s.preview(d, publisher, v.Where)
 	if d.State == draft.Held {
@@ -204,18 +209,31 @@ func (w payloadWalk) field(n node, pointer, key string, schema map[string]any) a
 		f.Fields = w.children(n, pointer, key, schema)
 		return f
 	}
-	f.Value, f.Shown = n.scalar, words.Values[n.scalar]
+	f.Value, f.Shown, f.Tone = n.scalar, words.Values[n.scalar], words.Tones[n.scalar]
 	f.Markdown = words.Markdown != nil && *words.Markdown
 	if slices.Contains(w.editable, pointer) {
 		enum, _ := schema["enum"].([]any)
 		for _, e := range enum {
 			if v, ok := e.(string); ok {
-				f.Options = append(f.Options, api.DraftOption{Value: v, Label: cmp.Or(words.Values[v], v)})
+				f.Options = append(f.Options, api.DraftOption{Value: v, Label: cmp.Or(words.Values[v], v), Tone: words.Tones[v]})
 			}
 		}
 		f.Editable = len(f.Options) > 0
 	}
 	return f
+}
+
+// fieldAt is the field of fs, at any depth, at pointer.
+func fieldAt(fs []api.DraftField, pointer string) (api.DraftField, bool) {
+	for _, f := range fs {
+		if f.Pointer == pointer {
+			return f, true
+		}
+		if g, ok := fieldAt(f.Fields, pointer); ok {
+			return g, true
+		}
+	}
+	return api.DraftField{}, false
 }
 
 func schemaAt(schema map[string]any, key string) map[string]any {

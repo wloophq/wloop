@@ -101,6 +101,21 @@
                   "description": "The field's value is Markdown, such as an inline comment's body: the card renders it as it renders the draft's text.",
                   "type": "boolean"
                 },
+                "tones": {
+                  "additionalProperties": {
+                    "description": "The value's tone.",
+                    "enum": [
+                      "me",
+                      "loop",
+                      "late",
+                      "err",
+                      "muted"
+                    ],
+                    "type": "string"
+                  },
+                  "description": "The design token each of the field's values is drawn in, by value, such as a review verdict's chip.",
+                  "type": "object"
+                },
                 "values": {
                   "additionalProperties": {
                     "description": "The value's word.",

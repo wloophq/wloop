@@ -1041,6 +1041,13 @@ The fields each notice reads besides `Name` and `Command`:
 - `drafts.<name>.fields.<name>.markdown` (bool, default `false`): The field's value is Markdown, such as an inline comment's body: the card renders it as it renders the draft's text.
 - `drafts.<name>.fields.<name>.values` (table by name): The words of the field's values, by value, such as an enum's; the card keeps the value itself in its tooltip.
 - `drafts.<name>.fields.<name>.values.<name>` (string, localized): The value's word.
+- `drafts.<name>.fields.<name>.tones` (table by name): The design token each of the field's values is drawn in, by value, such as a review verdict's chip.
+- `drafts.<name>.fields.<name>.tones.<name>` (one of `me`, `loop`, `late`, `err`, `muted`): The value's tone.
+  - `me`: What waits on the user; the accent.
+  - `loop`: The loop's doing, or a good outcome.
+  - `late`: Time and medium risk: amber.
+  - `err`: A failure, a block or high risk.
+  - `muted`: Secondary, nothing to signal.
 - `detail` (table): How a field of the plugin's unit detail shows, by field.
 - `detail.<name>` (table): One field's words.
 - `detail.<name>.label` (string, localized): The field's name. Required.
@@ -1277,6 +1284,12 @@ The fields each notice reads besides `Name` and `Command`:
 - `kinds.<name>.primary` (string): The gate intent a queue offers first on a gate of the kind; empty offers the gate's first.
 - `kinds.<name>.queue` (string, localized): The title of the kind's queue. Required.
 - `kinds.<name>.empty` (string, localized): What the kind's queue says when it holds nothing. Required.
+- `kinds.<name>.tone` (one of `me`, `loop`, `late`, `err`, `muted`, default `me`): The design token the floating widget draws the kind's items in, such as "late" for plans.
+  - `me`: What waits on the user; the accent.
+  - `loop`: The loop's doing, or a good outcome.
+  - `late`: Time and medium risk: amber.
+  - `err`: A failure, a block or high risk.
+  - `muted`: Secondary, nothing to signal.
 - `kinds.<name>.noun` (string or table, localized): What one of the kind's tasks is, which the briefing counts, such as "question". A string, or a table of its CLDR plural forms, `other` required.
 - `kinds.<name>.noun.zero` (string, localized): Its zero form.
 - `kinds.<name>.noun.one` (string, localized): Its one form.

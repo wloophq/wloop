@@ -43,6 +43,7 @@ var nonProse = map[string]string{
 	"Plus":                         "the + key's name in aria-keyshortcuts",
 	"noopener noreferrer":          "a link's rel tokens",
 	"(prefers-color-scheme: dark)": "a CSS media query",
+	"Float":                        "the suffix of the floating widget's window property after the brand's command",
 }
 
 // proseClients are the Go clients whose words a person reads; the hook and the CLI's turn client write what

@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"slices"
@@ -102,7 +103,7 @@ func (s *Server) queueItems(ctx context.Context, g *coretasks.Service, its []hom
 		if err != nil {
 			return nil, err
 		}
-		qi := api.QueueItem{Kind: string(it.Found.Kind), Task: v, Primary: api.QueueAction{Kind: it.Primary.Kind, ID: it.Primary.ID, Label: primaryLabel(l, it)}}
+		qi := api.QueueItem{Kind: string(it.Found.Kind), Word: it.Word, Tone: it.Tone, Since: it.Found.Since, Task: v, Primary: api.QueueAction{Kind: it.Primary.Kind, ID: it.Primary.ID, Label: primaryLabel(l, it)}}
 		if g := it.Found.Gate; g != nil {
 			gv := s.gateView(ctx, *g, byUnit)
 			qi.Gate = &gv
@@ -157,7 +158,6 @@ func (s *Server) questionOptions(ctx context.Context, q gate.Gate, pinned map[in
 			{ID: "yes", Label: s.notice(builtin.NoticeNotifyYes, nil), Recommended: m.Recommend == "yes", Draft: yes},
 			{ID: "no", Label: s.notice(builtin.NoticeNotifyNo, nil), Recommended: m.Recommend == "no"},
 		}
-		return out, nil
 	}
 	for _, o := range m.Options {
 		d, err := draftGate(o.Draft)
@@ -166,7 +166,21 @@ func (s *Server) questionOptions(ctx context.Context, q gate.Gate, pinned map[in
 		}
 		out = append(out, api.QueueOption{ID: o.ID, Label: o.Label, Recommended: o.ID == m.Recommend, Draft: d})
 	}
+	for i := range out {
+		out[i].Primary = s.word(api.QueueOptionPrimary, map[string]any{"option": optionWord(out[i])})
+	}
 	return out, nil
+}
+
+// optionWord is what o's button names: its draft's verdict, else its label.
+func optionWord(o api.QueueOption) string {
+	if o.Draft != nil && len(o.Draft.Subject) > 0 {
+		var d api.Draft
+		if json.Unmarshal(o.Draft.Subject, &d) == nil && d.Verdict != "" {
+			return d.Verdict
+		}
+	}
+	return o.Label
 }
 
 // pinsAny says whether message pins a draft of pinned.

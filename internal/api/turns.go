@@ -5,11 +5,13 @@ import "time"
 // TurnsLivePath serves the turns the floating widget shows.
 const TurnsLivePath = "/api/turns/live"
 
-// LiveTurn is one turn as the widget lists it; DurationMS is the time from its start (its send, when it has not
+// LiveTurn is one turn as the widget lists it; Label is its intent's label, its name when the intent has none;
+// DurationMS is the time from its start (its send, when it has not
 // started) to its end, 0 while it runs.
 type LiveTurn struct {
 	Seq        int64     `json:"seq"`
 	Intent     string    `json:"intent"`
+	Label      string    `json:"label"`
 	Task       string    `json:"task,omitempty"`
 	Title      string    `json:"title,omitempty"`
 	Unit       string    `json:"unit"`

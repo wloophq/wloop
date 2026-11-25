@@ -119,3 +119,9 @@ export function readRoute(hash: string): Route {
 // routeItem is the item a route's detail shows, the task before the unit, as the window controller reads it;
 // "" when it names none.
 export const routeItem = (r: Route): string => (r.task ? "task:" + r.task : r.unit ? "unit:" + r.unit : "");
+
+// FLOAT_ROUTE is the floating widget's page, which a native panel hosts beside the cockpit.
+export const FLOAT_ROUTE = "/float";
+
+// isFloatRoute says whether hash opens the floating widget.
+export const isFloatRoute = (hash: string): boolean => String(hash || "").replace(/^#/, "").split(/[?&]/)[0] === FLOAT_ROUTE;

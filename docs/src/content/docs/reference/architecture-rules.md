@@ -102,6 +102,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `Enter` | ✅ | KeyboardEvent.key |
 | `Esc` | ✅ | the Escape key's name as the served bindings spell it |
 | `Escape` | ✅ | KeyboardEvent.key |
+| `Float` | ✅ | the suffix of the floating widget's window property after the brand's command |
 | `GET` | ✅ | an HTTP method |
 | `Home` | ✅ | KeyboardEvent.key |
 | `Meta` | ✅ | KeyboardEvent.key |
@@ -173,6 +174,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `Enter` | ✅ | KeyboardEvent.key |
 | `Esc` | ✅ | the Escape key's name as the served bindings spell it |
 | `Escape` | ✅ | KeyboardEvent.key |
+| `Float` | ✅ | the suffix of the floating widget's window property after the brand's command |
 | `GET` | ✅ | an HTTP method |
 | `Home` | ✅ | KeyboardEvent.key |
 | `Meta` | ✅ | KeyboardEvent.key |

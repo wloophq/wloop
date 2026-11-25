@@ -92,6 +92,8 @@ type Draft struct {
 	// it, in the payload's order; both empty for a draft of a kind with no payload.
 	Payload json.RawMessage `json:"payload,omitempty"`
 	Fields  []DraftField    `json:"fields,omitempty"`
+	// Verdict is the value of the field its kind posts as its verdict, as its plugin words it; "" for none.
+	Verdict string `json:"verdict,omitempty"`
 	// Basis is what the draft was written against, such as a pull request's head; Stale says its unit moved
 	// past it, so approving it is refused.
 	Basis string `json:"basis,omitempty"`
@@ -132,12 +134,15 @@ type DraftField struct {
 	Options  []DraftOption `json:"options,omitempty"`
 	// Markdown says Value is Markdown, which the card renders as it renders the draft's text.
 	Markdown bool `json:"markdown,omitempty"`
+	// Tone is the design token the plugin draws Value in, "" for none.
+	Tone string `json:"tone,omitempty"`
 }
 
 // DraftOption is a value an editable field takes, with its word.
 type DraftOption struct {
 	Value string `json:"value"`
 	Label string `json:"label"`
+	Tone  string `json:"tone,omitempty"`
 }
 
 // OutboxPage is the Outbox's drafts, in the order of its view's sort, with the draft facets a lens over them reads.

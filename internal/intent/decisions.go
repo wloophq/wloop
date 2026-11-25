@@ -43,6 +43,8 @@ type KindTexts struct {
 	Noun, Clause i18n.Forms
 	Queue, Empty string
 	Primary      string
+	// Tone is the design token the kind's items are drawn in.
+	Tone         string
 	viewAt, prAt *sheet
 }
 
@@ -65,6 +67,7 @@ type mKind struct {
 	Empty   *string `toml:"empty"`
 	Noun    any     `toml:"noun"`
 	Clause  any     `toml:"clause"`
+	Tone    *string `toml:"tone"`
 }
 
 type decisionsLoad struct {
@@ -244,6 +247,12 @@ func (l *decisionsLoad) mergeKind(s *sheet, k decision.Kind, m mKind) {
 	required("empty", m.Empty, &t.Empty)
 	if m.Primary != nil {
 		t.Primary, t.prAt = strings.TrimSpace(*m.Primary), s
+	}
+	if m.Tone != nil && slices.ContainsFunc(builtin.TokenTones, func(v builtin.Value) bool { return v.Name == *m.Tone }) {
+		t.Tone = *m.Tone
+	}
+	if t.Tone == "" {
+		t.Tone = builtin.DefaultTone
 	}
 	for _, f := range []struct {
 		key string

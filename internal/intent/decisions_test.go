@@ -231,3 +231,33 @@ func TestDecisionsOrderRefusesUnknownAndRepeatedKinds(t *testing.T) {
 		t.Fatalf("order = %v", l.Decisions.Order)
 	}
 }
+
+func TestDecisionsKindToneIsADesignTokenMeByDefault(t *testing.T) {
+	l, problems := loadProfile(t, "en", map[string]string{"decisions.toml": "[kinds.act]\ntone = \"muted\"\n"})
+	if len(problems) > 0 {
+		t.Fatalf("problems: %v", problems)
+	}
+	k := l.Decisions.Kinds
+	if k[decision.ApprovePlan].Tone != "late" || k[decision.Act].Tone != "muted" || k[decision.Answer].Tone != "me" {
+		t.Fatalf("tones plan %q act %q answer %q, want late, muted and the default me", k[decision.ApprovePlan].Tone, k[decision.Act].Tone, k[decision.Answer].Tone)
+	}
+	_, problems = loadProfile(t, "en", map[string]string{"decisions.toml": "[kinds.act]\ntone = \"amber\"\n"})
+	if _, ok := problemAt(problems, "kinds.act.tone", "amber"); !ok {
+		t.Fatalf("a tone that is no design token loads: %v", problems)
+	}
+}
+
+func TestUIDraftFieldTonesAreDesignTokens(t *testing.T) {
+	l, problems := loadProfile(t, "en", nil)
+	if len(problems) > 0 {
+		t.Fatalf("problems: %v", problems)
+	}
+	tones := l.UI["github"].Drafts["review"].Fields["event"].Tones
+	if tones["REQUEST_CHANGES"] != "err" || tones["APPROVE"] != "loop" || tones["COMMENT"] != "muted" {
+		t.Fatalf("review verdict tones %v", tones)
+	}
+	_, problems = loadProfile(t, "en", map[string]string{"plugins/github/ui.toml": "[drafts.review.fields.event.tones]\nAPPROVE = \"green\"\n"})
+	if _, ok := problemAt(problems, "drafts.review.fields.event.tones.APPROVE", "green"); !ok {
+		t.Fatalf("a field tone that is no design token loads: %v", problems)
+	}
+}

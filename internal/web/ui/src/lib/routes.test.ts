@@ -5,7 +5,7 @@ import { queueKey } from "../state/loaders.svelte";
 import { hashString, nav, readHash } from "../state/route.svelte";
 import { catalog, tasksState } from "../state/store.svelte";
 import { resetStore } from "../testing/reset.svelte";
-import { readRoute } from "./routes";
+import { isFloatRoute, readRoute } from "./routes";
 
 // Ported from routes_test.go and catalog_test.go's route checks.
 
@@ -20,6 +20,12 @@ describe("routes", () => {
     const r = readHash();
     expect([r.view, r.task, r.pr]).toEqual(["fits-now", "e-1", ""]);
     expect(hashString({ ...r, task: "" })).toBe("view=fits-now");
+  });
+
+  test("the float route opens the floating widget, and no other route does", () => {
+    expect([isFloatRoute("#/float"), isFloatRoute("/float"), isFloatRoute("#/float&x=1"), isFloatRoute("#view=float"), isFloatRoute("#/floating")]).toEqual([
+      true, true, true, false, false,
+    ]);
   });
 
   test("readRoute reads the panel", () => {

@@ -109,7 +109,7 @@ func (w homeWords) Profile() home.Profile {
 
 func (w homeWords) Kind(k decision.Kind) home.KindWords {
 	t := w.l.Decisions.Kinds[k]
-	return home.KindWords{View: task.View(t.View), Noun: home.Forms(t.Noun), Clause: home.Forms(t.Clause), Queue: t.Queue, Empty: t.Empty, Primary: t.Primary}
+	return home.KindWords{View: task.View(t.View), Noun: home.Forms(t.Noun), Clause: home.Forms(t.Clause), Queue: t.Queue, Empty: t.Empty, Primary: t.Primary, Tone: t.Tone}
 }
 
 func (w homeWords) Plugin(p unit.ProviderID) home.PluginWords {

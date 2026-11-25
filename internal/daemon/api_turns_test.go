@@ -231,3 +231,17 @@ func TestTurnsLiveMidnightOnADaylightSavingDay(t *testing.T) {
 		t.Fatalf("done %v, want only the turn after the day's local midnight", got)
 	}
 }
+
+func TestTurnsLiveLabelsEachTurnWithItsIntentsLabel(t *testing.T) {
+	t.Parallel()
+	at := turnsNow.Add(-time.Hour)
+	s := turnsLiveServer(t, liveTurnAt(1, "review", turn.Started, at, time.Time{}), liveTurnAt(2, "unheard-of", turn.Started, at, time.Time{}))
+	def, ok := s.loaded().Registry.Get("review")
+	if !ok || def.Label == "" || def.Label == "review" {
+		t.Fatalf("the bundled review intent has no label of its own: %+v", def)
+	}
+	got := getTurnsLive(t, s)
+	if len(got.Running) != 2 || got.Running[0].Label != def.Label || got.Running[1].Label != "unheard-of" {
+		t.Fatalf("running %+v, want review labelled %q and an intent the registry lacks labelled by its name", got.Running, def.Label)
+	}
+}

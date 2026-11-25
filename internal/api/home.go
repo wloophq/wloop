@@ -1,5 +1,7 @@
 package api
 
+import "time"
+
 // HomePath serves the cockpit's home, as Home.
 const HomePath = "/api/home"
 
@@ -79,7 +81,12 @@ type Queue struct {
 
 // QueueItem is one decision of kind Kind: a task's open gate, or a situation of one of its units.
 type QueueItem struct {
-	Kind      string          `json:"kind"`
+	Kind string `json:"kind"`
+	// Word is what one such decision is, as the home's counters word it (a plugin's noun for its units); Tone is
+	// the design token decisions.toml draws the kind in; Since is when the decision began.
+	Word      string          `json:"word,omitempty"`
+	Tone      string          `json:"tone,omitempty"`
+	Since     time.Time       `json:"since,omitzero"`
 	Task      TaskView        `json:"task"`
 	Gate      *GateView       `json:"gate,omitempty"`
 	Situation *QueueSituation `json:"situation,omitempty"`
@@ -90,13 +97,18 @@ type QueueItem struct {
 }
 
 // QueueOption is an option of a question an item stands for; Draft is the gate of the held draft picking
-// it approves, nil for an option that pins none.
+// it approves, nil for an option that pins none; Primary is what the button that picks it says, the profile's
+// QueueOptionPrimary filled with the draft's verdict, else the option's label.
 type QueueOption struct {
 	ID          string    `json:"id"`
 	Label       string    `json:"label"`
 	Recommended bool      `json:"recommended,omitempty"`
 	Draft       *GateView `json:"draft,omitempty"`
+	Primary     string    `json:"primary"`
 }
+
+// QueueOptionPrimary is the strings.toml key of an option's button, {option} its word.
+const QueueOptionPrimary = "Post {option}"
 
 // QueueSituation is the situation of a provider's unit that makes the decision.
 type QueueSituation struct {

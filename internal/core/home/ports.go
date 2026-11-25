@@ -76,11 +76,13 @@ type Section struct {
 	Limit       int
 }
 
-// KindWords are a decision kind's view and words; Primary is the gate intent a queue offers first.
+// KindWords are a decision kind's view and words; Primary is the gate intent a queue offers first, Tone the
+// design token its items are drawn in.
 type KindWords struct {
 	View                  task.View
 	Noun, Clause          Forms
 	Queue, Empty, Primary string
+	Tone                  string
 }
 
 // PluginWords are a plugin's noun, its words of each decision kind and what its queue offers first on each.
