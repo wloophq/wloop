@@ -68,6 +68,10 @@ type Config struct {
 	// Window shows the cockpit's own window at a route; nil opens the
 	// browser at CockpitURL instead.
 	Window func(route string) error
+	// Float shows the floating widget at launch through ShowFloat; off
+	// unless the configuration turns it on.
+	Float     bool
+	ShowFloat func() error
 	// Reword gets each catalog of client strings the daemon serves, as the
 	// strings change; nil rewords nothing.
 	Reword func(*texts.Catalog)
@@ -197,6 +201,11 @@ func (c *Controller) Run(ctx context.Context) error {
 	c.mu.Unlock()
 	c.cfg.Notifier.WithdrawAll()
 	c.forgetSent()
+	if c.cfg.Float && c.cfg.ShowFloat != nil {
+		if err := c.cfg.ShowFloat(); err != nil {
+			c.cfg.Log("float: %v", err)
+		}
+	}
 	if c.cfg.DigestAt != "" {
 		go c.digests(ctx)
 	}

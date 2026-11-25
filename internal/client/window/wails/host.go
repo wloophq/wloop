@@ -4,6 +4,7 @@ package wails
 
 import (
 	"encoding/json"
+	"math"
 	"os"
 	"runtime"
 	"sync"
@@ -33,15 +34,19 @@ func Available() bool { return true }
 // thread, and never returns: quitting the app ends the process.
 func Run(name string, cat *texts.Catalog, ready func(window.Host)) {
 	runtime.LockOSThread()
+	var h *host
 	app := application.New(application.Options{
 		Name: name,
 		Mac: application.MacOptions{
 			ActivationPolicy: application.ActivationPolicyAccessory,
 			ApplicationShouldTerminateAfterLastWindowClosed: false,
 		},
+		RawMessageHandler: func(w application.Window, message string, origin *application.OriginInfo) {
+			h.pageMessage(w.Name(), message, origin != nil && origin.IsMainFrame)
+		},
 	})
 	app.Menu.Set(wailsMenu(menuOf(name, cat)))
-	h := newHost(app, name)
+	h = newHost(app, name)
 	app.Event.OnApplicationEvent(events.Mac.ApplicationDidFinishLaunching, func(*application.ApplicationEvent) {
 		go application.InvokeSync(func() {
 			h.launched()
@@ -55,6 +60,9 @@ func Run(name string, cat *texts.Catalog, ready func(window.Host)) {
 	})
 	app.Event.OnApplicationEvent(events.Common.ApplicationLaunchedWithUrl, func(e *application.ApplicationEvent) {
 		h.openURL(e.Context().URL())
+	})
+	app.Event.OnApplicationEvent(events.Mac.ApplicationDidChangeScreenParameters, func(*application.ApplicationEvent) {
+		h.do(h.screensChanged)
 	})
 	_ = app.Run()
 	os.Exit(0)
@@ -95,9 +103,10 @@ var wailsRole = map[role]application.Role{
 // host runs every request in order on its own goroutine, so a caller never
 // waits on the main thread.
 type host struct {
-	app         *application.App
-	name        string
-	main, panel *application.WebviewWindow
+	userDefaults
+	app                *application.App
+	name               string
+	main, panel, float *application.WebviewWindow
 
 	mu        sync.Mutex
 	queue     []func()
@@ -118,7 +127,15 @@ type host struct {
 	// focus loss is the person leaving it, not a late event of an earlier
 	// show.
 	panelKey bool
+	floatURL string
+	// floatShown, floatFrame, the frame last set or reported moved, and
+	// floatMode, the mode the float's page last said it draws in.
+	floatShown bool
+	floatFrame window.Rect
+	floatMode  string
 }
+
+const floatName = "float"
 
 func newHost(app *application.App, name string) *host {
 	h := &host{app: app, name: name, wake: make(chan struct{}, 1), detached: map[string]*detachedWindow{}}
@@ -137,6 +154,21 @@ func newHost(app *application.App, name string) *host {
 				application.MacWindowCollectionBehaviorFullScreenAuxiliary,
 		},
 	})
+	h.float = app.Window.NewWithOptions(application.WebviewWindowOptions{
+		Name: floatName, Title: name, URL: "about:blank", Width: 112, Height: 32, Hidden: true, Frameless: true,
+		DisableResize: true, BackgroundType: application.BackgroundTypeTransparent,
+		Mac: application.MacWindow{
+			WindowClass:        application.MacWindowClassPanel,
+			PanelPreferences:   application.MacPanelPreferences{NonActivating: true, FloatingPanel: true},
+			WindowLevel:        application.MacWindowLevelFloating,
+			CollectionBehavior: application.MacWindowCollectionBehaviorCanJoinAllSpaces,
+			Backdrop:           application.MacBackdropTransparent,
+			DisableShadow:      true,
+		},
+	})
+	h.float.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) { e.Cancel() })
+	h.float.OnWindowEvent(events.Mac.WindowDidBecomeKey, func(*application.WindowEvent) { h.do(h.releaseKeyboard) })
+	h.float.OnWindowEvent(events.Mac.WindowDidMove, func(*application.WindowEvent) { h.do(h.floatMoved) })
 	h.main.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
 		e.Cancel()
 		h.do(h.hideMain)
@@ -281,6 +313,90 @@ func (h *host) OpenExternal(url string) {
 	}
 }
 
+func (h *host) ShowFloat(url string) {
+	h.do(func() {
+		navigate(h.float, &h.floatURL, url)
+		h.floatShown = true
+		h.float.Show()
+	})
+}
+
+func (h *host) HideFloat() {
+	h.do(func() {
+		h.floatShown = false
+		h.float.Hide()
+	})
+}
+
+func (h *host) SetFloatFrame(r window.Rect) {
+	h.do(func() {
+		h.floatFrame = r
+		application.InvokeSync(func() { setFrame(nsWindow(h.float), r) })
+	})
+}
+
+// pageMessage hands a message the float's page sent to the controller,
+// keeping the mode it says it draws in; a message from any other window or
+// frame is dropped.
+func (h *host) pageMessage(windowName, message string, mainFrame bool) {
+	if windowName != floatName || !mainFrame {
+		return
+	}
+	m, ok := window.ParseFloatMessage(message)
+	if !ok {
+		return
+	}
+	h.do(func() {
+		if m.Kind == window.FloatSize && m.Mode != "" {
+			h.floatMode = m.Mode
+			h.releaseKeyboard()
+		}
+		if on := h.handlers().OnFloat; on != nil {
+			on(m)
+		}
+	})
+}
+
+// releaseKeyboard hands the keyboard back when the float holds it outside the
+// open panel.
+func (h *host) releaseKeyboard() {
+	if window.FloatKeyable(h.floatMode) || !isKey(h.float) {
+		return
+	}
+	application.InvokeSync(func() { handBackKeyboard(nsWindow(h.float)) })
+}
+
+// floatMoved reports a move the person made: a frame other than the one the
+// host last set.
+func (h *host) floatMoved() {
+	if !h.floatShown {
+		return
+	}
+	var f window.Rect
+	application.InvokeSync(func() { f = frameOf(nsWindow(h.float)) })
+	if sameFrame(f, h.floatFrame) {
+		return
+	}
+	h.floatFrame = f
+	if on := h.handlers().OnFloatMoved; on != nil {
+		on(f)
+	}
+}
+
+// sameFrame allows the rounding AppKit applies to a frame it was given.
+func sameFrame(a, b window.Rect) bool {
+	near := func(x, y float64) bool { return math.Abs(x-y) < 1 }
+	return near(a.X, b.X) && near(a.Y, b.Y) && near(a.W, b.W) && near(a.H, b.H)
+}
+
+func (h *host) screensChanged() {
+	var s []window.Rect
+	application.InvokeSync(func() { s = screens() })
+	if on := h.handlers().OnScreens; on != nil && len(s) > 0 {
+		on(s)
+	}
+}
+
 func (h *host) HidePanel() {
 	h.do(func() {
 		h.panelShown, h.panelKey = false, false
@@ -288,14 +404,20 @@ func (h *host) HidePanel() {
 	})
 }
 
-// Listen binds the reopen and, unless h.Hotkey is empty, the hotkey; call it
-// after the app launched, off the main thread, so a refused chord comes back
-// as the error.
+// Listen binds the reopen, the float's messages and the screens and, unless
+// h.Hotkey is empty, the hotkey; call it after the app launched, off the main
+// thread, so a refused chord comes back as the error.
 func (h *host) Listen(hs window.Handlers) error {
 	h.links.Lock()
 	h.mu.Lock()
 	h.listening = hs
 	h.mu.Unlock()
+	if hs.FloatOverFullScreen {
+		application.InvokeSync(func() {
+			addCollectionBehavior(nsWindow(h.float), application.MacWindowCollectionBehaviorFullScreenAuxiliary)
+		})
+	}
+	h.do(h.screensChanged)
 	if hs.OnOpenURL != nil {
 		for _, link := range h.pending {
 			hs.OnOpenURL(link)
