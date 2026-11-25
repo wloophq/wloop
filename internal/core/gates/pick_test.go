@@ -36,6 +36,12 @@ func (p *pins) Pinning(ctx context.Context, d gate.Gate) (gate.Gate, string, int
 
 func pickFixture(t *testing.T) (fixture, gate.Gate, gate.Gate) {
 	t.Helper()
+	return pickFixtureAsked(t, "s-worker")
+}
+
+// pickFixtureAsked is pickFixture with the question asked by session asker.
+func pickFixtureAsked(t *testing.T, asker string) (fixture, gate.Gate, gate.Gate) {
+	t.Helper()
 	store := gatestest.NewStore(fixedNow)
 	cons := &gatestest.Consequences{}
 	p := &pins{store: store}
@@ -43,7 +49,7 @@ func pickFixture(t *testing.T) (fixture, gate.Gate, gate.Gate) {
 		Sessions: drivenSessions{}, Options: p})
 	f := fixture{svc: svc, store: store, cons: cons}
 	d := f.draftGate(t)
-	q := f.question(t, "s-worker")
+	q := f.question(t, asker)
 	p.question, p.drafted = q.ID, d.ID
 	return f, d, q
 }
@@ -93,4 +99,38 @@ func TestAPickAtAnotherRevChangesNothing(t *testing.T) {
 	if err := f.svc.PickOption(ctx, q.ID, gates.Resolution{Intent: "answer", Answer: "Hold", By: task.ActorPerson}, 3, nil); !errors.Is(err, gates.ErrRefused) {
 		t.Fatalf("a pick of an option that pins no draft: %v, want ErrRefused", err)
 	}
+}
+
+// The question of a session that revised the draft pins it: approving the draft on its card picks the option, and a
+// person's edit as they pick keeps the reviser's stamp on the edit's gate, so the pick approves the edited draft.
+func TestAReviserQuestionsPinnedDraftIsApprovedOnItsCardOrByAnEditedPick(t *testing.T) {
+	ctx := context.Background()
+	t.Run("on its card", func(t *testing.T) {
+		f, d, q := pickFixtureAsked(t, "s-reviser")
+		if err := f.svc.Resolve(ctx, d.ID, gates.Resolution{Intent: "approve", By: task.ActorPerson}); err != nil {
+			t.Fatal(err)
+		}
+		if gq, gd := f.get(t, q.ID), f.get(t, d.ID); gq.Status != gate.Answered || gq.Answer != "Approve (option a)" || gd.Status != gate.Approved {
+			t.Fatalf("question %+v, draft %+v", gq, gd)
+		}
+	})
+	t.Run("an edited pick", func(t *testing.T) {
+		f, d, q := pickFixtureAsked(t, "s-reviser")
+		var edited gate.Gate
+		edit := func(ctx context.Context, drafted gate.Gate) (gate.Gate, error) {
+			if err := f.svc.Supersede(ctx, drafted.ID, task.ActorPerson); err != nil {
+				return gate.Gate{}, err
+			}
+			g, err := f.svc.Open(ctx, gate.Gate{Kind: gate.KindDraft, Unit: acme, Subject: "42", Session: drafted.Session, ApprovedRev: 4,
+				Sessions: drafted.Sessions}, waits)
+			edited = g
+			return g, err
+		}
+		if err := f.svc.PickOption(ctx, q.ID, answer(task.ActorPerson, ""), 3, edit); err != nil {
+			t.Fatal(err)
+		}
+		if got := f.get(t, edited.ID); got.Status != gate.Approved || got.ApprovedRev != 4 || f.get(t, d.ID).Status != gate.Superseded {
+			t.Fatalf("the edit's gate %+v", got)
+		}
+	})
 }

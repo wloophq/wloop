@@ -106,7 +106,6 @@ func TestApproveOptionPinsRev(t *testing.T) {
 		{"rev 0", answer(task.ActorPerson, ""), 0, nil},
 		{"a resolver the user does not drive", answer(task.ActorAgent, "s-stranger"), 3, nil},
 		{"a draft on another unit", answer(task.ActorPerson, ""), 3, func(g *gate.Gate) { g.Unit.Key = "acme/api#8" }},
-		{"a draft of another session", answer(task.ActorPerson, ""), 3, func(g *gate.Gate) { g.Session, g.Sessions = "s-other", nil }},
 		{"a rule", gates.Resolution{Intent: "answer", Answer: "x", By: task.ActorWorkflow, Rule: "rule 0"}, 3, nil},
 	} {
 		t.Run(c.name, func(t *testing.T) {
@@ -300,5 +299,28 @@ func TestAnAnswerDoesNotClaimADraftAnotherResolverApproved(t *testing.T) {
 	}
 	if f.get(t, q.ID).Status != gate.Open {
 		t.Fatal("the question was answered with a draft another resolver approved")
+	}
+}
+
+// The question's turn chain, which the caller checks, ties the question to its options' drafts, not the session
+// that asks: a session that revised the draft, or one that never touched it, asks the question, and picking the
+// option approves the draft.
+func TestAnOptionsDraftNeedNotBeOfTheQuestionsSession(t *testing.T) {
+	ctx := context.Background()
+	for _, asker := range []string{"s-reviser", "s-asker"} {
+		for _, r := range []gates.Resolution{answer(task.ActorPerson, ""), answer(task.ActorAgent, asker)} {
+			t.Run(asker+"/"+string(r.By), func(t *testing.T) {
+				f := newFixture(t, nil, bundled)
+				f.drive(asker)
+				d := f.draftGate(t)
+				q := f.question(t, asker)
+				if err := f.svc.ApproveOption(ctx, q, r, d, 3); err != nil {
+					t.Fatal(err)
+				}
+				if gq, gd := f.get(t, q.ID), f.get(t, d.ID); gq.Status != gate.Answered || gd.Status != gate.Approved || gd.By != r.By {
+					t.Fatalf("question %+v, draft %+v", gq, gd)
+				}
+			})
+		}
 	}
 }

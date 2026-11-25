@@ -104,6 +104,37 @@ func TestAReplacingTurnsQuestionPinsItsPredecessorsDrafts(t *testing.T) {
 	}
 }
 
+// TestAReplacingTurnInAnotherSessionPinsItsPredecessorsDrafts: turn 2 replaced asked turn 1 and runs in another
+// session, term_2, which never revised drafts 42 and 43; its question still pins them, and approving draft 42's card
+// picks its option.
+func TestAReplacingTurnInAnotherSessionPinsItsPredecessorsDrafts(t *testing.T) {
+	ctx := context.Background()
+	r := newRig(t)
+	od := newOptionDrafts(t, r)
+	od.put(heldDraft(42, r7, 1, 1), "term_1")
+	od.put(heldDraft(43, r7, 1, 1), "term_1")
+	b := r.started(r7)
+	t1 := b.Turns[0]
+	t2 := t1
+	t1.State, t1.ReplacedBy, t1.Before = turn.Replaced, 2, turn.Asked
+	t2.Seq, t2.ID, t2.State, t2.Session = 2, "def", turn.Started, "term_2"
+	b.Turns = []turn.Turn{t1, t2}
+	r.books.Put(b)
+	r.record(t, r7, 2, askedRecord(draftQuestion()))
+	r.live()
+	r.reconcile(t, r7)
+	m := r.only(t)
+	if got := r.gateOf(t, m); got.Session != "term_2" {
+		t.Fatalf("question gate of session %q, want term_2", got.Session)
+	}
+	if err := r.gates.Resolve(ctx, od.gateOf(42).ID, gates.Resolution{Intent: "approve", By: task.ActorPerson}); err != nil {
+		t.Fatalf("approving draft 42's card: %v", err)
+	}
+	if got := r.gateOf(t, m); got.Status != gate.Answered || len(od.approvals) != 1 || od.approvals[0].drafted != od.gateOf(42).ID {
+		t.Errorf("question %s, approvals %+v: want the question answered by draft 42's approval alone", got.Status, od.approvals)
+	}
+}
+
 // TestAQuestionDecidesItsPinnedDraftsRetry: while a question pins drafts 42 and 43, a retry of either is refused;
 // once its answer picked 42, the question no longer decides it.
 func TestAQuestionDecidesItsPinnedDraftsRetry(t *testing.T) {
