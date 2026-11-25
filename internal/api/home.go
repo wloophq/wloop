@@ -9,8 +9,9 @@ const HomePath = "/api/home"
 // lens query, as CountersPath's does.
 const QueuePath = "/api/queues/{kind}"
 
-// QueueAllPath serves the queue of every decision kind, as Queue with no Kind: the kinds in the order
-// decisions.toml gives, each kind's items oldest decision first. Its query parameter q is QueuePath's.
+// QueueAllPath serves the queue of every decision kind, as Queue with no Kind and with View the view drawn as
+// the queue: the kinds in the order decisions.toml gives, each kind's items oldest decision first. Its query
+// parameter q is QueuePath's.
 const QueueAllPath = "/api/queue"
 
 // Home is the briefing, the home's sections and the capture field.
@@ -52,15 +53,18 @@ type PluginNoun struct {
 	Noun   string `json:"noun"`
 }
 
-// HomeSection is the first rows of View; Total counts all of them, Time names the time each row shows
-// ("owed" or "moved").
+// HomeSection is the first rows of View, or, for a view drawn as the queue, the first Items of the queue of
+// every decision kind; Total counts all of them, Time names the time each row shows ("owed" or "moved").
 type HomeSection struct {
-	ID    string     `json:"id"`
-	View  string     `json:"view"`
-	Label string     `json:"label"`
-	Time  string     `json:"time"`
-	Rows  []TaskView `json:"rows"`
-	Total int        `json:"total"`
+	ID    string      `json:"id"`
+	View  string      `json:"view"`
+	Label string      `json:"label"`
+	Time  string      `json:"time"`
+	Rows  []TaskView  `json:"rows"`
+	Items []QueueItem `json:"items,omitempty"`
+	// Empty is what a queue section says when it lists nothing.
+	Empty string `json:"empty,omitempty"`
+	Total int    `json:"total"`
 }
 
 // HomeCapture is the capture field's hint and key.
@@ -79,7 +83,8 @@ type Queue struct {
 	Items []QueueItem `json:"items"`
 }
 
-// QueueItem is one decision of kind Kind: a task's open gate, or a situation of one of its units.
+// QueueItem is one decision of kind Kind, which Word words: a task's open gate, a failed delivery's approved
+// draft gate, or a situation of one of its units.
 type QueueItem struct {
 	Kind string `json:"kind"`
 	// Word is what one such decision is, as the home's counters word it (a plugin's noun for its units); Tone is
@@ -118,9 +123,12 @@ type QueueSituation struct {
 }
 
 // QueueAction is an item's primary action: Kind "gate" (ID a gate intent), "action" (ID a catalog
-// action) or "open" (open the unit at its source).
+// action), "open" (open the unit at its source) or "verb" (run the task verb ID on task Task with Args, as
+// POST TaskPath(Task, ID) does: a failed delivery's retry on its draft's task, its gate approved already).
 type QueueAction struct {
-	Kind  string `json:"kind"`
-	ID    string `json:"id,omitempty"`
-	Label string `json:"label"`
+	Kind  string            `json:"kind"`
+	ID    string            `json:"id,omitempty"`
+	Task  string            `json:"task,omitempty"`
+	Args  map[string]string `json:"args,omitempty"`
+	Label string            `json:"label"`
 }

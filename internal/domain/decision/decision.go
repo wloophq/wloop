@@ -59,8 +59,8 @@ type Source struct {
 // Open is the primary action that opens a unit at its source.
 const Open = "open"
 
-// Found is one decision a task waits on: an open gate (Gate) or a linked unit (Unit, with the Situation that
-// made it, "" when a signal did).
+// Found is one decision a task waits on: an open gate or an undelivered draft's approved gate (Gate), or a linked
+// unit (Unit, with the Situation that made it, "" when a signal did).
 type Found struct {
 	Kind      Kind
 	Gate      *gate.Gate
@@ -69,14 +69,19 @@ type Found struct {
 	Since     time.Time
 }
 
-// Of are the decisions of a task's gates and linked units: one per open mapped gate, and per unit one per kind
-// its situation or its signals map to, ordered by Since, then kind order.
-func (m Map) Of(gates []gate.Gate, links []Source) []Found {
+// Of are the decisions of a task's gates and linked units: one per open mapped gate of open, one per draft gate of
+// undelivered, the approved gates of the task's drafts whose delivery failed, and per unit one per kind its
+// situation or its signals map to, ordered by Since, then kind order.
+func (m Map) Of(open, undelivered []gate.Gate, links []Source) []Found {
 	var out []Found
-	for _, g := range gates {
+	for _, g := range open {
 		if k, ok := m.Gates[g.Kind]; ok && g.Status == gate.Open {
-			open := g
-			out = append(out, Found{Kind: k, Gate: &open, Since: g.OpenedAt})
+			out = append(out, Found{Kind: k, Gate: &g, Since: g.OpenedAt})
+		}
+	}
+	for _, g := range undelivered {
+		if k, ok := m.Gates[g.Kind]; ok && g.Kind == gate.KindDraft && g.Status == gate.Approved {
+			out = append(out, Found{Kind: k, Gate: &g, Since: g.OpenedAt})
 		}
 	}
 	for _, l := range links {

@@ -207,6 +207,8 @@ type Attention struct {
 	Body     string            `json:"body"`
 	Image    string            `json:"image,omitempty"`
 	Actions  []AttentionAction `json:"actions"`
+	// Daily is posted once a day: its id's token is the local day.
+	Daily bool `json:"daily,omitempty"`
 }
 
 // TurnView is the pull request's newest turn with its records and answers.

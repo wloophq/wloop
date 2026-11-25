@@ -39,7 +39,7 @@ func TestOfMapsGatesSituationsAndSignals(t *testing.T) {
 	u := unit.Unit{Provider: "alpha", Key: "acme/api#8"}
 	question := gate.Gate{ID: 7, Kind: gate.KindQuestion, Status: gate.Open, OpenedAt: t0, Intents: []string{"answer"}}
 	got := alphaMap().Of(
-		[]gate.Gate{question},
+		[]gate.Gate{question}, nil,
 		[]Source{{Unit: u, Situation: "merge", Signals: map[string]bool{"ready": true}, Since: t0.Add(time.Hour)}},
 	)
 	want := []Found{
@@ -53,7 +53,7 @@ func TestOfMapsGatesSituationsAndSignals(t *testing.T) {
 
 func TestOfSignalAloneFindsTheKind(t *testing.T) {
 	u := unit.Unit{Provider: "alpha", Key: "acme/api#9"}
-	got := alphaMap().Of(nil, []Source{{Unit: u, Situation: "review", Signals: map[string]bool{"ready": true, "stalled": true}, Since: t0}})
+	got := alphaMap().Of(nil, nil, []Source{{Unit: u, Situation: "review", Signals: map[string]bool{"ready": true, "stalled": true}, Since: t0}})
 	want := []Found{{Kind: LastStep, Unit: u, Since: t0}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("Of = %+v, want %+v", got, want)
@@ -62,7 +62,7 @@ func TestOfSignalAloneFindsTheKind(t *testing.T) {
 
 func TestOfIgnoresUnmappedAndClosedGates(t *testing.T) {
 	got := alphaMap().Of(
-		[]gate.Gate{{ID: 1, Kind: gate.KindPlan, Status: gate.Approved, OpenedAt: t0}, {ID: 2, Kind: gate.KindTrust, Status: gate.Open}},
+		[]gate.Gate{{ID: 1, Kind: gate.KindPlan, Status: gate.Approved, OpenedAt: t0}, {ID: 2, Kind: gate.KindTrust, Status: gate.Open}}, nil,
 		[]Source{{Unit: unit.Unit{Provider: "alpha", Key: "a#1"}, Situation: "review", Signals: map[string]bool{"ready": false}},
 			{Unit: unit.Unit{Provider: "beta", Key: "b"}, Situation: "merge"}},
 	)
@@ -76,13 +76,25 @@ func TestOfOneFoundPerGateOrderedBySinceThenKind(t *testing.T) {
 		{ID: 3, Kind: gate.KindQuestion, Status: gate.Open, OpenedAt: t0.Add(time.Minute)},
 		{ID: 4, Kind: gate.KindQuestion, Status: gate.Open, OpenedAt: t0},
 		{ID: 5, Kind: gate.KindPlan, Status: gate.Open, OpenedAt: t0},
-	}, nil)
+	}, nil, nil)
 	ids := []int64{}
 	for _, f := range got {
 		ids = append(ids, f.Gate.ID)
 	}
 	if !slices.Equal(ids, []int64{4, 5, 3}) {
 		t.Fatalf("gates in order %v, want [4 5 3]", ids)
+	}
+}
+
+func TestOfCountsOnlyTheUndeliveredDraftsGivenAsSuch(t *testing.T) {
+	m := alphaMap()
+	m.Gates[gate.KindDraft] = SendDraft
+	sent := gate.Gate{ID: 8, Kind: gate.KindDraft, Status: gate.Approved, OpenedAt: t0}
+	failed := gate.Gate{ID: 9, Kind: gate.KindDraft, Status: gate.Approved, OpenedAt: t0}
+	plan := gate.Gate{ID: 10, Kind: gate.KindPlan, Status: gate.Approved, OpenedAt: t0}
+	got := m.Of([]gate.Gate{sent}, []gate.Gate{failed, plan}, nil)
+	if len(got) != 1 || got[0].Kind != SendDraft || got[0].Gate.ID != 9 {
+		t.Fatalf("Of = %+v, want the undelivered draft alone: an approved gate among the open ones, or one of no draft, waits on nothing", got)
 	}
 }
 

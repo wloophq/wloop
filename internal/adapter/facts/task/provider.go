@@ -65,7 +65,8 @@ type Deps struct {
 	Items Items
 	// Cards are the facts of the tasks' units; nil: none.
 	Cards coretasks.Facts
-	// Drafts are read for task.settled_at; nil: always zero.
+	// Drafts are read for task.settled_at and for the failed deliveries task.decisions counts; nil: always zero,
+	// and none.
 	Drafts Drafts
 	// Enabled says whether a provider's plugin is enabled; nil: every one is.
 	Enabled  func(unit.ProviderID) bool
@@ -397,7 +398,11 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		if err != nil {
 			return nil, err
 		}
-		if found := p.d.Decisions().Of(gates.Unpinned(gs, pinned), sources); len(found) > 0 {
+		undelivered, err := p.undelivered(ctx, e.ID)
+		if err != nil {
+			return nil, err
+		}
+		if found := p.d.Decisions().Of(gates.Unpinned(gs, pinned), undelivered, sources); len(found) > 0 {
 			f["task.decisions"], f["task.decision_since"] = decision.Names(found), found[0].Since
 		}
 	}
@@ -841,6 +846,25 @@ func (p *Provider) pinned(ctx context.Context) (map[int64]int64, error) {
 	return coretasks.Once(ctx, passPinned, func() (map[int64]int64, error) { return p.d.Pinned(ctx) })
 }
 
+// undelivered are task id's approved draft gates whose drafts failed to deliver; in a pass, read once.
+func (p *Provider) undelivered(ctx context.Context, id task.ID) ([]gate.Gate, error) {
+	if p.d.Drafts == nil || p.d.Gates == nil {
+		return nil, nil
+	}
+	all, err := coretasks.Once(ctx, passUndelivered, func() (map[task.ID][]gate.Gate, error) {
+		ds, err := p.d.Drafts.List(ctx, outbox.Filter{States: []draft.State{draft.Failed}})
+		if err != nil {
+			return nil, err
+		}
+		ids := make([]int64, len(ds))
+		for i, d := range ds {
+			ids[i] = int64(d.ID)
+		}
+		return gates.Undelivered(ctx, p.d.Gates.Where, ids)
+	})
+	return all[id], err
+}
+
 // wake is task id's wake; in a pass, every task's is read once.
 func (p *Provider) wake(ctx context.Context, id task.ID) (wake.Wake, bool, error) {
 	return coretasks.WakeIn(ctx, p.d.Wakes, id)
@@ -848,12 +872,13 @@ func (p *Provider) wake(ctx context.Context, id task.ID) (wake.Wake, bool, error
 
 // What every task's facts read of the store as a whole, once per pass.
 const (
-	passOpenTurns = "facts.open_turns"
-	passTurns     = "facts.turns"
-	passGates     = "facts.gates"
-	passPinned    = "facts.pinned"
-	passSettled   = "facts.settled."
-	passTask      = "facts.task."
+	passOpenTurns   = "facts.open_turns"
+	passTurns       = "facts.turns"
+	passGates       = "facts.gates"
+	passPinned      = "facts.pinned"
+	passUndelivered = "facts.undelivered"
+	passSettled     = "facts.settled."
+	passTask        = "facts.task."
 )
 
 // items are the items of units; those of the pass ctx carries are read once for every unit of it.

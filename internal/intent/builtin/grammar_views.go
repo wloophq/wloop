@@ -10,10 +10,11 @@ const (
 	ViewLayoutList   = "list"
 	ViewLayoutBoard  = "board"
 	ViewLayoutOutbox = "outbox"
+	ViewLayoutQueue  = "queue"
 )
 
 // ViewLayouts are the layouts of views.*.layout.
-var ViewLayouts = []string{ViewLayoutList, ViewLayoutBoard, ViewLayoutOutbox}
+var ViewLayouts = []string{ViewLayoutList, ViewLayoutBoard, ViewLayoutOutbox, ViewLayoutQueue}
 
 // viewsGrammar is the keys of views.toml.
 var viewsGrammar = []Key{
@@ -72,9 +73,9 @@ var viewsGrammar = []Key{
 	{Path: "views.*.hide_disabled", In: SurfaceViews, Kind: KindBool, Default: "false", Doc: "The view hides the tasks whose units are all of a disabled plugin, and the gates on a disabled plugin's units."},
 	{Path: "views.*.rail", In: SurfaceViews, Kind: KindBool, Default: "true", Doc: "The rail lists the view; false keeps it for the home, a queue or search."},
 	{Path: "views.*.remove_clean", In: SurfaceViews, Kind: KindBool, Default: "false", Doc: "The view offers to remove at once the workspaces its tasks' links hold whose checkouts hold nothing that is not published, as each link's remove action does; the rest are kept, with why."},
-	{Path: "views.*.layout", In: SurfaceViews, Kind: KindEnum, Values: named(ViewLayouts...), Default: ViewLayoutList, Doc: "How the cockpit draws the view: list, its rows; board, a lane per group, which a person may switch back to the list; outbox, the Outbox's drafts, which the lens filters, groups and sorts over the `draft_facets` and the view's own `group` and `sort` (draft facts), read from the Outbox's own route whatever the view lists."},
-	{Path: "badge", In: SurfaceViews, Kind: KindTable, Doc: "The menu bar's badge."},
-	{Path: "badge.views", In: SurfaceViews, Kind: KindList, Elem: KindText, Doc: "The views whose counts the badge adds up, each a view of views."},
+	{Path: "views.*.layout", In: SurfaceViews, Kind: KindEnum, Values: named(ViewLayouts...), Default: ViewLayoutList, Doc: "How the cockpit draws the view: list, its rows; board, a lane per group, which a person may switch back to the list; outbox, the Outbox's drafts, which the lens filters, groups and sorts over the `draft_facets` and the view's own `group` and `sort` (draft facts), read from the Outbox's own route whatever the view lists, and which a page of its own opens as the queue view narrowed to the kind draft gates count as; queue, what waits on you one decision at a time, the queue of every decision kind in decisions.toml's order, read from its own route whatever the view lists, which the home's section and counter of the view, the menu bar and the Outbox open; with no `when` of its own, such a view lists the tasks of the views decisions.toml's kinds name."},
+	{Path: "badge", In: SurfaceViews, Kind: KindTable, Doc: "The views whose tasks the menu bar notifies, the daily digest counts and `status` prints; the menu bar's title counts Needs you, the queue of every decision kind, instead."},
+	{Path: "badge.views", In: SurfaceViews, Kind: KindList, Elem: KindText, Doc: "Those views, each a view of views: the tasks of the ones on the rail post the menu bar's banners, the digest counts what moved in them, `status` prints their tasks, and their counts add up to the counters' badge, which no client title reads."},
 	{Path: "review", In: SurfaceViews, Kind: KindTable, Doc: "The review's steps, in the order the review walks them."},
 	{Path: "review.*", In: SurfaceViews, Kind: KindTable, Doc: "A step of the review, by the view it walks, which views declares. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones, and comes after the steps below it."},
 	{Path: "review.*.label", In: SurfaceViews, Localized: true, Kind: KindText, Required: true, Doc: "What the step asks of you, as the review lists it. Required."},

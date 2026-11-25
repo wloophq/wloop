@@ -277,7 +277,7 @@ async function act(intent?: string): Promise<void> {
     const p = item.primary || {};
     if (item.gate && (p.kind === "gate" || intent)) await floatDeps.resolve(item, intent || p.id, (item.options || []).length ? optionOf(item) : undefined);
     else await floatDeps.run(item);
-    if (!item.gate && p.kind !== "action") return;
+    if (!item.gate && p.kind !== "action" && p.kind !== "verb") return;
   } finally {
     fl.busy = false;
   }

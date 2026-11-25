@@ -3,7 +3,11 @@ package daemon
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -12,9 +16,13 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/api/client"
+	"github.com/wloophq/wloop/internal/brand"
+	"github.com/wloophq/wloop/internal/client/menubar"
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/domain/decision"
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	dmessage "github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/record"
@@ -346,7 +354,7 @@ func TestOptionDraftCountsAgainOnceQuestionCloses(t *testing.T) {
 	}
 }
 
-func TestQueueItemCarriesItsKindWordAndSince(t *testing.T) {
+func TestQueueItemCarriesItsKindWordAndSinceOnTheQueueAndTheHome(t *testing.T) {
 	t.Parallel()
 	q := newQueueRig(t, nil)
 	q.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "plan the move"})
@@ -357,5 +365,216 @@ func TestQueueItemCarriesItsKindWordAndSince(t *testing.T) {
 	}
 	if it := got.Items[0]; it.Word != "plan" || !it.Since.Equal(g.OpenedAt) || it.Tone != "late" {
 		t.Fatalf("item word %q since %v tone %q, want the kind's noun %q, the gate's opening %v and the kind's tone late", it.Word, it.Since, it.Tone, "plan", g.OpenedAt)
+	}
+	q.open(t, "t-0000000000000001", gate.KindQuestion, "7", time.Hour)
+	var h api.Home
+	get(t, q.s, api.HomePath, &h)
+	var words []string
+	for _, it := range h.Sections[0].Items {
+		words = append(words, it.Word)
+	}
+	if !slices.Equal(words, []string{"question", "plan"}) {
+		t.Fatalf("home item words %q, want each item's kind word, so the task's two rows read apart", words)
+	}
+}
+
+// failedOn stores, on task id, a draft a person approved whose delivery failed, with its approved gate.
+func (r *outboxRig) failedOn(t *testing.T, id task.ID, text string) (draft.Draft, gate.Gate) {
+	t.Helper()
+	ctx := context.Background()
+	d, err := r.db.Drafts().Insert(ctx, draft.Draft{Unit: r7u, Task: string(id), Kind: draft.Kind("reply"), Text: text, Original: text, State: draft.Failed,
+		Error: "refused", CreatedAt: r.clock.Now(), UpdatedAt: r.clock.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := r.db.Gates(r.clock.Now)
+	g, err := st.Open(ctx, gate.Gate{Kind: gate.KindDraft, Name: "draft", Intents: []string{"approve", "discard"}, Unit: r7u, Task: id,
+		Subject: strconv.FormatInt(int64(d.ID), 10), ApprovedRev: d.Rev})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g, err = st.Resolve(ctx, g.ID, gates.Resolution{Status: gate.Approved, Intent: "approve", By: task.ActorPerson}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Applied(ctx, g.ID); err != nil {
+		t.Fatal(err)
+	}
+	return d, g
+}
+
+func TestFailedDeliveryIsAQueueItem(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	r.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "thank the reviewer"})
+	d, g := r.failedOn(t, "t-0000000000000001", "Thanks for the review.")
+	var outboxPage api.OutboxPage
+	if code := get(t, r.s, api.OutboxPath+"?view=outbox", &outboxPage); code != 200 || !slices.ContainsFunc(outboxPage.Drafts, func(o api.OutboxDraft) bool { return o.ID == int64(d.ID) }) {
+		t.Fatalf("%d: the Outbox lists %+v, want the failed draft", code, outboxPage.Drafts)
+	}
+	for _, path := range []string{api.QueueAllPath, queuePath("send-draft")} {
+		var q api.Queue
+		if code := get(t, r.s, path, &q); code != 200 {
+			t.Fatalf("GET %s: %d", path, code)
+		}
+		if len(q.Items) != 1 || q.Items[0].Kind != "send-draft" || q.Items[0].Gate == nil || q.Items[0].Gate.ID != g.ID || q.Items[0].Gate.Delivery != "failed" ||
+			q.Items[0].Task.ID != "t-0000000000000001" {
+			t.Fatalf("GET %s: items %+v, want the failed delivery as a send-draft item of its own", path, q.Items)
+		}
+		if q.Items[0].Word != "draft" {
+			t.Fatalf("GET %s: word %q, want the send-draft kind's noun", path, q.Items[0].Word)
+		}
+		want := api.QueueAction{Kind: "verb", ID: "retry", Task: "draft:" + strconv.FormatInt(int64(d.ID), 10), Label: "Retry", Args: map[string]string{"rev": strconv.FormatInt(d.Rev, 10)}}
+		if got := q.Items[0].Primary; !reflect.DeepEqual(got, want) {
+			t.Fatalf("GET %s: primary %+v, want %+v: its gate is approved already, so it retries through the draft's own verb", path, got, want)
+		}
+	}
+	if rec := post(t, r.s, api.TaskPath("draft:"+strconv.FormatInt(int64(d.ID), 10), "retry"), `{"args":{"rev":"`+strconv.FormatInt(d.Rev, 10)+`"},"source":"cockpit"}`); rec.Code != 200 {
+		t.Fatalf("the primary's request answered %d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestTheHomesNeedsYouSectionIsTheQueueOfEveryKind(t *testing.T) {
+	t.Parallel()
+	q := newQueueRig(t, nil)
+	q.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "send the notes"},
+		task.Task{ID: "t-0000000000000002", State: "next", Category: task.CategoryReady, Title: "pick a name"})
+	q.open(t, "t-0000000000000001", gate.KindDraft, "41", 2*time.Hour)
+	q.open(t, "t-0000000000000002", gate.KindQuestion, "7", time.Hour)
+	var h api.Home
+	if code := get(t, q.s, api.HomePath, &h); code != 200 {
+		t.Fatalf("GET %s: %d", api.HomePath, code)
+	}
+	if len(h.Sections) == 0 || h.Sections[0].View != "needs-you" || h.Sections[0].Label != "Needs you" {
+		t.Fatalf("sections %+v, want Needs you first", h.Sections)
+	}
+	s := h.Sections[0]
+	var kinds []string
+	for _, it := range s.Items {
+		kinds = append(kinds, it.Kind)
+	}
+	if s.Total != 2 || len(s.Rows) != 0 || !slices.Equal(kinds, []string{"answer", "send-draft"}) || s.Items[0].Gate == nil {
+		t.Fatalf("section %+v, want the queue's items in the profile's order", s)
+	}
+	if all := q.all(t); all.View != "needs-you" {
+		t.Fatalf("the queue's view %q, want the view that draws it", all.View)
+	}
+	var cat api.ViewsCatalog
+	get(t, q.s, api.ViewsPath, &cat)
+	i := slices.IndexFunc(cat.Views, func(v api.TaskViewSpec) bool { return v.ID == "outbox" })
+	if i < 0 || cat.Views[i].Opens != "view=needs-you&kind=send-draft" {
+		t.Fatalf("the Outbox's view %+v, want it to open Needs you narrowed to the drafts to send", cat.Views)
+	}
+}
+
+// sentence is the home's first briefing sentence, its counters written as [label].
+func sentence(h api.Home) string {
+	var b strings.Builder
+	for _, p := range h.Briefing.Sentences[0] {
+		if p.Counter != nil {
+			b.WriteString("[" + h.Briefing.Counters[*p.Counter].Label + "]")
+		} else {
+			b.WriteString(p.Text)
+		}
+	}
+	return b.String()
+}
+
+func TestTheBriefingCountsWhatWaitsOnYouNotTasks(t *testing.T) {
+	t.Parallel()
+	q := newQueueRig(t, nil)
+	q.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "ship the retries"})
+	q.open(t, "t-0000000000000001", gate.KindQuestion, "7", time.Hour)
+	var one api.Home
+	get(t, q.s, api.HomePath, &one)
+	if got := sentence(one); got != "[1 thing] waits on you." {
+		t.Fatalf("sentence %q for one item", got)
+	}
+	q.open(t, "t-0000000000000001", gate.KindDraft, "41", 2*time.Hour)
+	var two api.Home
+	get(t, q.s, api.HomePath, &two)
+	if got := sentence(two); got != "[2 things] wait on you." {
+		t.Fatalf("sentence %q for two items of one task, want them counted as things, not tasks", got)
+	}
+}
+
+func TestNeedsYouIsOneCount(t *testing.T) {
+	t.Parallel()
+	q := newQueueRig(t, nil)
+	var empty api.Home
+	get(t, q.s, api.HomePath, &empty)
+	if s := empty.Sections[0]; s.View != "needs-you" || s.Empty != "Nothing needs you." {
+		t.Fatalf("empty section %+v, want decisions.toml's empty_all", s)
+	}
+	q.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "ship the retries"})
+	q.open(t, "t-0000000000000001", gate.KindQuestion, "7", time.Hour)
+	q.open(t, "t-0000000000000001", gate.KindDraft, "41", 2*time.Hour)
+	var h api.Home
+	get(t, q.s, api.HomePath, &h)
+	i := slices.IndexFunc(h.Briefing.Counters, func(c api.HomeCounter) bool { return c.ID == "needs-you" })
+	if i < 0 {
+		t.Fatalf("counters %+v, want needs-you", h.Briefing.Counters)
+	}
+	all := q.all(t)
+	if counter, section := h.Briefing.Counters[i].Count, h.Sections[0].Total; counter != 2 || section != 2 || all.Total != 2 {
+		t.Fatalf("counter %d, section %d, queue %d: want each to count the task's two items", counter, section, all.Total)
+	}
+}
+
+// titleTray keeps the menu bar's title.
+type titleTray struct {
+	mu    sync.Mutex
+	title string
+}
+
+func (r *titleTray) SetTitle(title string)    { r.mu.Lock(); r.title = title; r.mu.Unlock() }
+func (*titleTray) SetMenu([]menubar.MenuItem) {}
+
+// quietNotifier posts nothing.
+type quietNotifier struct{}
+
+func (quietNotifier) Authorize(context.Context) (menubar.Permission, error) {
+	return menubar.PermissionDenied, nil
+}
+func (quietNotifier) Permission(context.Context) (menubar.Permission, error) {
+	return menubar.PermissionDenied, nil
+}
+func (quietNotifier) Post(menubar.Notification) error   { return nil }
+func (quietNotifier) Withdraw([]string)                 {}
+func (quietNotifier) WithdrawAll()                      {}
+func (quietNotifier) OnResponse(func(menubar.Response)) {}
+
+func TestTheCounterTheQueueAndTheMenuBarTitleAgree(t *testing.T) {
+	t.Parallel()
+	q := newQueueRig(t, nil)
+	q.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "ship the retries"})
+	q.open(t, "t-0000000000000001", gate.KindQuestion, "7", time.Hour)
+	q.open(t, "t-0000000000000001", gate.KindDraft, "41", 2*time.Hour)
+	dir, err := os.MkdirTemp("", "q")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	l, err := net.Listen("unix", filepath.Join(dir, "d.sock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewUnstartedServer(q.s.Handler())
+	srv.Listener.Close()
+	srv.Listener = l
+	srv.Start()
+	t.Cleanup(srv.Close)
+	tray := &titleTray{}
+	bar := menubar.New(menubar.Config{Daemon: client.New(l.Addr().String()), Tray: tray, Notifier: quietNotifier{}, Now: func() time.Time { return tasksNow },
+		CockpitURL: func(route string) (string, error) { return "cockpit#" + route, nil }, Log: t.Logf})
+	bar.Refresh(context.Background())
+	var h api.Home
+	get(t, q.s, api.HomePath, &h)
+	i := slices.IndexFunc(h.Briefing.Counters, func(c api.HomeCounter) bool { return c.ID == "needs-you" })
+	all := q.all(t)
+	tray.mu.Lock()
+	title := tray.title
+	tray.mu.Unlock()
+	if i < 0 || h.Briefing.Counters[i].Count != 2 || all.Total != 2 || title != brand.Name+" 2" {
+		t.Fatalf("counter %+v, queue %d, title %q: want the task's two items counted alike", h.Briefing.Counters, all.Total, title)
 	}
 }

@@ -1,5 +1,5 @@
-import { isPluginView, resolveView } from "../lib/catalog";
-import { DASH, EXPLORE, QUEUE, readRoute, routeHash } from "../lib/routes";
+import { isPluginView, isQueueView, resolveView } from "../lib/catalog";
+import { DASH, EXPLORE, KIND, QUEUE, readRoute, routeHash } from "../lib/routes";
 import { catalog, tasksState } from "./store.svelte";
 
 const UNIT_KEY = /^[a-z][a-z0-9-]*:\S{1,300}$/;
@@ -19,6 +19,7 @@ export const win = {
 export interface Hash {
   view: string;
   queue: string;
+  kind: string;
   ids: string[];
   pr: string;
   task: string;
@@ -51,6 +52,7 @@ export function readHash(hash: string = currentHash()): Hash {
   return {
     view,
     queue: view === QUEUE ? route.queue : "",
+    kind: isQueueView(view) ? route.kind : "",
     ids: view === QUEUE ? route.ids : [],
     pr: UNIT_KEY.test(route.unit) ? route.unit : "",
     task: route.task,
@@ -71,6 +73,7 @@ export function hashString(next: Partial<Hash> & { view?: string }): string {
   const queue = next.view === QUEUE && next.queue;
   if (queue) p.set("queue", next.queue as string);
   if (queue && next.ids && next.ids.length) p.set("ids", next.ids.join(","));
+  if (next.kind && isQueueView(next.view || "")) p.set(KIND, next.kind);
   if (next.task) p.set("task", next.task);
   if (next.area) p.set("area", next.area);
   if (next.ctx && next.ctx.length) p.set("ctx", ([] as string[]).concat(next.ctx).join(","));
@@ -99,6 +102,11 @@ export function writeHash(change: Partial<Hash> & { ctx?: string[] | string }, r
     Object.assign(written, { hash: win.location().hash, over });
     return;
   }
+  replaceHash(hash);
+}
+
+// replaceHash moves the route to hash (no "#") in place of the current one, which no hashchange reports.
+export function replaceHash(hash: string): void {
   written.hash = "";
   win.replaceState("#" + hash);
   nav.hash = "#" + hash;

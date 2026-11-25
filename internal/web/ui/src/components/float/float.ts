@@ -4,7 +4,7 @@ import { t } from "../../lib/i18n.svelte";
 import { isSet, safeURL, type J } from "../../lib/util";
 import { floatDeps, floatState, openRoute, taskRoute, type FloatMode, type FloatPlace } from "../../state/float.svelte";
 import { resolveDraft, resolveGate } from "../gates/gates";
-import { queueDeps, queueDraft, queueDraftOf, queueUnit } from "../screens/queue";
+import { queueDeps, queueDraft, queueDraftOf, queueUnit, queueVerb } from "../screens/queue";
 
 // The floating widget's ends: resolving an item through the gates endpoint, and the bridge to the window that
 // hosts the page. The host calls window[FLOAT_BRIDGE].setMode; the page posts JSON messages through the Wails
@@ -102,13 +102,17 @@ export async function floatResolve(item: J, intent: string, option?: string): Pr
   return resolveGate(item.task, g, intent, option);
 }
 
-// floatRun runs a primary that is no gate's: a unit's catalog action, opening the unit at its source, or the task
-// in the cockpit.
+// floatRun runs a primary that is no gate's: a unit's catalog action, a task verb (a failed delivery's retry),
+// opening the unit at its source, or the task in the cockpit.
 export async function floatRun(item: J): Promise<unknown> {
   const p = item.primary || {};
   const u = queueUnit(item);
   if (p.kind === "action" && u) {
     if ((await queueDeps.act(u, p.id)) === false) throw new Error(t("{action} failed", { action: p.label || p.id }));
+    return true;
+  }
+  if (p.kind === "verb") {
+    await queueVerb(item);
     return true;
   }
   if (p.kind === "open") {

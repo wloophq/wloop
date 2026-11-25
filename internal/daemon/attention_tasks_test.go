@@ -120,15 +120,12 @@ func pullRequestTask(e api.TaskView) bool {
 	return len(e.Units) > 0 && e.Units[0].Provider == unit.GitHub
 }
 
-// newCategory is the category a row attention's category takes on a task.
-func newCategory(old string) api.Category {
-	switch old {
-	case "HELD":
-		return api.CategoryHeld
-	case "ROUND", "BLOCKED", "WAIT":
-		return api.CategoryInbox
+// newCategory is the category a row attention's category takes on a task, and whether it posts once a day.
+func newCategory(old string) (api.Category, bool) {
+	if old == "HELD" {
+		return api.CategoryNeeds, true
 	}
-	return api.Category(old)
+	return api.CategoryNeeds, false
 }
 
 // taskActions are a row attention's action ids as a task offers them.
@@ -221,7 +218,8 @@ func TestTaskAttentionMatchesRowAttention(t *testing.T) {
 			for id, e := range got {
 				a := e.Attention
 				cat, task, ok := api.ParseNotificationID(a.ID)
-				if !ok || task != id || cat != newCategory(old.Category) || a.Category != string(cat) {
+				want, daily := newCategory(old.Category)
+				if !ok || task != id || cat != want || a.Category != string(cat) || a.Daily != daily {
 					t.Errorf("id %s category %s, old %s %s", a.ID, a.Category, old.ID, old.Category)
 				}
 				if a.Title != old.Title || a.Body != old.Body || a.Subtitle != old.Subtitle || a.Image != old.Image {
@@ -320,7 +318,7 @@ func TestInboxTasksCarryAttention(t *testing.T) {
 		t.Fatalf("%+v", got)
 	}
 	cat, tk, ok := api.ParseNotificationID(a.ID)
-	if !ok || cat != api.CategoryInbox || tk != "t-in" || a.Category != "INBOX" || a.Body != "ask ana about the export" {
+	if !ok || cat != api.CategoryNeeds || tk != "t-in" || a.Category != "NEEDS" || a.Body != "ask ana about the export" {
 		t.Fatalf("%+v", a)
 	}
 	r.put(t, task.Task{ID: "t-renamed", State: "inbox", Category: task.CategoryInbox, Title: "another"})
@@ -362,7 +360,7 @@ func TestOutboxDraftNotifiesOnce(t *testing.T) {
 	for _, id := range []string{"draft:1", "draft:2"} {
 		a := got[id]
 		d := proposed(int64(id[len(id)-1]-'0'), "")
-		if a == nil || a.ID != api.NotificationID(api.CategoryOutbox, id, d.UpdatedAt.UTC().Format(stampToken)) || a.Category != "OUTBOX" ||
+		if a == nil || a.ID != api.NotificationID(api.CategoryNeeds, id, d.UpdatedAt.UTC().Format(stampToken)) || a.Category != "NEEDS" ||
 			!slices.Equal(actionIDs(a), []string{"open", "task:dismiss"}) || a.Body != "comment: Thanks, merging." {
 			t.Errorf("%s: %+v", id, a)
 		}
@@ -420,7 +418,7 @@ func TestAskedTurnNotifiesOnce(t *testing.T) {
 		t.Fatalf("%d notifications: %+v", len(got), got)
 	}
 	for _, e := range got {
-		if _, _, asks := e.MessageOf(); !asks || e.Attention.Category != string(api.QuestionCategory(row.Question.RecordID)) {
+		if _, _, asks := e.MessageOf(); !asks || e.Attention.Category != string(api.CategoryNeeds) || e.Attention.ID != api.NotificationID(api.CategoryNeeds, e.ID, strconv.FormatInt(row.Question.RecordID, 10)) {
 			t.Fatalf("%+v", e)
 		}
 	}
@@ -444,7 +442,7 @@ func TestHeldTaskIdStableAcrossRestart(t *testing.T) {
 	second := r.notified(t)
 	for id, e := range first {
 		cat, _, _ := api.ParseNotificationID(e.Attention.ID)
-		if cat != api.CategoryHeld || second[id].Attention == nil || second[id].Attention.ID != e.Attention.ID {
+		if cat != api.CategoryNeeds || !e.Attention.Daily || second[id].Attention == nil || second[id].Attention.ID != e.Attention.ID {
 			t.Fatalf("%s then %+v", e.Attention.ID, second[id].Attention)
 		}
 	}
@@ -613,7 +611,7 @@ func TestAnotherDerivedTaskOfANotifyingRowStaysSilent(t *testing.T) {
 		t.Fatalf("%d notifications: %+v", len(got), got)
 	}
 	for _, e := range got {
-		if cat, _, _ := api.ParseNotificationID(e.Attention.ID); cat != api.CategoryHeld {
+		if cat, _, _ := api.ParseNotificationID(e.Attention.ID); cat != api.CategoryNeeds || !e.Attention.Daily {
 			t.Fatalf("%+v", e.Attention)
 		}
 	}
@@ -642,5 +640,33 @@ func TestANotificationOffersOnlyTheVerbsTheProfileOffers(t *testing.T) {
 	withOutbox(r, proposed(1, ""))
 	if a := attentions(t, r)["draft:1"]; a == nil || !slices.Equal(actionIDs(a), []string{"open"}) {
 		t.Errorf("%+v", a)
+	}
+}
+
+func TestBannerCategoryIsNeeds(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	r.put(t, task.Task{ID: "t-in", State: "inbox", Category: task.CategoryInbox, Title: "ask ana about the export"})
+	failed := proposed(2, "")
+	failed.State = draft.Failed
+	withOutbox(r, proposed(1, ""), failed)
+	got := attentions(t, r)
+	for _, id := range []string{"t-in", "draft:1", "draft:2"} {
+		a := got[id]
+		if a == nil {
+			t.Fatalf("%s notifies nothing: %+v", id, got)
+		}
+		cat, tk, ok := api.ParseNotificationID(a.ID)
+		if !ok || cat != api.CategoryNeeds || tk != id || a.Category != "NEEDS" || a.Daily {
+			t.Errorf("%s: %+v, want category NEEDS, posted as often as it changes", id, a)
+		}
+	}
+	held := newNotifyRig(t)
+	held.events(t, dinv.Event{PR: r7, Kind: dinv.KindRoundHeld, Key: "cap", At: catalogNow, Data: "daily cap"})
+	held.settle(t, r7u)
+	for _, e := range held.notified(t) {
+		if cat, _, _ := api.ParseNotificationID(e.Attention.ID); cat != api.CategoryNeeds || e.Attention.Category != "NEEDS" || !e.Attention.Daily {
+			t.Errorf("held %+v, want category NEEDS, posted once a day", e.Attention)
+		}
 	}
 }

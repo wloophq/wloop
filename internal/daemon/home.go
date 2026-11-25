@@ -8,13 +8,16 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/home"
+	"github.com/wloophq/wloop/internal/core/outbox"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/decision"
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/i18n"
 	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/keys"
 )
 
@@ -57,6 +60,14 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	vs.readRows(ctx, shown)
 	for _, sec := range h.Sections {
 		hs := api.HomeSection{ID: sec.ID, View: string(sec.View), Label: sec.Label, Time: sec.Time, Rows: []api.TaskView{}, Total: sec.Total}
+		if sec.Queue {
+			items, err := s.queueItems(withPlanReads(ctx), g, sec.Items)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+			hs.Items, hs.Empty = items, s.loaded().Decisions.EmptyAll
+		}
 		for _, e := range sec.Tasks {
 			v, err := vs.view(ctx, e)
 			if err != nil {
@@ -96,13 +107,16 @@ type homeWords struct{ l *intentload.Loaded }
 func (w homeWords) Profile() home.Profile {
 	d := w.l.Home
 	p := home.Profile{Template: d.Template, Join: d.Join, LastJoin: d.LastJoin, End: d.End, Count: d.Count, Empty: d.Empty,
-		PerSentence: d.PerSentence, CaptureHint: d.CaptureHint}
+		PerSentence: d.PerSentence, CaptureHint: d.CaptureHint, Order: w.l.Decisions.Order}
 	for _, c := range d.Counters {
-		p.Counters = append(p.Counters, home.Counter{ID: c.ID, Kind: c.Kind, View: task.View(c.View), Noun: home.Forms(c.Noun), Clause: home.Forms(c.Clause)})
+		v, _ := w.l.Views.View(c.View)
+		p.Counters = append(p.Counters, home.Counter{ID: c.ID, Kind: c.Kind, View: task.View(c.View), Noun: home.Forms(c.Noun), Clause: home.Forms(c.Clause),
+			Queue: c.Kind == "" && v.Layout == builtin.ViewLayoutQueue})
 	}
 	for _, sec := range d.Sections {
 		v, _ := w.l.Views.View(sec.View)
-		p.Sections = append(p.Sections, home.Section{ID: sec.ID, View: task.View(sec.View), Label: v.Label, Time: sec.Time, Limit: sec.Limit})
+		p.Sections = append(p.Sections, home.Section{ID: sec.ID, View: task.View(sec.View), Label: v.Label, Time: sec.Time, Limit: sec.Limit,
+			Queue: v.Layout == builtin.ViewLayoutQueue})
 	}
 	return p
 }
@@ -123,14 +137,33 @@ func (w homeWords) Plugin(p unit.ProviderID) home.PluginWords {
 
 func (w homeWords) Form(n int) string { return i18n.Form(w.l.Locale, float64(n)) }
 
-// taskDecisions are the decisions a task waits on: its open gates but the draft gates an open message pins,
-// read once for every task, and, while it is open, its units' situations and signals as the read model holds
+// taskDecisions are the decisions a task waits on: its open gates but the draft gates an open message pins, and
+// the approved gates of its drafts whose delivery failed, read once for every task, and, while it is open, its units' situations and signals as the read model holds
 // them.
 type taskDecisions struct {
 	s     *Server
 	m     decision.Map
 	gates gates.Reader
 	open  map[task.ID][]gate.Gate
+	// undelivered are the approved draft gates whose drafts failed to deliver, by task.
+	undelivered map[task.ID][]gate.Gate
+}
+
+// readUndelivered reads the approved draft gates whose drafts failed to deliver, by task.
+func (d *taskDecisions) readUndelivered(ctx context.Context) (map[task.ID][]gate.Gate, error) {
+	o := d.s.deps.Outbox
+	if o == nil {
+		return nil, nil
+	}
+	ds, err := o.List(ctx, outbox.Filter{States: []draft.State{draft.Failed}})
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]int64, len(ds))
+	for i, x := range ds {
+		ids[i] = int64(x.ID)
+	}
+	return gates.Undelivered(ctx, d.gates.Where, ids)
 }
 
 func (d *taskDecisions) Of(ctx context.Context, e task.Task) ([]decision.Found, error) {
@@ -151,6 +184,11 @@ func (d *taskDecisions) Of(ctx context.Context, e task.Task) ([]decision.Found, 
 			for _, g := range gs {
 				d.open[g.Task] = append(d.open[g.Task], g)
 			}
+			undelivered, err := d.readUndelivered(ctx)
+			if err != nil {
+				return nil, err
+			}
+			d.undelivered = undelivered
 		}
 	}
 	var sources []decision.Source
@@ -167,5 +205,5 @@ func (d *taskDecisions) Of(ctx context.Context, e task.Task) ([]decision.Found, 
 			sources = append(sources, decision.Source{Unit: u, Situation: situation, Signals: signals, Since: moved})
 		}
 	}
-	return d.m.Of(d.open[e.ID], sources), nil
+	return d.m.Of(d.open[e.ID], d.undelivered[e.ID], sources), nil
 }

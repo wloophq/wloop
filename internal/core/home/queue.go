@@ -6,6 +6,7 @@ import (
 
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/decision"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -15,6 +16,7 @@ const (
 	ActionGate   = "gate"   // resolve the item's gate with the intent ID
 	ActionAction = "action" // run the catalog action ID on the item's unit
 	ActionOpen   = "open"   // open the item's unit at its source
+	ActionRetry  = "retry"  // retry the delivery of the draft of the item's gate, which a person approved already
 )
 
 // Queue is a decision kind's items, the oldest decision first, and View, the view its items are drawn as rows of.
@@ -105,6 +107,10 @@ func (s Service) decisions(ctx context.Context, k decision.Kind, ts []task.Task)
 
 func (s Service) item(kw KindWords, e task.Task, f decision.Found) Item {
 	it := Item{Task: e, Found: f, Word: s.noun(f.Unit.Provider, kw.Noun).For(s.Words.Form(1)), Tone: kw.Tone}
+	if f.Gate != nil && f.Gate.Status != gate.Open {
+		it.Primary = Action{Kind: ActionRetry}
+		return it
+	}
 	if f.Gate != nil {
 		it.Primary = Action{Kind: ActionGate, ID: primaryIntent(kw.Primary, f.Gate.Intents)}
 		return it

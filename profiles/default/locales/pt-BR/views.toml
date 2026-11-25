@@ -222,6 +222,11 @@ held = "esperando você"
 [draft_facets.age]
 label = "Escrito"
 
+[views.needs-you]
+label = "Precisa de você"
+summary = "O que espera por você, uma decisão de cada vez: perguntas primeiro, depois rascunhos a enviar, planos, passos e o resto."
+empty = "Nada precisa de você."
+
 [views.inbox]
 label = "Inbox"
 summary = "O que ninguém esclareceu ainda; depois de esclarecida, a tarefa sai de vez."

@@ -5,10 +5,10 @@
   "properties": {
     "badge": {
       "additionalProperties": false,
-      "description": "The menu bar's badge.",
+      "description": "The views whose tasks the menu bar notifies, the daily digest counts and `status` prints; the menu bar's title counts Needs you, the queue of every decision kind, instead.",
       "properties": {
         "views": {
-          "description": "The views whose counts the badge adds up, each a view of views.",
+          "description": "Those views, each a view of views: the tasks of the ones on the rail post the menu bar's banners, the digest counts what moved in them, `status` prints their tasks, and their counts add up to the counters' badge, which no client title reads.",
           "items": {
             "type": "string"
           },
@@ -755,11 +755,12 @@
           },
           "layout": {
             "default": "list",
-            "description": "How the cockpit draws the view: list, its rows; board, a lane per group, which a person may switch back to the list; outbox, the Outbox's drafts, which the lens filters, groups and sorts over the `draft_facets` and the view's own `group` and `sort` (draft facts), read from the Outbox's own route whatever the view lists.",
+            "description": "How the cockpit draws the view: list, its rows; board, a lane per group, which a person may switch back to the list; outbox, the Outbox's drafts, which the lens filters, groups and sorts over the `draft_facets` and the view's own `group` and `sort` (draft facts), read from the Outbox's own route whatever the view lists, and which a page of its own opens as the queue view narrowed to the kind draft gates count as; queue, what waits on you one decision at a time, the queue of every decision kind in decisions.toml's order, read from its own route whatever the view lists, which the home's section and counter of the view, the menu bar and the Outbox open; with no `when` of its own, such a view lists the tasks of the views decisions.toml's kinds name.",
             "enum": [
               "list",
               "board",
-              "outbox"
+              "outbox",
+              "queue"
             ],
             "type": "string"
           },

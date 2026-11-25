@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -23,20 +24,20 @@ func index(items []string, prefix string) int {
 	return slices.IndexFunc(items, func(s string) bool { return strings.HasPrefix(s, prefix) })
 }
 
-func TestTitleIsTheBadge(t *testing.T) {
+func TestTitleFollowsNeedsYou(t *testing.T) {
 	r := newRig(t)
-	r.d.rows["needs-me"] = []api.Row{reviewRow(1), reviewRow(2)}
+	r.d.queue = needsYou(plainTask(1), plainTask(2))
 	r.d.counters = api.Counters{Views: map[string]int{"inbox": 0, "outbox": 0}, Badge: 4}
 	r.c.Refresh(context.Background())
-	if got := r.title(); got != brand.Name+" 4" {
-		t.Fatalf("title %q, want the badge", got)
+	if got := r.title(); got != brand.Name+" 2" {
+		t.Fatalf("title %q, want the Needs you total", got)
 	}
 	r.d.mu.Lock()
-	r.d.counters.Badge = 6
+	r.d.queue = needsYou(plainTask(1), plainTask(2), plainTask(3))
 	r.d.mu.Unlock()
 	r.c.apply(context.Background(), api.Change{Type: "changed", Epoch: "e1", Rev: 1, Units: []unit.Unit{uref(1)}, Counters: &api.Counters{Badge: 6}})
-	if got := r.title(); got != brand.Name+" 6" {
-		t.Fatalf("title %q after a change with counters", got)
+	if got := r.title(); got != brand.Name+" 3" {
+		t.Fatalf("title %q after a change", got)
 	}
 }
 
@@ -44,8 +45,9 @@ func TestTitleReadsEachViewsCount(t *testing.T) {
 	r := newRig(t)
 	r.d.strings = &api.Strings{Locale: "en", Strings: map[string]api.Text{"{name} {n}": {"other": "{needs-me}/{inbox} of {n}"}}}
 	r.d.counters = api.Counters{Views: map[string]int{"inbox": 3, "needs-me": 2}, Badge: 5}
+	r.d.queue = needsYou(plainTask(1), plainTask(2), plainTask(3), plainTask(4))
 	r.c.Refresh(context.Background())
-	if got := r.title(); got != "2/3 of 5" {
+	if got := r.title(); got != "2/3 of 4" {
 		t.Fatalf("title %q, want each view's count", got)
 	}
 }
@@ -55,6 +57,7 @@ func TestTitleReadsTheCountsWithNoBadgeViewInTheRail(t *testing.T) {
 	r.d.views = []api.TaskViewSpec{{ID: "inbox", Label: "Inbox", Rail: true}, {ID: "home-blocked", Label: "Blocked by you", Badge: true}}
 	r.d.strings = &api.Strings{Locale: "en", Strings: map[string]api.Text{"{name} {n}": {"other": "{inbox} of {n}"}}}
 	r.d.counters = api.Counters{Views: map[string]int{"inbox": 3, "home-blocked": 1}, Badge: 1}
+	r.d.queue = needsYou(plainTask(1))
 	r.c.Refresh(context.Background())
 	if got := r.title(); got != "3 of 1" {
 		t.Fatalf("title %q, want the counts though no badge view is in the rail", got)
@@ -65,6 +68,7 @@ func TestTitleSaysPausedWhileAutomaticRoundsAre(t *testing.T) {
 	r := newRig(t)
 	r.d.health.Paused = true
 	r.d.counters = api.Counters{Views: map[string]int{"inbox": 3}, Badge: 3}
+	r.d.queue = needsYou(plainTask(1), plainTask(2), plainTask(3))
 	r.c.Refresh(context.Background())
 	if got := r.title(); got != brand.Name+" 3 paused" {
 		t.Fatalf("title %q, want the paused title", got)
@@ -77,28 +81,18 @@ func TestTitleSaysPausedWhileAutomaticRoundsAre(t *testing.T) {
 	}
 }
 
-func TestBadgeAgreesWithTheInbox(t *testing.T) {
-	r := newRig(t)
-	r.d.tasks["inbox"] = []api.TaskView{plainTask(1), plainTask(2), plainTask(3)}
-	r.d.tasks["outbox"] = []api.TaskView{draftTask(4)}
-	r.d.counters = api.Counters{Views: map[string]int{"inbox": 3, "outbox": 1}, Badge: 4}
-	r.c.Refresh(context.Background())
-	got := titles(r.tray.menu)
-	if r.title() != brand.Name+" 4" || index(got, "Inbox (3)") < 0 || index(got, "Outbox (1)") < 0 {
-		t.Fatalf("title %q, menu %q", r.title(), got)
-	}
-}
-
 func TestMenuListsFiveAndMore(t *testing.T) {
 	r := newRig(t)
+	var waiting []api.TaskView
 	for i := 1; i <= 7; i++ {
-		r.d.tasks["inbox"] = append(r.d.tasks["inbox"], plainTask(i))
+		waiting = append(waiting, plainTask(i))
 	}
+	r.d.queue = needsYou(waiting...)
 	r.d.rows["loop"] = []api.Row{reviewRow(9)}
 	r.d.health = api.Health{Jobs: []api.JobStatus{{Name: "ingest:github", LastOK: now.Add(-2 * time.Minute)}}}
 	r.c.Refresh(context.Background())
 	got := titles(r.tray.menu)
-	if got[0] != "Focus (0)" || index(got, "Inbox (7)") < 0 || !slices.Contains(got, "more…") || got[len(got)-1] != "Quit "+brand.Name {
+	if got[0] != "Needs you (7)" || !slices.Contains(got, "more…") || got[len(got)-1] != "Quit "+brand.Name {
 		t.Fatalf("menu %q", got)
 	}
 	n := 0
@@ -108,16 +102,16 @@ func TestMenuListsFiveAndMore(t *testing.T) {
 		}
 	}
 	if n != 6 {
-		t.Fatalf("%d listed, want 5 of the Inbox + 1 in loop: %q", n, got)
+		t.Fatalf("%d listed, want 5 of Needs you + 1 in loop: %q", n, got)
 	}
-	for _, want := range []string{"Outbox (0)", "In loop (1)", "Open cockpit", "Sweep now", "Pause automatic rounds", "Synced " + texts.English().Time(now.Add(-2*time.Minute).Local(), "time")} {
+	for _, want := range []string{"In loop (1)", "Open cockpit", "Sweep now", "Pause automatic rounds", "Synced " + texts.English().Time(now.Add(-2*time.Minute).Local(), "time")} {
 		if _, ok := find(r.tray.menu, want); !ok {
 			t.Errorf("menu lacks %q: %q", want, got)
 		}
 	}
 	more, _ := find(r.tray.menu, "more…")
 	more.Action()
-	waitFor(t, func() bool { o := r.openedURLs(); return len(o) == 1 && o[0] == "cockpit#view=inbox" })
+	waitFor(t, func() bool { o := r.openedURLs(); return len(o) == 1 && o[0] == "cockpit#view=needs-you" })
 }
 
 func TestPluginSectionsFollowTheCatalog(t *testing.T) {
@@ -127,8 +121,8 @@ func TestPluginSectionsFollowTheCatalog(t *testing.T) {
 	r.d.rows["loop"] = []api.Row{reviewRow(2)}
 	r.c.Refresh(context.Background())
 	got := titles(r.tray.menu)
-	loop, outbox := index(got, "In loop (1)"), index(got, "Outbox (0)")
-	if loop < 0 || outbox < 0 || loop < outbox || index(got, "Needs me") >= 0 {
+	loop, needs := index(got, "In loop (1)"), index(got, "Needs you (0)")
+	if loop < 0 || needs < 0 || loop < needs || index(got, "Needs me") >= 0 {
 		t.Fatalf("menu %q, want In loop below the core sections and no Needs me", got)
 	}
 	r.d.mu.Lock()
@@ -136,7 +130,7 @@ func TestPluginSectionsFollowTheCatalog(t *testing.T) {
 	r.d.mu.Unlock()
 	r.c.apply(context.Background(), api.Change{Health: true})
 	got = titles(r.tray.menu)
-	if index(got, "In loop") >= 0 || index(got, "Threads (1)") < index(got, "Outbox (0)") || index(got, "Inbox (1)") < 0 {
+	if index(got, "In loop") >= 0 || index(got, "Threads (1)") < index(got, "Needs you (0)") {
 		t.Fatalf("menu with github disabled %q", got)
 	}
 	r.d.mu.Lock()
@@ -185,8 +179,7 @@ func TestDaemonDownShowsAQuestionMark(t *testing.T) {
 	}
 	r.d.mu.Lock()
 	r.d.err = nil
-	r.d.tasks["inbox"] = []api.TaskView{plainTask(2)}
-	r.d.counters = api.Counters{Badge: 1}
+	r.d.queue = needsYou(plainTask(2))
 	r.d.mu.Unlock()
 	r.c.Refresh(context.Background())
 	if r.title() != brand.Name+" 1" {
@@ -196,8 +189,7 @@ func TestDaemonDownShowsAQuestionMark(t *testing.T) {
 
 func TestTaskClickOpensItInTheCockpit(t *testing.T) {
 	r := newRig(t)
-	r.d.tasks["focus"] = []api.TaskView{plainTask(2)}
-	r.d.tasks["outbox"] = []api.TaskView{{ID: "draft:5", State: "inbox", Title: "reply: on it"}}
+	r.d.queue = needsYou(plainTask(2), api.TaskView{ID: "draft:5", State: "inbox", Title: "reply: on it"})
 	r.c.Refresh(context.Background())
 	it, ok := find(r.tray.menu, "acme/api#2 · Review the retry")
 	if !ok {
@@ -225,4 +217,53 @@ func TestRowClickOpensItInTheCockpit(t *testing.T) {
 		o := r.openedURLs()
 		return len(o) == 1 && o[0] == "cockpit#view=loop&unit=github/acme%2Fapi%232"
 	})
+}
+
+// needsYou is the queue of every kind with an item for each of tasks.
+func needsYou(tasks ...api.TaskView) *api.Queue {
+	q := &api.Queue{Title: "Needs you", View: "needs-you", Total: len(tasks), Items: []api.QueueItem{}}
+	for _, e := range tasks {
+		q.Items = append(q.Items, api.QueueItem{Kind: "answer", Task: e})
+	}
+	return q
+}
+
+func TestMenuShowsNeedsYouCount(t *testing.T) {
+	r := newRig(t)
+	var waiting []api.TaskView
+	for i := 1; i <= 7; i++ {
+		waiting = append(waiting, plainTask(i))
+	}
+	r.d.queue = needsYou(waiting...)
+	r.d.tasks["inbox"] = []api.TaskView{plainTask(20), plainTask(21)}
+	r.c.Refresh(context.Background())
+	got := titles(r.tray.menu)
+	at := index(got, "Needs you (7)")
+	if at < 0 || index(got, "Inbox (") >= 0 || index(got, "Focus (") >= 0 || index(got, "Outbox (") >= 0 {
+		t.Fatalf("menu %q, want one Needs you section instead of a section per view", got)
+	}
+	for i := 1; i <= perSection; i++ {
+		if want := "acme/api#" + strconv.Itoa(i) + " · Review the retry"; got[at+i] != want {
+			t.Fatalf("menu %q, want the queue's first items in its order", got)
+		}
+	}
+	if got[at+perSection+1] != "more…" {
+		t.Fatalf("menu %q, want more… after the first %d", got, perSection)
+	}
+	r.tray.menu[at+1].Action()
+	r.tray.menu[at+perSection+1].Action()
+	waitFor(t, func() bool {
+		o := r.openedURLs()
+		return len(o) == 2 && slices.Contains(o, "cockpit#task=e-1") && slices.Contains(o, "cockpit#view=needs-you")
+	})
+}
+
+func TestTitleIsTheNeedsYouTotal(t *testing.T) {
+	r := newRig(t)
+	r.d.queue = needsYou(plainTask(1), plainTask(1), plainTask(2))
+	r.d.counters = api.Counters{Views: map[string]int{"inbox": 7}, Badge: 9}
+	r.c.Refresh(context.Background())
+	if got, menu := r.title(), titles(r.tray.menu); got != brand.Name+" 3" || index(menu, "Needs you (3)") < 0 {
+		t.Fatalf("title %q, menu %q: want both to read the queue's 3 items", got, menu)
+	}
 }

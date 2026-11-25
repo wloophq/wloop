@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { J } from "../lib/util";
-import { floatResolve } from "../components/float/float";
+import { floatResolve, floatRun } from "../components/float/float";
 import { FakeDaemon } from "../testing/fakedaemon";
 import { resetStore } from "../testing/reset.svelte";
 import { Reply } from "../testing/fakedaemon";
@@ -64,6 +64,23 @@ test("act resolves the current gate with its primary intent through the gates en
   f.move(1);
   await f.act();
   expect(posts()).toEqual(["/api/gates/2/approve"]);
+});
+
+test("act runs a failed delivery's retry through the draft's own verb, never the approved gate", async () => {
+  floatDeps.run = floatRun;
+  served = queue({
+    kind: "send-draft",
+    task: { id: "t-7", title: "thank the reviewer", units: [] },
+    gate: { id: 9, kind: "draft", name: "draft", status: "approved", delivery: "failed", subject: "5", intents: [{ id: "approve", label: "Post" }, { id: "discard", label: "Discard" }] },
+    primary: { kind: "verb", id: "retry", task: "draft:5", args: { rev: "3" }, label: "Retry" },
+  });
+  await floatLoad();
+  const f = floatState();
+  await f.act();
+  expect(posts()).toEqual(["/api/tasks/draft:5/retry"]);
+  const call = daemon.calls.find((c) => c.url === "/api/tasks/draft:5/retry");
+  expect(JSON.parse(String(call && call.init && call.init.body)).args).toEqual({ rev: "3" });
+  expect(daemon.calls.filter((c) => c.url === "/api/queue").length).toBe(2);
 });
 
 test("an item that leaves on a refetch hands the focus to its successor, and act never reaches the closed gate", async () => {

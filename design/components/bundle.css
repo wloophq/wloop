@@ -888,6 +888,7 @@ body.layout-detail .d-window { right: 0; }
 .home-section .see-all { margin-left: auto; font-size: var(--text-meta); color: var(--muted); }
 .home-section .rows { list-style: none; margin: var(--space-6) 0 0; padding: 0; }
 .home-section .empty { padding: var(--space-8) 0; }
+.home-section .item-kind { display: block; margin-top: var(--space-6); font-size: var(--text-meta); color: var(--muted); }
 .queue { display: flex; flex-direction: column; gap: var(--space-12); max-width: 48rem; }
 .queue .crumbs { display: flex; gap: var(--space-6); font-size: var(--text-meta); color: var(--muted); }
 .queue .crumbs a { color: var(--muted); }

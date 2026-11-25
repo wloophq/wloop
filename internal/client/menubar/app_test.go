@@ -77,6 +77,19 @@ type fakeDaemon struct {
 	strings     *api.Strings // nil: English
 	stringsErr  error
 	stringsN    int
+	queue       *api.Queue // nil: Needs you with no item
+}
+
+func (f *fakeDaemon) QueueAll(context.Context, string) (api.Queue, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.err != nil {
+		return api.Queue{}, f.err
+	}
+	if f.queue == nil {
+		return api.Queue{Title: "Needs you", View: "needs-you", Items: []api.QueueItem{}}, nil
+	}
+	return *f.queue, nil
 }
 
 func (f *fakeDaemon) Strings(context.Context) (api.Strings, error) {
@@ -638,7 +651,7 @@ func TestMenuShowsBeforeThePermissionIsAnswered(t *testing.T) {
 	r := newRig(t)
 	r.notes.block = make(chan struct{})
 	r.d.rows["loop"] = []api.Row{reviewRow(2)}
-	r.d.counters = api.Counters{Badge: 1}
+	r.d.queue = needsYou(plainTask(1))
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- r.c.Run(ctx) }()

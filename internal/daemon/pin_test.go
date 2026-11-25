@@ -31,7 +31,7 @@ func TestAPinnedQuestionServesItsDrafts(t *testing.T) {
 	if len(got) != 2 || got[0].ID != int64(a.ID) || got[0].Text != "Ship it." || got[1].ID != int64(b.ID) || got[0].Gate == 0 {
 		t.Fatalf("pinned %+v, want drafts a and b once each, as their cards serve them", got)
 	}
-	_, _, att := r.s.messageNotice(task.Task{}, m, 1)
+	_, att := r.s.messageNotice(task.Task{}, m, 1)
 	var ids []string
 	for _, x := range att.Actions {
 		ids = append(ids, x.ID)
