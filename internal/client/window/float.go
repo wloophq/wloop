@@ -278,11 +278,11 @@ func (c *Controller) ShowFloat() error {
 }
 
 // refloat shows the wanted float again as the daemon's events answer: after
-// they were lost, so a page the daemon refused loads anew, or when the daemon
-// could not serve the page before.
+// they were lost, or while its page has not reported in, so a page the daemon
+// refused or could not serve loads anew.
 func (c *Controller) refloat(back bool) {
 	c.mu.Lock()
-	again := c.floatWanted && (back || c.floatURL == "")
+	again := c.floatWanted && (back || !c.pageReady)
 	c.mu.Unlock()
 	if !again {
 		return

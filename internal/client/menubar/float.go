@@ -45,6 +45,11 @@ var VisibilityKey = window.PlacementKey + ".visibility"
 // snoozeHour is how long "Hide for 1 hour" hides the float.
 const snoozeHour = time.Hour
 
+// floatLoadGrace is how long a shown float whose page was asked to load
+// carries the Needs you banners before its page reports in; past it, a page
+// that never loaded lets them post.
+const floatLoadGrace = 4 * time.Second
+
 // snoozeTick is how often a snooze compares the wall clock with its end, since
 // a timer stands still while the Mac sleeps.
 const snoozeTick = time.Minute
@@ -82,7 +87,7 @@ func (c *Controller) visibility() Visibility {
 
 // muteNeeds says whether the float carries what waits on the user, so no
 // Needs you banner posts: while the user hid it for a while, or while it
-// shows a page that has reported in.
+// shows a page that has reported in or is within floatLoadGrace of loading.
 func (c *Controller) muteNeeds() bool {
 	if !c.floatOn() {
 		return false
@@ -95,7 +100,8 @@ func (c *Controller) muteNeeds() bool {
 	case c.vis.Mode != VisibilityShown:
 		return true
 	}
-	return c.cfg.FloatReady == nil || c.cfg.FloatReady()
+	loading := !c.loadAt.IsZero() && c.cfg.Now().Sub(c.loadAt) < floatLoadGrace
+	return loading || c.cfg.FloatReady == nil || c.cfg.FloatReady()
 }
 
 // FloatPageReady follows the float's page reporting in: the banners it now
@@ -144,10 +150,11 @@ func (c *Controller) runFloat() {
 	if c.stopped {
 		return
 	}
-	c.running = true
+	c.running, c.quit = true, make(chan struct{})
 	if c.vis.Mode == VisibilitySnoozed {
 		c.wakeAt(c.vis.Until)
 	}
+	c.armGrace()
 }
 
 // stopFloat keeps anything from moving the float from now on, then waits on
@@ -158,6 +165,10 @@ func (c *Controller) stopFloat() {
 	if c.wake != nil {
 		close(c.wake)
 		c.wake = nil
+	}
+	if c.quit != nil {
+		close(c.quit)
+		c.quit = nil
 	}
 	c.floatMu.Unlock()
 	c.bg.Wait()
@@ -275,10 +286,35 @@ func (c *Controller) saveVisibility() {
 	c.cfg.Defaults.SetString(VisibilityKey, string(b))
 }
 
+// showFloat asks the window to show the float, whose page then has
+// floatLoadGrace to report in; it runs under floatMu.
 func (c *Controller) showFloat() {
 	if err := c.cfg.ShowFloat(); err != nil {
 		c.cfg.Log("float: %v", err)
+		c.loadAt = time.Time{}
+		return
 	}
+	c.loadAt = c.cfg.Now()
+	c.armGrace()
+}
+
+// armGrace redraws the banners as the float's load grace ends, so they post
+// when its page never reported in; it runs under floatMu, and starts nothing
+// unless Run runs.
+func (c *Controller) armGrace() {
+	left := floatLoadGrace - c.cfg.Now().Sub(c.loadAt)
+	if !c.running || c.stopped || c.loadAt.IsZero() || left <= 0 {
+		return
+	}
+	ctx, quit, wait := c.runCtx(), c.quit, c.cfg.After(left)
+	c.bg.Go(func() {
+		select {
+		case <-ctx.Done():
+		case <-quit:
+		case <-wait:
+			c.redraw(ctx)
+		}
+	})
 }
 
 // wakeAt shows the float at until, or the first tick past it on the wall

@@ -752,9 +752,10 @@ func TestTheVisibilityKeepsThePlacement(t *testing.T) {
 	})
 }
 
-// While the float's page has not reported in, the Needs you banners post;
-// once it has, they are withdrawn, as the float carries them.
-func TestNeedsBannersPostUntilTheFloatsPageReportsIn(t *testing.T) {
+// While a shown float's page loads, the Needs you banners stay muted for
+// floatLoadGrace; a page that never reports in by then lets them post, at
+// exactly the deadline.
+func TestNeedsBannersWaitForALoadingPageUntilTheGraceEnds(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		r, h := floatRig(t, nil)
 		h.set(nil, true)
@@ -763,14 +764,38 @@ func TestNeedsBannersPostUntilTheFloatsPageReportsIn(t *testing.T) {
 		stop := run(t, r)
 		defer stop()
 		synctest.Wait()
-		if needsPosted(r.notes) != 1 {
-			t.Fatalf("posted %d NEEDS banners before the float's page reported in, want 1", needsPosted(r.notes))
+		time.Sleep(floatLoadGrace - time.Nanosecond)
+		synctest.Wait()
+		if needsPosted(r.notes) != 0 {
+			t.Fatalf("posted %d NEEDS banners while the float's page loads", needsPosted(r.notes))
 		}
+		time.Sleep(time.Nanosecond)
+		synctest.Wait()
+		if needsPosted(r.notes) != 1 {
+			t.Fatalf("posted %d NEEDS banners at the grace's end with no page, want 1", needsPosted(r.notes))
+		}
+	})
+}
+
+// A page that reports in inside the grace carries the banners: none posts,
+// so none is withdrawn, then or at the deadline.
+func TestAPageThatReportsInsideTheGracePostsNoBanner(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r, h := floatRig(t, nil)
+		h.set(nil, true)
+		r.d.events = make(chan api.Change)
+		r.d.tasks["inbox"] = []api.TaskView{pendingTask(1)}
+		stop := run(t, r)
+		defer stop()
+		synctest.Wait()
+		time.Sleep(floatLoadGrace / 2)
 		h.set(nil, false)
 		r.c.FloatPageReady()
 		synctest.Wait()
-		if w := r.notes.withdrawnIDs(); len(w) != 1 || w[0] != pendingTask(1).Attention.ID {
-			t.Fatalf("withdrew %q, want the NEEDS banner the float now carries", w)
+		time.Sleep(floatLoadGrace)
+		synctest.Wait()
+		if needsPosted(r.notes) != 0 || len(r.notes.withdrawnIDs()) != 0 {
+			t.Fatalf("posted %d NEEDS banners, withdrew %q; want neither", needsPosted(r.notes), r.notes.withdrawnIDs())
 		}
 	})
 }

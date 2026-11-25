@@ -149,6 +149,10 @@ type Controller struct {
 	started, running, stopped bool
 	// wake stops the timer of the snooze, under floatMu.
 	wake chan struct{}
+	// loadAt is when the float's page was last asked to show, and quit ends
+	// the grace's timer as Run ends; both under floatMu.
+	loadAt time.Time
+	quit   chan struct{}
 	// bg are the goroutines Run starts and the float's, which Run waits on.
 	bg sync.WaitGroup
 }

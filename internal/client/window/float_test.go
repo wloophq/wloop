@@ -515,3 +515,20 @@ func TestTheFloatIsReadyOnceItsPageReportsIn(t *testing.T) {
 		}
 	})
 }
+
+// A float whose page has not reported in loads it anew on the first
+// subscription too, as when a stale http.json named a daemon that was still
+// starting.
+func TestAFloatPageNotYetReadyLoadsAnewOnTheFirstSubscription(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var down atomic.Bool
+		r := downRig(&down, make(chan api.Change))
+		if err := r.ctl.ShowFloat(); err != nil {
+			t.Fatal(err)
+		}
+		r.host.taken()
+		r.run(t)
+		synctest.Wait()
+		want(t, r.host.taken(), "float-load "+base+"#"+FloatRoute)
+	})
+}
