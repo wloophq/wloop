@@ -3,7 +3,9 @@
 package wails
 
 import (
+	"encoding/json"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/brand"
@@ -71,36 +73,48 @@ func TestARoundedFrameIsTheOneSet(t *testing.T) {
 	}
 }
 
-// Only the float's own page, in its main frame, reaches the controller.
-func TestOnlyTheFloatsPageSendsFloatMessages(t *testing.T) {
-	size := `float:size {"w":460,"h":600}`
+const cockpit = "http://127.0.0.1:7000/?token=a#/float"
+
+// Only the float's own page, in its main frame and from the cockpit's
+// origin, reaches the controller.
+func TestOnlyTheCockpitsPageSendsFloatMessages(t *testing.T) {
+	open := `{"type":"float:open","route":"task=t-1"}`
 	for _, c := range []struct {
-		window string
-		main   bool
-		msg    string
-		queued int
+		window, origin string
+		main           bool
+		msg            string
+		delivered      bool
 	}{
-		{floatName, true, size, 1},
-		{floatName, false, size, 0},
-		{"panel", true, size, 0},
-		{floatName, true, "float:size", 0},
+		{floatName, "http://127.0.0.1:7000/?token=a#/float", true, open, true},
+		{floatName, "http://127.0.0.1:7000/", true, open, true},
+		{floatName, "http://127.0.0.1:7001/", true, open, false},
+		{floatName, "https://elsewhere.example/", true, open, false},
+		{floatName, "", true, open, false},
+		{floatName, "http://127.0.0.1:7000/", false, open, false},
+		{"panel", "http://127.0.0.1:7000/", true, open, false},
+		{floatName, "http://127.0.0.1:7000/", true, `float:open {"route":"task=t-1"}`, false},
 	} {
-		h := &host{}
-		h.pageMessage(c.window, c.msg, c.main)
-		if len(h.queue) != c.queued {
-			t.Errorf("%s main=%v %q: queued %d, want %d", c.window, c.main, c.msg, len(h.queue), c.queued)
+		var got []window.FloatMessage
+		h := &host{floatURL: cockpit, listening: window.Handlers{OnFloat: func(m window.FloatMessage) { got = append(got, m) }}}
+		h.pageMessage(c.window, c.msg, c.origin, c.main)
+		for _, fn := range h.queue {
+			fn()
+		}
+		if delivered := len(got) == 1 && got[0] == (window.FloatMessage{Kind: window.FloatOpen, Route: "task=t-1"}); delivered != c.delivered {
+			t.Errorf("%s from %q main=%v %q: delivered %v, want %v", c.window, c.origin, c.main, c.msg, delivered, c.delivered)
 		}
 	}
 }
 
-// A message of the float's page reaches the controller through the host's
-// worker.
-func TestAFloatMessageReachesTheController(t *testing.T) {
-	var got []window.FloatMessage
-	h := &host{listening: window.Handlers{OnFloat: func(m window.FloatMessage) { got = append(got, m) }}}
-	h.pageMessage(floatName, `float:open {"route":"task=t-1"}`, true)
-	h.queue[0]()
-	if len(got) != 1 || got[0] != (window.FloatMessage{Kind: window.FloatOpen, Route: "task=t-1"}) {
-		t.Fatalf("controller got %+v", got)
+// The host calls the page's global the brand names, with the mode the page
+// last said it draws in, the pill until it says one.
+func TestThePlaceGoesToTheBrandsGlobal(t *testing.T) {
+	name, _ := json.Marshal(window.FloatBridge)
+	want := `(function(b){if(b&&b.setMode)b.setMode("pill",{"edge":"left","up":true})})(window[` + string(name) + `])`
+	if got := floatPlaceJS("", window.FloatPlace{Edge: window.EdgeLeft, Up: true}); got != want {
+		t.Fatalf("js\n got %s\nwant %s", got, want)
+	}
+	if got := floatPlaceJS(window.ModePanel, window.FloatPlace{}); !strings.Contains(got, `setMode("panel",{"edge":"","up":false})`) {
+		t.Fatalf("js %s", got)
 	}
 }

@@ -3,6 +3,9 @@
 package wails
 
 import (
+	"runtime"
+
+	"github.com/ebitengine/purego"
 	"github.com/ebitengine/purego/objc"
 	"github.com/wailsapp/wails/v3/pkg/application"
 
@@ -97,18 +100,22 @@ func bottomLeft(r window.Rect, mainHeight float64) rect {
 	return rect{Origin: point{X: r.X, Y: mainHeight - r.Y - r.H}, Size: size{Width: r.W, Height: r.H}}
 }
 
-// screens is every screen's visible frame, without the menu bar and the
-// Dock, the main screen first; it runs on the main thread.
-func screens() []window.Rect {
+// screens is every screen with its visible frame, without the menu bar and
+// the Dock, the main screen first; it runs on the main thread.
+func screens() []window.Screen {
 	all := class("NSScreen").Send(sel("screens"))
 	n := objc.Send[int](all, sel("count"))
 	if n == 0 {
 		return nil
 	}
 	mainHeight := objc.Send[rect](all.Send(sel("objectAtIndex:"), 0), sel("frame")).Size.Height
-	out := make([]window.Rect, 0, n)
+	out := make([]window.Screen, 0, n)
 	for i := range n {
-		out = append(out, topLeft(objc.Send[rect](all.Send(sel("objectAtIndex:"), i), sel("visibleFrame")), mainHeight))
+		s := all.Send(sel("objectAtIndex:"), i)
+		out = append(out, window.Screen{
+			Frame:   topLeft(objc.Send[rect](s, sel("frame")), mainHeight),
+			Visible: topLeft(objc.Send[rect](s, sel("visibleFrame")), mainHeight),
+		})
 	}
 	return out
 }
@@ -141,26 +148,58 @@ func addCollectionBehavior(win objc.ID, b application.MacWindowCollectionBehavio
 
 // handBackKeyboard gives the keyboard back to the app the person was typing
 // in: a non-activating panel ordered out passes key status back to the
-// active app's window. It runs on the main thread.
+// active app's window. It runs on the main thread, with no mouse button
+// down, since ordering out under a press drops its mouse-up.
 func handBackKeyboard(win objc.ID) {
 	win.Send(sel("orderOut:"), objc.ID(0))
 	win.Send(sel("orderFrontRegardless"))
 }
 
+func mouseButtonsUp() bool {
+	return objc.Send[uint](objc.ID(class("NSEvent")), sel("pressedMouseButtons")) == 0
+}
+
+// keyOnlyWhen makes AppKit ask keyable whether win may become key. It
+// replaces canBecomeKeyWindow on win's class, which Wails shares with every
+// panel it makes, keeping the other panels' answer, yes. It runs on the main
+// thread.
+func keyOnlyWhen(win objc.ID, keyable func() bool) error {
+	lib, err := purego.Dlopen("/usr/lib/libobjc.A.dylib", purego.RTLD_NOW|purego.RTLD_GLOBAL)
+	if err != nil {
+		return err
+	}
+	var replace func(cls objc.Class, name objc.SEL, imp objc.IMP, types string) objc.IMP
+	purego.RegisterLibFunc(&replace, lib, "class_replaceMethod")
+	replace(win.Class(), sel("canBecomeKeyWindow"), objc.NewIMP(func(self objc.ID, _ objc.SEL) bool {
+		return self != win || keyable()
+	}), "B@:")
+	return nil
+}
+
 // userDefaults is the app's standard user defaults, whose domain is its
-// bundle identifier.
+// bundle identifier. It runs on any thread, inside its own autorelease pool,
+// since the threads Go runs it on have none.
 type userDefaults struct{}
+
+func withPool(fn func()) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	pool := class("NSAutoreleasePool").Send(sel("new"))
+	defer pool.Send(sel("drain"))
+	fn()
+}
 
 func standardDefaults() objc.ID { return class("NSUserDefaults").Send(sel("standardUserDefaults")) }
 
-func (userDefaults) String(key string) string {
-	s := standardDefaults().Send(sel("stringForKey:"), nsString(key))
-	if s == 0 {
-		return ""
-	}
-	return objc.Send[string](s, sel("UTF8String"))
+func (userDefaults) String(key string) (value string) {
+	withPool(func() {
+		if s := standardDefaults().Send(sel("stringForKey:"), nsString(key)); s != 0 {
+			value = objc.Send[string](s, sel("UTF8String"))
+		}
+	})
+	return value
 }
 
 func (userDefaults) SetString(key, value string) {
-	standardDefaults().Send(sel("setObject:forKey:"), nsString(value), nsString(key))
+	withPool(func() { standardDefaults().Send(sel("setObject:forKey:"), nsString(value), nsString(key)) })
 }

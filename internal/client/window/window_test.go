@@ -47,6 +47,7 @@ func (h *fakeHost) OpenExternal(url string) { h.record("external " + url) }
 func (h *fakeHost) ShowFloat(url string)    { h.record("float " + url) }
 func (h *fakeHost) HideFloat()              { h.record("hide-float") }
 func (h *fakeHost) SetFloatFrame(r Rect)    { h.record(fmt.Sprint("float-frame ", r)) }
+func (h *fakeHost) PlaceFloat(p FloatPlace) { h.record(fmt.Sprintf("float-place %q %v", p.Edge, p.Up)) }
 func (h *fakeHost) Listen(hs Handlers) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()

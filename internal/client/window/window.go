@@ -44,6 +44,8 @@ type Host interface {
 	HideFloat()
 	// SetFloatFrame moves and sizes the floating widget to r.
 	SetFloatFrame(r Rect)
+	// PlaceFloat tells the float's page where it sits.
+	PlaceFloat(p FloatPlace)
 	// Listen binds the hotkey, the reopen and opened links; an error leaves
 	// the reopen and the links bound.
 	Listen(h Handlers) error
@@ -64,11 +66,13 @@ type Handlers struct {
 	OnOpenURL func(link string)
 	// OnFloat runs for each message the float's page sends.
 	OnFloat func(m FloatMessage)
-	// OnFloatMoved runs with the float's frame once the person moved it.
-	OnFloatMoved func(frame Rect)
-	// OnScreens runs with the screens' visible frames, the main screen
-	// first, when the host starts listening and whenever they change.
-	OnScreens func(screens []Rect)
+	// OnFloatMoving runs when the person starts moving the float, and
+	// OnFloatDropped with its frame once they let go.
+	OnFloatMoving  func()
+	OnFloatDropped func(frame Rect)
+	// OnScreens runs with the screens, the main screen first, when the host
+	// starts listening and whenever they change.
+	OnScreens func(screens []Screen)
 	// FloatOverFullScreen lets the float show over a full-screen app.
 	FloatOverFullScreen bool
 }
@@ -104,8 +108,12 @@ type Controller struct {
 	// the default one on the first screens known.
 	placement FloatPlacement
 	placed    bool
-	screens   []Rect
+	screens   []Screen
 	floatHide func(mode string)
+	// dragging holds the frame still while the person drags it; tellPlace
+	// says the page is due its place, which it gets once it has loaded
+	// (pageReady) and the frame is set.
+	dragging, tellPlace, pageReady bool
 }
 
 // New returns a controller of cfg.Host.
@@ -128,14 +136,15 @@ func New(cfg Config) *Controller {
 // returns once the stream it follows has closed.
 func (c *Controller) Run(ctx context.Context) error {
 	err := c.cfg.Host.Listen(Handlers{
-		Hotkey:        c.cfg.Hotkey,
-		OnHotkey:      c.TogglePanel,
-		OnReopen:      func() { _ = c.Show("") },
-		OnPanelHidden: func() { c.setPanel(false) },
-		OnOpenURL:     c.OpenLink,
-		OnFloat:       c.floatMessage,
-		OnFloatMoved:  c.floatMoved,
-		OnScreens:     c.setScreens,
+		Hotkey:         c.cfg.Hotkey,
+		OnHotkey:       c.TogglePanel,
+		OnReopen:       func() { _ = c.Show("") },
+		OnPanelHidden:  func() { c.setPanel(false) },
+		OnOpenURL:      c.OpenLink,
+		OnFloat:        c.floatMessage,
+		OnFloatMoving:  c.floatMoving,
+		OnFloatDropped: c.floatDropped,
+		OnScreens:      c.setScreens,
 
 		FloatOverFullScreen: c.cfg.FloatOverFullScreen,
 	})

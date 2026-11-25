@@ -5,9 +5,12 @@ package wails
 import (
 	"encoding/json"
 	"math"
+	"net/url"
 	"os"
 	"runtime"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/ebitengine/purego/objc"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -42,7 +45,9 @@ func Run(name string, cat *texts.Catalog, ready func(window.Host)) {
 			ApplicationShouldTerminateAfterLastWindowClosed: false,
 		},
 		RawMessageHandler: func(w application.Window, message string, origin *application.OriginInfo) {
-			h.pageMessage(w.Name(), message, origin != nil && origin.IsMainFrame)
+			if origin != nil {
+				h.pageMessage(w.Name(), message, origin.Origin, origin.IsMainFrame)
+			}
 		},
 	})
 	app.Menu.Set(wailsMenu(menuOf(name, cat)))
@@ -128,11 +133,16 @@ type host struct {
 	// show.
 	panelKey bool
 	floatURL string
-	// floatShown, floatFrame, the frame last set or reported moved, and
-	// floatMode, the mode the float's page last said it draws in.
+	// floatShown, floatFrame, the frame last set or dropped, floatMode, the
+	// mode the float's page last said it draws in, and dragging, from the
+	// first move the person made to the drop.
 	floatShown bool
 	floatFrame window.Rect
 	floatMode  string
+	dragging   bool
+	// floatKeyable is read on the main thread, where AppKit asks whether the
+	// float may become key.
+	floatKeyable atomic.Bool
 }
 
 const floatName = "float"
@@ -158,16 +168,16 @@ func newHost(app *application.App, name string) *host {
 		Name: floatName, Title: name, URL: "about:blank", Width: 112, Height: 32, Hidden: true, Frameless: true,
 		DisableResize: true, BackgroundType: application.BackgroundTypeTransparent,
 		Mac: application.MacWindow{
-			WindowClass:        application.MacWindowClassPanel,
-			PanelPreferences:   application.MacPanelPreferences{NonActivating: true, FloatingPanel: true},
-			WindowLevel:        application.MacWindowLevelFloating,
-			CollectionBehavior: application.MacWindowCollectionBehaviorCanJoinAllSpaces,
-			Backdrop:           application.MacBackdropTransparent,
-			DisableShadow:      true,
+			WindowClass:      application.MacWindowClassPanel,
+			PanelPreferences: application.MacPanelPreferences{NonActivating: true, FloatingPanel: true},
+			WindowLevel:      application.MacWindowLevelFloating,
+			CollectionBehavior: application.MacWindowCollectionBehaviorCanJoinAllSpaces |
+				application.MacWindowCollectionBehaviorStationary | application.MacWindowCollectionBehaviorIgnoresCycle,
+			Backdrop:      application.MacBackdropTransparent,
+			DisableShadow: true,
 		},
 	})
 	h.float.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) { e.Cancel() })
-	h.float.OnWindowEvent(events.Mac.WindowDidBecomeKey, func(*application.WindowEvent) { h.do(h.releaseKeyboard) })
 	h.float.OnWindowEvent(events.Mac.WindowDidMove, func(*application.WindowEvent) { h.do(h.floatMoved) })
 	h.main.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
 		e.Cancel()
@@ -187,9 +197,13 @@ func newHost(app *application.App, name string) *host {
 	return h
 }
 
-// launched restores the main window's frame; it runs on the main thread.
+// launched restores the main window's frame and lets the float become key
+// only while it is keyable; it runs on the main thread.
 func (h *host) launched() {
 	nsWindow(h.main).Send(objc.RegisterName("setFrameAutosaveName:"), nsString(frameAutosaveName))
+	if err := keyOnlyWhen(nsWindow(h.float), h.floatKeyable.Load); err != nil {
+		h.app.Logger.Warn("window: the float may take the keyboard in any mode", "error", err)
+	}
 }
 
 func (h *host) do(fn func()) {
@@ -335,10 +349,30 @@ func (h *host) SetFloatFrame(r window.Rect) {
 	})
 }
 
-// pageMessage hands a message the float's page sent to the controller,
-// keeping the mode it says it draws in; a message from any other window or
-// frame is dropped.
-func (h *host) pageMessage(windowName, message string, mainFrame bool) {
+// PlaceFloat tells the float's page where it sits, in the mode it draws in.
+func (h *host) PlaceFloat(p window.FloatPlace) {
+	h.do(func() { evalJS(h.float, floatPlaceJS(h.floatMode, p)) })
+}
+
+// floatPlaceJS calls the page's bridge with mode, the pill when the page has
+// said none, and p.
+func floatPlaceJS(mode string, p window.FloatPlace) string {
+	if mode == "" {
+		mode = window.ModePill
+	}
+	name, _ := json.Marshal(window.FloatBridge)
+	m, _ := json.Marshal(mode)
+	place, _ := json.Marshal(struct {
+		Edge string `json:"edge"`
+		Up   bool   `json:"up"`
+	}{p.Edge, p.Up})
+	return "(function(b){if(b&&b.setMode)b.setMode(" + string(m) + "," + string(place) + ")})(window[" + string(name) + "])"
+}
+
+// pageMessage hands the controller a message the float's page sent from the
+// cockpit's origin, in its main frame, keeping the mode it says it draws in;
+// any other message is dropped.
+func (h *host) pageMessage(windowName, message, origin string, mainFrame bool) {
 	if windowName != floatName || !mainFrame {
 		return
 	}
@@ -347,9 +381,11 @@ func (h *host) pageMessage(windowName, message string, mainFrame bool) {
 		return
 	}
 	h.do(func() {
+		if !sameOrigin(origin, h.floatURL) {
+			return
+		}
 		if m.Kind == window.FloatSize && m.Mode != "" {
-			h.floatMode = m.Mode
-			h.releaseKeyboard()
+			h.setFloatMode(m.Mode)
 		}
 		if on := h.handlers().OnFloat; on != nil {
 			on(m)
@@ -357,19 +393,31 @@ func (h *host) pageMessage(windowName, message string, mainFrame bool) {
 	})
 }
 
-// releaseKeyboard hands the keyboard back when the float holds it outside the
-// open panel.
-func (h *host) releaseKeyboard() {
-	if window.FloatKeyable(h.floatMode) || !isKey(h.float) {
+// sameOrigin says whether two addresses share their scheme, host and port.
+func sameOrigin(a, b string) bool {
+	ua, errA := url.Parse(a)
+	ub, errB := url.Parse(b)
+	return errA == nil && errB == nil && ua.Scheme != "" && ua.Scheme == ub.Scheme && ua.Host == ub.Host
+}
+
+// setFloatMode keeps mode and, leaving the panel while the float holds the
+// keyboard and no mouse button is down, hands the keyboard back.
+func (h *host) setFloatMode(mode string) {
+	h.floatMode = mode
+	keyable := window.FloatKeyable(mode)
+	h.floatKeyable.Store(keyable)
+	if keyable || !mouseButtonsUp() || !isKey(h.float) {
 		return
 	}
 	application.InvokeSync(func() { handBackKeyboard(nsWindow(h.float)) })
 }
 
-// floatMoved reports a move the person made: a frame other than the one the
-// host last set.
+// floatMoved starts following a move the person made, a frame other than the
+// one the host last set while a mouse button is down, until they let go; a
+// move AppKit makes itself, as when a screen goes away, is left to the
+// controller's clamp.
 func (h *host) floatMoved() {
-	if !h.floatShown {
+	if !h.floatShown || h.dragging || mouseButtonsUp() {
 		return
 	}
 	var f window.Rect
@@ -377,8 +425,34 @@ func (h *host) floatMoved() {
 	if sameFrame(f, h.floatFrame) {
 		return
 	}
+	h.dragging = true
+	if on := h.handlers().OnFloatMoving; on != nil {
+		on()
+	}
+	go h.awaitDrop()
+}
+
+// dropPoll is how often a drag is checked for its end: AppKit sends the
+// window no mouse-up for a drag the window server runs.
+const dropPoll = 30 * time.Millisecond
+
+func (h *host) awaitDrop() {
+	tick := time.NewTicker(dropPoll)
+	defer tick.Stop()
+	for range tick.C {
+		if mouseButtonsUp() {
+			h.do(h.dropped)
+			return
+		}
+	}
+}
+
+func (h *host) dropped() {
+	h.dragging = false
+	var f window.Rect
+	application.InvokeSync(func() { f = frameOf(nsWindow(h.float)) })
 	h.floatFrame = f
-	if on := h.handlers().OnFloatMoved; on != nil {
+	if on := h.handlers().OnFloatDropped; on != nil {
 		on(f)
 	}
 }
@@ -390,7 +464,7 @@ func sameFrame(a, b window.Rect) bool {
 }
 
 func (h *host) screensChanged() {
-	var s []window.Rect
+	var s []window.Screen
 	application.InvokeSync(func() { s = screens() })
 	if on := h.handlers().OnScreens; on != nil && len(s) > 0 {
 		on(s)

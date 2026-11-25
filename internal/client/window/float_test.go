@@ -9,11 +9,11 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 )
 
-// The visible frames of a laptop screen under its menu bar and of a larger
-// screen to its right, in the coordinates of a Rect.
+// A laptop screen with its menu bar, and a larger screen to its right with
+// its own menu bar and the Dock, in the coordinates of a Rect.
 var (
-	laptop = Rect{X: 0, Y: 33, W: 1512, H: 911}
-	wide   = Rect{X: 1512, Y: 0, W: 2560, H: 1415}
+	laptop = Screen{Frame: Rect{X: 0, Y: 0, W: 1512, H: 944}, Visible: Rect{X: 0, Y: 33, W: 1512, H: 911}}
+	wide   = Screen{Frame: Rect{X: 1512, Y: 0, W: 2560, H: 1440}, Visible: Rect{X: 1512, Y: 25, W: 2560, H: 1390}}
 )
 
 func wantRect(t *testing.T, got, want Rect) {
@@ -27,29 +27,48 @@ func wantRect(t *testing.T, got, want Rect) {
 // inside its visible frame.
 func TestClampToScreensFallsBackToMainWhenScreenGone(t *testing.T) {
 	onWide := FloatPlacement{Corner: CornerBottomRight, X: 3900, Y: 1300, W: 112, H: 32}
-	wantRect(t, ClampToScreens(onWide, []Rect{laptop, wide}), Rect{X: 3900 - 112, Y: 1300 - 32, W: 112, H: 32})
-	wantRect(t, ClampToScreens(onWide, []Rect{laptop}), Rect{X: 1512 - 112, Y: 33 + 911 - 32, W: 112, H: 32})
+	wantRect(t, ClampToScreens(onWide, []Screen{laptop, wide}), Rect{X: 3900 - 112, Y: 1300 - 32, W: 112, H: 32})
+	wantRect(t, ClampToScreens(onWide, []Screen{laptop}), Rect{X: 1512 - 112, Y: 33 + 911 - 32, W: 112, H: 32})
 }
 
 // A docked pill stays flush with its edge, wherever its saved point drifted,
 // and inside the screen's height.
 func TestClampToScreensKeepsEdgeDock(t *testing.T) {
 	right := FloatPlacement{Edge: EdgeRight, Corner: CornerTopRight, X: 4050, Y: 300, W: 34, H: 84}
-	wantRect(t, ClampToScreens(right, []Rect{laptop, wide}), Rect{X: 1512 + 2560 - 34, Y: 300, W: 34, H: 84})
+	wantRect(t, ClampToScreens(right, []Screen{laptop, wide}), Rect{X: 1512 + 2560 - 34, Y: 300, W: 34, H: 84})
 
 	left := FloatPlacement{Edge: EdgeLeft, Corner: CornerBottomLeft, X: 40, Y: 2000, W: 34, H: 84}
-	wantRect(t, ClampToScreens(left, []Rect{laptop, wide}), Rect{X: 0, Y: 33 + 911 - 84, W: 34, H: 84})
+	wantRect(t, ClampToScreens(left, []Screen{laptop, wide}), Rect{X: 0, Y: 944 - 84, W: 34, H: 84})
 }
 
-// A frame larger than the screen starts at the screen's top left rather
-// than past its far edges.
-func TestClampToScreensKeepsAnOversizedFrameAtTheTopLeft(t *testing.T) {
+// A frame larger than its screen's visible frame shrinks to it.
+func TestClampToScreensCapsTheSizeToTheVisibleFrame(t *testing.T) {
 	big := FloatPlacement{Corner: CornerBottomRight, X: 1500, Y: 900, W: 2000, H: 1200}
-	wantRect(t, ClampToScreens(big, []Rect{laptop}), Rect{X: 0, Y: 33, W: 2000, H: 1200})
+	wantRect(t, ClampToScreens(big, []Screen{laptop}), laptop.Visible)
+}
+
+// A pill dropped in the second screen's menu-bar strip, outside every
+// visible frame, stays on that screen, under its menu bar.
+func TestAPillDroppedInAMenuBarStripStaysOnItsScreen(t *testing.T) {
+	screens := []Screen{laptop, wide}
+	p := PlacementOf(Rect{X: 2000, Y: 5, W: 112, H: 32}, screens)
+	if want := (FloatPlacement{Corner: CornerTopLeft, X: 2000, Y: 5, W: 112, H: 32}); p != want {
+		t.Fatalf("placement %+v, want %+v", p, want)
+	}
+	wantRect(t, ClampToScreens(p, screens), Rect{X: 2000, Y: 25, W: 112, H: 32})
+}
+
+// A frame across two screens belongs to the one holding more of it.
+func TestAFrameAcrossScreensBelongsToTheOneHoldingMore(t *testing.T) {
+	screens := []Screen{laptop, wide}
+	p := PlacementOf(Rect{X: 1430, Y: 600, W: 112, H: 32}, screens)
+	if p.Edge != EdgeRight || p.X != 1512 {
+		t.Fatalf("placement %+v, want docked on the laptop's right edge", p)
+	}
 }
 
 func TestPlacementOfAMovedFrame(t *testing.T) {
-	screens := []Rect{laptop, wide}
+	screens := []Screen{laptop, wide}
 	cases := []struct {
 		name  string
 		frame Rect
@@ -72,7 +91,7 @@ func TestPlacementOfAMovedFrame(t *testing.T) {
 // What a moved frame becomes, clamped back, is where it was dropped, or
 // flush with the edge it was dropped near.
 func TestAMovedFrameClampsToWhereItWasDropped(t *testing.T) {
-	screens := []Rect{laptop, wide}
+	screens := []Screen{laptop, wide}
 	free := Rect{X: 2000, Y: 900, W: 112, H: 32}
 	wantRect(t, ClampToScreens(PlacementOf(free, screens), screens), free)
 	nearLeft := Rect{X: 9, Y: 400, W: 34, H: 84}
@@ -103,6 +122,14 @@ func TestPlacementSavesAndLoadsUnderTheBrandsDomain(t *testing.T) {
 	}
 }
 
+// A placement saved without a size loads with the size the float starts at.
+func TestAPlacementWithoutASizeLoadsWithTheStartSize(t *testing.T) {
+	p, ok := LoadPlacement(memDefaults{PlacementKey: `{"corner":"tl","x":10,"y":50,"w":0,"h":0}`})
+	if want := (FloatPlacement{Corner: CornerTopLeft, X: 10, Y: 50, W: floatStartW, H: floatStartH}); !ok || p != want {
+		t.Fatalf("loaded %+v %v, want %+v", p, ok, want)
+	}
+}
+
 func TestAnUnreadablePlacementLoadsAsNone(t *testing.T) {
 	for _, v := range []string{"{", `{"corner":"middle"}`, `{"corner":"tl","edge":"top"}`} {
 		if p, ok := LoadPlacement(memDefaults{PlacementKey: v}); ok {
@@ -117,15 +144,14 @@ func TestParseFloatMessage(t *testing.T) {
 		want FloatMessage
 		ok   bool
 	}{
-		{`float:size {"w":460,"h":600}`, FloatMessage{Kind: FloatSize, W: 460, H: 600}, true},
-		{`float:size {"w":112,"h":32,"mode":"pill"}`, FloatMessage{Kind: FloatSize, W: 112, H: 32, Mode: ModePill}, true},
-		{`float:size:{"w":112,"h":32}`, FloatMessage{Kind: FloatSize, W: 112, H: 32}, true},
-		{`float:open {"route":"task=t-1"}`, FloatMessage{Kind: FloatOpen, Route: "task=t-1"}, true},
-		{`float:hide {"mode":"quiet"}`, FloatMessage{Kind: FloatHide, Mode: "quiet"}, true},
-		{`float:size {"w":0,"h":32}`, FloatMessage{}, false},
-		{`float:size`, FloatMessage{}, false},
-		{`float:sizes {"w":1,"h":1}`, FloatMessage{}, false},
-		{`float:move {"x":1}`, FloatMessage{}, false},
+		{`{"type":"float:size","w":460,"h":600,"mode":"panel"}`, FloatMessage{Kind: FloatSize, W: 460, H: 600, Mode: ModePanel}, true},
+		{`{"type":"float:size","w":128,"h":48,"mode":"pill"}`, FloatMessage{Kind: FloatSize, W: 128, H: 48, Mode: ModePill}, true},
+		{`{"type":"float:open","route":"task=t-1"}`, FloatMessage{Kind: FloatOpen, Route: "task=t-1"}, true},
+		{`{"type":"float:hide","mode":"quiet"}`, FloatMessage{Kind: FloatHide, Mode: "quiet"}, true},
+		{`{"type":"float:size","w":0,"h":32,"mode":"pill"}`, FloatMessage{}, false},
+		{`{"type":"float:move","x":1}`, FloatMessage{}, false},
+		{`float:size {"w":460,"h":600}`, FloatMessage{}, false},
+		{`{"w":460,"h":600}`, FloatMessage{}, false},
 		{`hello`, FloatMessage{}, false},
 	}
 	for _, c := range cases {
@@ -137,7 +163,7 @@ func TestParseFloatMessage(t *testing.T) {
 }
 
 func TestTheFloatTakesTheKeyboardOnlyInPanelMode(t *testing.T) {
-	for mode, want := range map[string]bool{ModePill: false, ModePeek: false, ModePanel: true, "": true} {
+	for mode, want := range map[string]bool{ModePill: false, ModePeek: false, ModePanel: true, "": false, "other": false} {
 		if got := FloatKeyable(mode); got != want {
 			t.Errorf("mode %q keyable %v, want %v", mode, got, want)
 		}
@@ -145,7 +171,7 @@ func TestTheFloatTakesTheKeyboardOnlyInPanelMode(t *testing.T) {
 }
 
 // floatRig is a running controller whose host listened and reported screens.
-func floatRig(t *testing.T, d Defaults, screens ...Rect) *rig {
+func floatRig(t *testing.T, d Defaults, screens ...Screen) *rig {
 	t.Helper()
 	r := &rig{host: &fakeHost{}, events: &fakeEvents{streams: []chan api.Change{make(chan api.Change)}, stop: make(chan struct{})}, logs: &logs{}}
 	r.ctl = New(Config{Host: r.host, Daemon: r.events, CockpitURL: cockpitURL, Log: r.logs.logf, Defaults: d})
@@ -155,8 +181,27 @@ func floatRig(t *testing.T, d Defaults, screens ...Rect) *rig {
 	return r
 }
 
+// size is a size message of the pill.
+func size(w, h float64) FloatMessage {
+	return FloatMessage{Kind: FloatSize, W: w, H: h, Mode: ModePill}
+}
+
+// shownRig is a floatRig whose float shows and whose page has loaded, with
+// the host calls so far taken.
+func shownRig(t *testing.T, d Defaults, screens ...Screen) *rig {
+	t.Helper()
+	r := floatRig(t, d, screens...)
+	if err := r.ctl.ShowFloat(); err != nil {
+		t.Fatal(err)
+	}
+	r.host.handlers().OnFloat(size(112, 32))
+	r.host.taken()
+	return r
+}
+
 // Growing from the bottom right, the frame keeps its right and bottom edges
 // where they were: the pill stays under the mouse while the panel opens.
+// The page learns where it sits once it has loaded.
 func TestFloatSizeKeepsAnchorCorner(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		d := memDefaults{}
@@ -166,9 +211,20 @@ func TestFloatSizeKeepsAnchorCorner(t *testing.T) {
 			t.Fatal(err)
 		}
 		want(t, r.host.taken(), "float-frame {1288 868 112 32}", "float "+base+"#"+FloatRoute)
-		r.host.handlers().OnFloat(FloatMessage{Kind: FloatSize, W: 460, H: 600})
-		r.host.handlers().OnFloat(FloatMessage{Kind: FloatSize, W: 112, H: 32})
-		want(t, r.host.taken(), "float-frame {940 300 460 600}", "float-frame {1288 868 112 32}")
+		r.host.handlers().OnFloat(FloatMessage{Kind: FloatSize, W: 460, H: 600, Mode: ModePanel})
+		r.host.handlers().OnFloat(size(112, 32))
+		want(t, r.host.taken(), "float-frame {940 300 460 600}", `float-place "" true`, "float-frame {1288 868 112 32}")
+	})
+}
+
+// A size larger than the screen's visible frame is capped to it.
+func TestFloatSizeIsCappedToTheScreen(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := memDefaults{}
+		SavePlacement(d, FloatPlacement{Corner: CornerBottomRight, X: 1400, Y: 900, W: 112, H: 32})
+		r := shownRig(t, d, laptop)
+		r.host.handlers().OnFloat(FloatMessage{Kind: FloatSize, W: 2000, H: 1200, Mode: ModePanel})
+		want(t, r.host.taken(), "float-frame {0 33 1512 911}")
 	})
 }
 
@@ -176,7 +232,7 @@ func TestFloatSizeKeepsAnchorCorner(t *testing.T) {
 func TestFloatSizeWhileHiddenMovesNothing(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		r := floatRig(t, nil, laptop)
-		r.host.handlers().OnFloat(FloatMessage{Kind: FloatSize, W: 460, H: 600})
+		r.host.handlers().OnFloat(size(460, 600))
 		want(t, r.host.taken())
 	})
 }
@@ -192,44 +248,61 @@ func TestTheFloatStartsDockedRight(t *testing.T) {
 		if len(got) != 2 || !strings.HasPrefix(got[0], "float-frame {1400 ") {
 			t.Fatalf("host calls %q, want a frame flush with the laptop's right edge", got)
 		}
+		r.host.handlers().OnFloat(size(34, 84))
+		want(t, r.host.taken(), "float-frame {1478 260.75 34 84}", `float-place "right" false`)
 	})
 }
 
 // Unplugging the screen the pill sits on brings it back on the main screen;
-// plugging it back returns the pill where the person left it.
+// plugging it back returns the pill where the person left it. Each time the
+// page learns where it sits.
 func TestScreensChangingMoveTheFloatBack(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		d := memDefaults{}
 		SavePlacement(d, FloatPlacement{Corner: CornerBottomRight, X: 3900, Y: 1300, W: 112, H: 32})
-		r := floatRig(t, d, laptop, wide)
-		if err := r.ctl.ShowFloat(); err != nil {
-			t.Fatal(err)
-		}
-		r.host.taken()
-		r.host.handlers().OnScreens([]Rect{laptop})
-		r.host.handlers().OnScreens([]Rect{laptop, wide})
-		want(t, r.host.taken(), "float-frame {1400 912 112 32}", "float-frame {3788 1268 112 32}")
+		r := shownRig(t, d, laptop, wide)
+		r.host.handlers().OnScreens([]Screen{laptop})
+		r.host.handlers().OnScreens([]Screen{laptop, wide})
+		want(t, r.host.taken(),
+			"float-frame {1400 912 112 32}", `float-place "" true`,
+			"float-frame {3788 1268 112 32}", `float-place "" true`)
 	})
 }
 
-// A move the person made is saved, and the next size snaps the frame to the
-// edge it was dropped near.
-func TestAMoveIsSavedAndSnapsOnTheNextSize(t *testing.T) {
+// A drop is saved and snapped to the edge it was dropped near at once; the
+// moves before it save nothing.
+func TestADropIsSavedAndSnapped(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		d := memDefaults{}
-		r := floatRig(t, d, laptop)
-		if err := r.ctl.ShowFloat(); err != nil {
-			t.Fatal(err)
+		r := shownRig(t, d, laptop)
+		saved := d[PlacementKey]
+		r.host.handlers().OnFloatMoving()
+		if d[PlacementKey] != saved {
+			t.Fatal("a move saved the placement before the drop")
 		}
-		r.host.taken()
-		r.host.handlers().OnFloatMoved(Rect{X: 10, Y: 500, W: 112, H: 32})
-		saved, ok := LoadPlacement(d)
-		if want := (FloatPlacement{Edge: EdgeLeft, Corner: CornerBottomLeft, X: 0, Y: 532, W: 112, H: 32}); !ok || saved != want {
-			t.Fatalf("saved %+v %v, want %+v", saved, ok, want)
+		r.host.handlers().OnFloatDropped(Rect{X: 10, Y: 500, W: 112, H: 32})
+		got, ok := LoadPlacement(d)
+		if want := (FloatPlacement{Edge: EdgeLeft, Corner: CornerBottomLeft, X: 0, Y: 532, W: 112, H: 32}); !ok || got != want {
+			t.Fatalf("saved %+v %v, want %+v", got, ok, want)
 		}
+		want(t, r.host.taken(), "float-frame {0 500 112 32}", `float-place "left" true`)
+	})
+}
+
+// A size that arrives during a drag waits for the drop, so the frame never
+// jumps under the dragging mouse; the drop applies it from the new anchor.
+func TestASizeDuringADragWaitsForTheDrop(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := memDefaults{}
+		r := shownRig(t, d, laptop)
+		r.host.handlers().OnFloatMoving()
+		r.host.handlers().OnFloat(size(34, 84))
 		want(t, r.host.taken())
-		r.host.handlers().OnFloat(FloatMessage{Kind: FloatSize, W: 34, H: 84})
-		want(t, r.host.taken(), "float-frame {0 448 34 84}")
+		r.host.handlers().OnFloatDropped(Rect{X: 10, Y: 500, W: 112, H: 32})
+		want(t, r.host.taken(), "float-frame {0 448 34 84}", `float-place "left" true`)
+		if got, _ := LoadPlacement(d); got.W != 34 || got.H != 84 {
+			t.Fatalf("saved %+v, want the size sent during the drag", got)
+		}
 	})
 }
 
@@ -257,13 +330,9 @@ func TestFloatHideReachesItsHook(t *testing.T) {
 
 func TestHideFloat(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		r := floatRig(t, nil, laptop)
-		if err := r.ctl.ShowFloat(); err != nil {
-			t.Fatal(err)
-		}
-		r.host.taken()
+		r := shownRig(t, nil, laptop)
 		r.ctl.HideFloat()
-		r.host.handlers().OnFloat(FloatMessage{Kind: FloatSize, W: 460, H: 600})
+		r.host.handlers().OnFloat(size(460, 600))
 		want(t, r.host.taken(), "hide-float")
 	})
 }
@@ -280,4 +349,10 @@ func TestTheHostListensWithTheFullScreenSetting(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestTheBridgeIsNamedAfterTheBrandsCommand(t *testing.T) {
+	if FloatBridge != brand.Command+"Float" {
+		t.Fatalf("bridge %q", FloatBridge)
+	}
 }

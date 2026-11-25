@@ -17,8 +17,29 @@ type Rect struct{ X, Y, W, H float64 }
 func (r Rect) right() float64  { return r.X + r.W }
 func (r Rect) bottom() float64 { return r.Y + r.H }
 
-func (r Rect) contains(x, y float64) bool {
-	return x >= r.X && x < r.right() && y >= r.Y && y < r.bottom()
+// Screen is a screen's frame and its visible frame, without the menu bar and
+// the Dock.
+type Screen struct{ Frame, Visible Rect }
+
+// FloatPlace is what the float's page needs of its placement: the edge it
+// is docked on, and whether its anchor is in the lower half of its screen,
+// so the panel opens upward.
+type FloatPlace struct {
+	Edge string
+	Up   bool
+}
+
+// FloatBridge is the page's global the host calls setMode on.
+var FloatBridge = brand.Command + "Float"
+
+// overlap is the area r and o share.
+func (r Rect) overlap(o Rect) float64 {
+	w := min(r.right(), o.right()) - max(r.X, o.X)
+	h := min(r.bottom(), o.bottom()) - max(r.Y, o.Y)
+	if w <= 0 || h <= 0 {
+		return 0
+	}
+	return w * h
 }
 
 // The edges a float docks on, and the corners it grows away from.
@@ -66,27 +87,29 @@ func (p FloatPlacement) frame() Rect {
 // snapDistance is how near an edge a dropped float docks on it.
 const snapDistance = 16
 
-// screenOf is the visible frame of the screen holding r's center, the main
-// screen (the first) when none does.
-func screenOf(r Rect, screens []Rect) Rect {
-	cx, cy := r.X+r.W/2, r.Y+r.H/2
+// screenOf is the visible frame of the screen whose frame holds most of r,
+// the main screen's (the first) when no screen holds any of it.
+func screenOf(r Rect, screens []Screen) Rect {
+	best, most := screens[0], 0.0
 	for _, s := range screens {
-		if s.contains(cx, cy) {
-			return s
+		if a := r.overlap(s.Frame); a > most {
+			best, most = s, a
 		}
 	}
-	return screens[0]
+	return best.Visible
 }
 
 // ClampToScreens is the frame p puts the float in: on the screen holding it,
-// or on the main screen, the first of screens, when that screen is gone;
-// flush with its docked edge, and inside the screen's visible frame.
-func ClampToScreens(p FloatPlacement, screens []Rect) Rect {
-	r := p.frame()
+// or on the main screen, the first of screens, when that screen is gone; no
+// larger than that screen's visible frame, flush with its docked edge, and
+// inside the visible frame.
+func ClampToScreens(p FloatPlacement, screens []Screen) Rect {
 	if len(screens) == 0 {
-		return r
+		return p.frame()
 	}
-	s := screenOf(r, screens)
+	s := screenOf(p.frame(), screens)
+	p.W, p.H = min(p.W, s.W), min(p.H, s.H)
+	r := p.frame()
 	switch p.Edge {
 	case EdgeLeft:
 		r.X = s.X
@@ -101,7 +124,7 @@ func ClampToScreens(p FloatPlacement, screens []Rect) Rect {
 // PlacementOf is the placement of a frame the person dropped: docked on the
 // edge it was dropped near, anchored at the corner of its screen's quarter,
 // so a panel opening from it grows toward the screen's middle.
-func PlacementOf(frame Rect, screens []Rect) FloatPlacement {
+func PlacementOf(frame Rect, screens []Screen) FloatPlacement {
 	p := FloatPlacement{W: frame.W, H: frame.H}
 	if len(screens) == 0 {
 		p.Corner, p.X, p.Y = CornerTopLeft, frame.X, frame.Y
@@ -143,8 +166,9 @@ const floatStartW, floatStartH = 112, 32
 
 // defaultPlacement docks the float on the main screen's right edge, a
 // quarter down its visible frame.
-func defaultPlacement(main Rect) FloatPlacement {
-	return FloatPlacement{Edge: EdgeRight, Corner: CornerTopRight, X: main.right(), Y: main.Y + main.H/4, W: floatStartW, H: floatStartH}
+func defaultPlacement(main Screen) FloatPlacement {
+	v := main.Visible
+	return FloatPlacement{Edge: EdgeRight, Corner: CornerTopRight, X: v.right(), Y: v.Y + v.H/4, W: floatStartW, H: floatStartH}
 }
 
 // Defaults is the app's user defaults, whose domain is the app bundle's
@@ -163,12 +187,15 @@ func SavePlacement(d Defaults, p FloatPlacement) {
 	d.SetString(PlacementKey, string(b))
 }
 
-// LoadPlacement is the placement saved in d; false when none is, or it does
-// not read.
+// LoadPlacement is the placement saved in d, at the start size when it was
+// saved without one; false when none is, or it does not read.
 func LoadPlacement(d Defaults) (FloatPlacement, bool) {
 	var p FloatPlacement
 	if json.Unmarshal([]byte(d.String(PlacementKey)), &p) != nil || !p.valid() {
 		return FloatPlacement{}, false
+	}
+	if p.W <= 0 || p.H <= 0 {
+		p.W, p.H = floatStartW, floatStartH
 	}
 	return p, true
 }
@@ -193,37 +220,35 @@ type FloatMessage struct {
 	Route string
 }
 
-// ParseFloatMessage reads raw, a message's name then its JSON payload,
-// apart by a space or a colon; false for any other message.
+// ParseFloatMessage reads raw, a JSON object naming its message in "type";
+// false for any other message.
 func ParseFloatMessage(raw string) (FloatMessage, bool) {
-	for _, kind := range []string{FloatSize, FloatOpen, FloatHide} {
-		rest, ok := strings.CutPrefix(raw, kind)
-		if !ok || rest == "" || rest[0] != ' ' && rest[0] != ':' {
-			continue
-		}
-		var body struct {
-			W, H  float64
-			Mode  string
-			Route string
-		}
-		if json.Unmarshal([]byte(rest[1:]), &body) != nil {
+	var body struct {
+		Type  string
+		W, H  float64
+		Mode  string
+		Route string
+	}
+	if json.Unmarshal([]byte(raw), &body) != nil {
+		return FloatMessage{}, false
+	}
+	m := FloatMessage{Kind: body.Type, W: body.W, H: body.H, Mode: body.Mode, Route: body.Route}
+	switch m.Kind {
+	case FloatSize:
+		if m.W <= 0 || m.H <= 0 {
 			return FloatMessage{}, false
 		}
-		m := FloatMessage{Kind: kind, W: body.W, H: body.H, Mode: body.Mode, Route: body.Route}
-		if kind == FloatSize && (m.W <= 0 || m.H <= 0) {
-			return FloatMessage{}, false
-		}
+		return m, true
+	case FloatOpen, FloatHide:
 		return m, true
 	}
 	return FloatMessage{}, false
 }
 
 // FloatKeyable says whether the float may take the keyboard in mode: only
-// the open panel does, so hovering the pill never takes it from the app the
-// person types in. A page that says no mode keeps the keyboard it was given.
-func FloatKeyable(mode string) bool {
-	return mode != ModePill && mode != ModePeek
-}
+// the open panel does, so hovering or dragging the pill never takes it from
+// the app the person types in.
+func FloatKeyable(mode string) bool { return mode == ModePanel }
 
 // ShowFloat shows the floating widget where the person left it.
 func (c *Controller) ShowFloat() error {
@@ -233,7 +258,7 @@ func (c *Controller) ShowFloat() error {
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.floatShown = true
+	c.floatShown, c.pageReady, c.tellPlace = true, false, true
 	c.placeFloat()
 	c.cfg.Host.ShowFloat(u)
 	return nil
@@ -255,10 +280,11 @@ func (c *Controller) OnFloatHide(fn func(mode string)) {
 	c.floatHide = fn
 }
 
-// placeFloat moves a shown float to its placement on the known screens; it
-// runs under c.mu.
+// placeFloat moves a shown float to its placement on the known screens,
+// unless the person is dragging it, then tells a loaded page where it sits
+// when its placement was set anew; it runs under c.mu.
 func (c *Controller) placeFloat() {
-	if !c.floatShown || len(c.screens) == 0 {
+	if !c.floatShown || len(c.screens) == 0 || c.dragging {
 		return
 	}
 	if !c.placed {
@@ -269,9 +295,16 @@ func (c *Controller) placeFloat() {
 		}
 	}
 	c.cfg.Host.SetFloatFrame(ClampToScreens(c.placement, c.screens))
+	if c.tellPlace && c.pageReady {
+		c.cfg.Host.PlaceFloat(FloatPlace{Edge: c.placement.Edge, Up: strings.HasPrefix(c.placement.Corner, "b")})
+		c.tellPlace = false
+	}
 }
 
 func (c *Controller) floatMessage(m FloatMessage) {
+	c.mu.Lock()
+	c.pageReady = true
+	c.mu.Unlock()
 	switch m.Kind {
 	case FloatSize:
 		c.mu.Lock()
@@ -290,23 +323,35 @@ func (c *Controller) floatMessage(m FloatMessage) {
 	}
 }
 
-// floatMoved keeps where the person dropped the float; the frame snaps to
-// a docked edge on the next resize, not under the dragging mouse.
-func (c *Controller) floatMoved(frame Rect) {
+func (c *Controller) floatMoving() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.dragging = true
+}
+
+// floatDropped keeps where the person dropped the float and snaps it there,
+// at the size the page last sent.
+func (c *Controller) floatDropped(frame Rect) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.dragging = false
 	if len(c.screens) == 0 {
 		return
 	}
-	c.placement, c.placed = PlacementOf(frame, c.screens), true
+	p := PlacementOf(frame, c.screens)
+	if c.placement.W > 0 {
+		p.W, p.H = c.placement.W, c.placement.H
+	}
+	c.placement, c.placed, c.tellPlace = p, true, true
 	if c.cfg.Defaults != nil {
 		SavePlacement(c.cfg.Defaults, c.placement)
 	}
+	c.placeFloat()
 }
 
-func (c *Controller) setScreens(screens []Rect) {
+func (c *Controller) setScreens(screens []Screen) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.screens = screens
+	c.screens, c.tellPlace = screens, true
 	c.placeFloat()
 }
