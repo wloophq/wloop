@@ -2,6 +2,7 @@
   import { fmtNumber, t, tn } from "../../lib/i18n.svelte";
   import { age } from "../../lib/lens";
   import { clock } from "../../state/clock.svelte";
+  import type { J } from "../../lib/util";
   import type { FloatState } from "../../state/float.svelte";
   import { floatDrag, LATE_MS, oldest, progress } from "./float";
   import Peek from "./Peek.svelte";
@@ -10,7 +11,14 @@
   // The collapsed widget: how many decisions wait on the user, how many turns run, how old the oldest decision is
   // and, while a peek shows on a pill that is not docked, what just arrived; a dot when nothing waits and nothing runs. A drag moves the window,
   // a click toggles the panel, an Option-click hides the widget until something new.
-  let { f, onenter, ontoggle, ondrop }: { f: FloatState; onenter: () => void; ontoggle: () => void; ondrop: () => void } = $props();
+  let {
+    f,
+    peek,
+    leaving,
+    onenter,
+    ontoggle,
+    ondrop,
+  }: { f: FloatState; peek: J; leaving: boolean; onenter: () => void; ontoggle: () => void; ondrop: () => void } = $props();
 
   // DRAG_PX is how far the pointer moves before a press is a drag.
   const DRAG_PX = 4;
@@ -24,7 +32,6 @@
     const fr = running.map((r: { intent: string; started: string }) => progress(clock.now - Date.parse(r.started), usual[r.intent] || 0));
     return fr.length ? Math.max(...fr) : 0;
   });
-  const peeked = $derived(f.peeked);
   const idle = $derived(f.online && f.loaded && !n && !running.length && f.mode !== "panel");
 
   let press: { x: number; y: number } | null = null;
@@ -44,7 +51,7 @@
     if (!press) return;
     press = null;
     if (e.altKey) f.hide("quiet");
-    else if (peeked) f.setMode("panel");
+    else if (peek) f.setMode("panel");
     else ontoggle();
   }
 
@@ -57,7 +64,7 @@
 </script>
 
 <div
-  class={["fl-pill", idle && "dot", peeked && "peeking", !f.online && "offline"]}
+  class={["fl-pill", idle && "dot", peek && "peeking", !f.online && "offline"]}
   role="button"
   tabindex="0"
   aria-expanded={f.mode === "panel" ? "true" : "false"}
@@ -82,8 +89,8 @@
       {#if n && !Number.isNaN(first)}
         <span class={["fl-age", late && "late"]}>{age(new Date(first).toISOString(), clock.now)}</span>
       {/if}
-      {#if peeked && !f.place.edge}
-        <span class="fl-peek"><Peek item={peeked} /></span>
+      {#if peek && !f.place.edge}
+        <span class="fl-peek" data-state={leaving ? "leaving" : "shown"}><Peek item={peek} /></span>
       {/if}
     {/if}
   {/if}

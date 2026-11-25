@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { fmtNumber, t, tn } from "../../lib/i18n.svelte";
-  import { typing } from "../../lib/util";
+  import { typing, type J } from "../../lib/util";
   import { FLOAT_HOVER_CLOSE_MS, FLOAT_HOVER_OPEN_MS, floatState, type FloatHide } from "../../state/float.svelte";
   import { notice } from "../../state/store.svelte";
   import Agents from "./Agents.svelte";
-  import { floatSize, hovered } from "./float";
+  import { floatSize, hovered, peekLeaveMS } from "./float";
   import Peek from "./Peek.svelte";
   import Pill from "./Pill.svelte";
   import Queue from "./Queue.svelte";
@@ -16,7 +16,12 @@
   const f = floatState();
   const open = $derived(f.mode === "panel");
   const n = $derived(f.items.length);
-  const flyout = $derived(!open && f.place.edge && f.peeked);
+  // shown is the item the peek draws, kept while its card leaves after the peek ends; the window shrinks once it is
+  // gone, so the fade is not clipped.
+  let shown: J = $state(null);
+  let leaving = $state(false);
+  let gone: ReturnType<typeof setTimeout> | undefined;
+  const flyout = $derived(!open && f.place.edge && shown);
   const maxW = $derived(f.place.maxW || window.screen.availWidth);
   const maxH = $derived(f.place.maxH || window.screen.availHeight);
 
@@ -32,8 +37,33 @@
 
   const report = (force = false) => floatSize(root, f.mode, force);
 
+  function left(): void {
+    clearTimeout(gone);
+    shown = null;
+    leaving = false;
+  }
+
   $effect(() => {
-    void [f.mode, f.items.length, f.peeked, f.read, f.place.edge, f.place.up, maxW, maxH, menu, f.turns];
+    const peeked = f.peeked;
+    const panel = open;
+    untrack(() => {
+      if (peeked) {
+        clearTimeout(gone);
+        shown = peeked;
+        leaving = false;
+      } else if (panel || !shown) {
+        left();
+      } else if (!leaving) {
+        const ms = peekLeaveMS();
+        if (!ms) return left();
+        leaving = true;
+        gone = setTimeout(left, ms);
+      }
+    });
+  });
+
+  $effect(() => {
+    void [f.mode, f.items.length, shown, f.read, f.place.edge, f.place.up, maxW, maxH, menu, f.turns];
     queueMicrotask(() => report());
   });
 
@@ -99,6 +129,7 @@
     return () => {
       if (ro) ro.disconnect();
       clearTimeout(hover);
+      clearTimeout(gone);
       document.documentElement.classList.remove("float-page");
     };
   });
@@ -116,9 +147,9 @@
   role="presentation"
   onpointerleave={leave}
 >
-  <Pill {f} onenter={enterPill} ontoggle={toggle} ondrop={() => report(true)} />
+  <Pill {f} peek={shown} {leaving} onenter={enterPill} ontoggle={toggle} ondrop={() => report(true)} />
   {#if flyout}
-    <button type="button" class="fl-flyout" use:hovered onclick={() => f.setMode("panel")}><span class="fl-flyout-text"><Peek item={flyout} /></span></button>
+    <button type="button" class="fl-flyout" data-state={leaving ? "leaving" : "shown"} use:hovered onclick={() => f.setMode("panel")}><span class="fl-flyout-text"><Peek item={flyout} /></span></button>
   {/if}
   {#if open}
     <section class="fl-panel" aria-label={f.title || undefined} onpointerenter={enterPanel}>

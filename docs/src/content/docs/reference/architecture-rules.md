@@ -91,6 +91,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `nonProse` entry | Status | Reason |
 |---|---|---|
 | `(prefers-color-scheme: dark)` | ✅ | a CSS media query |
+| `(prefers-reduced-motion: reduce)` | ✅ | a CSS media query |
 | `Accept` | ✅ | an HTTP header name |
 | `Alt` | ✅ | KeyboardEvent.key |
 | `Backspace` | ✅ | KeyboardEvent.key |
@@ -164,6 +165,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `nonProse` entry | Status | Reason |
 |---|---|---|
 | `(prefers-color-scheme: dark)` | ✅ | a CSS media query |
+| `(prefers-reduced-motion: reduce)` | ✅ | a CSS media query |
 | `Accept` | ✅ | an HTTP header name |
 | `Alt` | ✅ | KeyboardEvent.key |
 | `Backspace` | ✅ | KeyboardEvent.key |

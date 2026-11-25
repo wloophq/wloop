@@ -46,6 +46,14 @@ export function floatSize(el: Element | undefined | null, mode: FloatMode, force
   floatDeps.post({ type: "float:size", w, h, mode });
 }
 
+// peekLeaveMS is how long a peek's card takes to leave: the stylesheet's --motion-peek-out, 0 under reduced motion
+// or where no stylesheet names it, since then no transition runs to wait for.
+export function peekLeaveMS(win: J = window): number {
+  if (typeof win.matchMedia === "function" && win.matchMedia("(prefers-reduced-motion: reduce)").matches) return 0;
+  const ms = parseFloat(win.getComputedStyle(win.document.documentElement).getPropertyValue("--motion-peek-out"));
+  return Number.isFinite(ms) && ms > 0 ? ms : 0;
+}
+
 // resetFloatSize forgets the size last told; tests call it between cases.
 export function resetFloatSize(): void {
   Object.assign(sent, { w: -1, h: -1, mode: "" });

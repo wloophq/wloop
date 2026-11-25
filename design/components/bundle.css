@@ -31,12 +31,17 @@
   --strip-card: 3px;
   --state-glyph: 14px;
   --motion-fast: 120ms;
+  --motion-peek-in: 180ms;
+  --motion-peek-out: 140ms;
   --motion-ease: cubic-bezier(0.2, 0, 0, 1);
+  --motion-exit-ease: cubic-bezier(0.3, 0, 1, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {
   :root {
     --motion-fast: 0ms;
+    --motion-peek-in: 0ms;
+    --motion-peek-out: 0ms;
   }
 }
 
@@ -1004,6 +1009,12 @@ html.float-page body { display: block; overflow: hidden; }
 }
 .fl-flyout:hover, .fl-flyout[data-hover] { border-color: var(--rule-strong); }
 .fl.up .fl-flyout { align-self: flex-end; }
+/* A peek slides in from the pill's side and fades out back toward it; the page keeps a leaving card until its
+   transition ends, so the window shrinks after it. */
+.fl-peek, .fl-flyout { --fl-peek-side: -1; transition: opacity var(--motion-peek-in) var(--motion-ease), transform var(--motion-peek-in) var(--motion-ease); }
+.fl[data-edge="right"] .fl-flyout { --fl-peek-side: 1; }
+@starting-style { .fl-peek, .fl-flyout { opacity: 0; transform: translateX(calc(var(--fl-peek-side) * 12px)); } }
+.fl-peek[data-state="leaving"], .fl-flyout[data-state="leaving"] { opacity: 0; transform: translateX(calc(var(--fl-peek-side) * 6px)); transition: opacity var(--motion-peek-out) var(--motion-exit-ease), transform var(--motion-peek-out) var(--motion-exit-ease); }
 .fl-flyout-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
 .fl-ring { flex: none; }
 .fl-ring circle { fill: none; stroke-width: 2; }

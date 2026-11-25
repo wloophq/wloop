@@ -19,6 +19,7 @@ import { queueDeps } from "../screens/queue";
 
 const saved = { ...floatDeps };
 const savedOpen = queueDeps.open;
+const savedMatchMedia = window.matchMedia;
 let opened: string[] = [];
 let posted: J[] = [];
 let raw: string[] = [];
@@ -49,6 +50,8 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  window.matchMedia = savedMatchMedia;
+  document.documentElement.style.removeProperty("--motion-peek-out");
   vi.restoreAllMocks();
   cleanup();
   Object.assign(floatDeps, saved);
@@ -416,7 +419,14 @@ const tick = async () => {
   flushSync();
 };
 
-test.each(["left", "right"] as const)("docked %s, a peek shows beside the tab what arrived, and the window grows for it until the peek ends", async (edge) => {
+// LEAVE_MS is the peek's leave as the stylesheet's token names it; jsdom loads no stylesheet, so a test sets it.
+const LEAVE_MS = 140;
+const motion = (reduced = false) => {
+  document.documentElement.style.setProperty("--motion-peek-out", LEAVE_MS + "ms");
+  window.matchMedia = (q: string) =>
+    ({ matches: reduced && q.includes("prefers-reduced-motion: reduce"), media: q, addEventListener() {}, removeEventListener() {} }) as unknown as MediaQueryList;
+};
+const peekDocked = async (edge: "left" | "right" = "right") => {
   drawsWide();
   served = { title: "Needs you", items: [linked()] };
   await floatLoad();
@@ -425,8 +435,15 @@ test.each(["left", "right"] as const)("docked %s, a peek shows beside the tab wh
   vi.useFakeTimers();
   floatState().setMode("peek", { edge, up: false, maxW: 1400, maxH: 900 });
   await tick();
+  return c;
+};
+
+test.each(["left", "right"] as const)("docked %s, a peek shows beside the tab what arrived, and the window grows for it until the card has left", async (edge) => {
+  motion();
+  const c = await peekDocked(edge);
   const card = flyout(c)!;
   expect(card).not.toBeNull();
+  expect(card.dataset.state).toBe("shown");
   expect(pill(c).nextElementSibling).toBe(card);
   expect(card.querySelector("b.tone-me")!.textContent).toBe("step");
   expect(card.textContent).toBe("step · acme/widgets#7 · Review it");
@@ -434,8 +451,71 @@ test.each(["left", "right"] as const)("docked %s, a peek shows beside the tab wh
   expect(sizes().at(-1)).toMatchObject({ w: 380, mode: "peek" });
   await vi.advanceTimersByTimeAsync(FLOAT_PEEK_MS);
   await tick();
+  expect(flyout(c)!.dataset.state).toBe("leaving");
+  expect(sizes().at(-1)).toMatchObject({ w: 380 });
+  await vi.advanceTimersByTimeAsync(LEAVE_MS - 1);
+  await tick();
+  expect(flyout(c)).not.toBeNull();
+  await vi.advanceTimersByTimeAsync(1);
+  await tick();
   expect(flyout(c)).toBeNull();
   expect(sizes().at(-1)).toMatchObject({ w: 50, mode: "pill" });
+});
+
+test("a peek that arrives while the last one leaves keeps the card", async () => {
+  motion();
+  const c = await peekDocked();
+  await vi.advanceTimersByTimeAsync(FLOAT_PEEK_MS);
+  await tick();
+  expect(flyout(c)!.dataset.state).toBe("leaving");
+  floatState().setMode("peek");
+  await tick();
+  expect(flyout(c)!.dataset.state).toBe("shown");
+  await vi.advanceTimersByTimeAsync(LEAVE_MS);
+  await tick();
+  expect(flyout(c)!.dataset.state).toBe("shown");
+  expect(sizes().at(-1)).toMatchObject({ w: 380 });
+});
+
+test("a click on the leaving card opens the panel on what arrived", async () => {
+  motion();
+  const c = await peekDocked();
+  await vi.advanceTimersByTimeAsync(FLOAT_PEEK_MS);
+  await tick();
+  await fireEvent.click(flyout(c)!);
+  await tick();
+  expect([floatState().mode, floatState().current]).toEqual(["panel", 0]);
+  expect(flyout(c)).toBeNull();
+  await vi.advanceTimersByTimeAsync(LEAVE_MS);
+  floatState().setMode("pill");
+  await tick();
+  expect(flyout(c)).toBeNull();
+});
+
+test("under reduced motion the card leaves as the peek ends", async () => {
+  motion(true);
+  const c = await peekDocked();
+  await vi.advanceTimersByTimeAsync(FLOAT_PEEK_MS);
+  await tick();
+  expect(flyout(c)).toBeNull();
+  expect(sizes().at(-1)).toMatchObject({ w: 50, mode: "pill" });
+});
+
+test("undocked, the peek's text leaves the pill the same way, and a click while it leaves opens the panel", async () => {
+  motion();
+  await floatLoad();
+  const c = render(Float).container;
+  await settle();
+  vi.useFakeTimers();
+  floatState().setMode("peek");
+  await tick();
+  expect((pill(c).querySelector(".fl-peek") as HTMLElement).dataset.state).toBe("shown");
+  await vi.advanceTimersByTimeAsync(FLOAT_PEEK_MS);
+  await tick();
+  expect((pill(c).querySelector(".fl-peek") as HTMLElement).dataset.state).toBe("leaving");
+  await fireEvent.pointerDown(pill(c), { button: 0, clientX: 0, clientY: 0 });
+  await fireEvent.pointerUp(pill(c));
+  expect(floatState().mode).toBe("panel");
 });
 
 test("a click on the docked peek opens the panel on what arrived", async () => {

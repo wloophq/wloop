@@ -64,7 +64,7 @@ Geist for interface and prose (`sans`), Geist Mono for figures and identifiers (
 
 ### Motion
 
-Only in answer to an action, short: the detail panel and the palette fade in as they open (`@starting-style`), a decision card dims while its gate is being resolved and comes back if that fails, and controls ease their hover and press. Every transition reads `motion-fast` (120ms) with `motion-ease`, and there are no keyframe animations. Under `prefers-reduced-motion: reduce` the generated tokens set `motion-fast` to 0ms, so nothing moves. Live updates never animate: they replace content in place, and the sync line reports freshness.
+Only in answer to an action, short: the detail panel and the palette fade in as they open (`@starting-style`), a decision card dims while its gate is being resolved and comes back if that fails, and controls ease their hover and press. Every transition reads `motion-fast` (120ms) with `motion-ease`, and there are no keyframe animations. The one motion that answers no action is the float's peek, once per burst of arrivals: its card slides 12px in from the pill's side and fades in over `motion-peek-in` (180ms) with `motion-ease`, then fades out moving 6px back toward the pill over `motion-peek-out` (140ms) with `motion-exit-ease`, and the window shrinks only once it is gone. Under `prefers-reduced-motion: reduce` the generated tokens set every duration to 0ms, so nothing moves and the peek appears and leaves at once. Live updates never animate: they replace content in place, and the sync line reports freshness.
 
 ## Iconography
 
