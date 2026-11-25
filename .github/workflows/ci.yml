@@ -27,12 +27,12 @@ jobs:
           (while true; do (cd internal/cli && /tmp/cli.test >/dev/null 2>&1); done) &
           (while true; do (cd internal/e2e && /tmp/e2e.test >/dev/null 2>&1); done) &
           tests='Narrow|UsersRow|FocusOrder|FloatingPanel|Omnibox|PlanGate|HomeSpans'
-          for round in 1 2; do
+          for round in 1 2 3; do
             for v in main fix; do
               if [ $v = main ]; then dir=/tmp/main/internal/web; else dir=internal/web; fi
-              (cd $dir && /tmp/web-$v.test -test.run "$tests" -test.count=10 -test.v 2>&1) > /tmp/$v-$round.txt
+              (cd $dir && /tmp/web-$v.test -test.run "$tests" -test.count=25 -test.v 2>&1) > /tmp/$v-$round.txt || true
               echo "$v round $round: $(grep -c '^--- PASS' /tmp/$v-$round.txt) passed, $(grep -c '^--- FAIL' /tmp/$v-$round.txt) failed"
-              grep -A1 -E '^\s+layout_test|^--- FAIL' /tmp/$v-$round.txt | grep -E 'chrome|sh:' | sort | uniq -c | head -5
+              grep -A1 -E '^\s+layout_test|^--- FAIL' /tmp/$v-$round.txt | grep -E 'chrome|sh:' | sort | uniq -c | head -5 || true
             done
           done
           kill %1 %2 || true
