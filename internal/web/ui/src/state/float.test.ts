@@ -269,8 +269,9 @@ test("act after a gate event waits for the read it queued and sends nothing agai
   expect(f.items[f.current].task.id).toBe("t-2");
 });
 
-test("an item is known by its gate, else its task, kind and situation's kind, as the menu bar knows it", () => {
-  const stuck = { kind: "fix-checks", task: { id: "t-1" }, situation: { provider: "github", kind: "checks-failed", label: "Checks failed" } };
-  expect(itemKey({ ...stuck, situation: { ...stuck.situation, label: "As verificações falharam" } })).toBe("task:t-1:fix-checks:checks-failed");
+test("an item is known by its gate, else its task, kind and situation's provider, kind and unit, as the menu bar knows it", () => {
+  const stuck = { kind: "fix-checks", task: { id: "t-1" }, situation: { provider: "github", kind: "checks-failed", label: "Checks failed", unit: "github:acme/api#1" } };
+  expect(itemKey({ ...stuck, situation: { ...stuck.situation, label: "As verificações falharam" } })).toBe("task:t-1:fix-checks:github:checks-failed:github:acme/api#1");
+  expect(itemKey({ ...stuck, situation: { ...stuck.situation, unit: "github:acme/api#2" } })).not.toBe(itemKey(stuck));
   expect(itemKey({ kind: "send-draft", task: { id: "t-1" }, gate: { id: 41 } })).toBe("gate:41");
 });

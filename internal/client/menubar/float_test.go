@@ -132,6 +132,34 @@ func TestQuietShowsOnNextArrivalOnce(t *testing.T) {
 	})
 }
 
+func threadsWaiting(keys ...string) *api.Queue {
+	q := &api.Queue{Title: "Needs you", View: "needs-you", Total: len(keys)}
+	for _, k := range keys {
+		q.Items = append(q.Items, api.QueueItem{Kind: "answer", Task: api.TaskView{ID: "t-1", Title: "Answer the team"},
+			Situation: &api.QueueSituation{Provider: "slack", Kind: "waits_on_viewer", Label: "Waits on you", Unit: "slack:" + k}})
+	}
+	return q
+}
+
+// A second unit of one task entering the same situation is a new item: it
+// shows a quiet float.
+func TestQuietShowsWhenAnotherUnitOfATaskWaitsTheSameWay(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r, h := floatRig(t, nil)
+		r.d.events = make(chan api.Change)
+		r.d.queue = threadsWaiting("C1/1.0")
+		stop := run(t, r)
+		defer stop()
+		synctest.Wait()
+		r.c.FloatHide(HideQuiet)
+		synctest.Wait()
+		r.change(threadsWaiting("C1/1.0", "C1/2.0"))
+		if shows, _ := h.counts(); shows != 2 || r.mode() != VisibilityShown {
+			t.Fatalf("shown %d, mode %q; want the second thread to show the float", shows, r.mode())
+		}
+	})
+}
+
 func TestSnoozeShowsAtUntil(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		r, h := floatRig(t, nil)
@@ -820,7 +848,8 @@ func TestAFloatThatCannotShowLeavesTheNeedsBannersOn(t *testing.T) {
 }
 
 // An item is known across reads by its gate, else by its task, its kind and
-// its situation's kind; never by the words the daemon serves for it.
+// its situation's provider, kind and unit; never by the words the daemon
+// serves for it.
 func TestAQueueItemsKeyNamesItsDecisionNotItsWords(t *testing.T) {
 	gated := api.QueueItem{Kind: "send-draft", Task: api.TaskView{ID: "t-1"}, Gate: &api.GateView{ID: 41}}
 	moved := gated
@@ -833,5 +862,10 @@ func TestAQueueItemsKeyNamesItsDecisionNotItsWords(t *testing.T) {
 	}
 	if queueKey(gated) == queueKey(stuck) {
 		t.Fatalf("a gate and a situation share the key %q", queueKey(gated))
+	}
+	other := stuck
+	other.Situation = &api.QueueSituation{Provider: "github", Kind: "checks-failed", Label: "Checks failed", Unit: "github:acme/api#2"}
+	if queueKey(stuck) == queueKey(other) {
+		t.Fatalf("two units of one task in one situation share the key %q", queueKey(stuck))
 	}
 }

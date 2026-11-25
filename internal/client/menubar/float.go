@@ -6,6 +6,7 @@ import (
 	"maps"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -422,16 +423,17 @@ func setOf(keys []string) map[string]bool {
 }
 
 // queueKey names a queue item across reads, as the float's page does: its
-// gate, else its task's decision of its kind and its situation's kind.
+// gate, else its task's decision of its kind and its situation's provider,
+// kind and unit.
 func queueKey(it api.QueueItem) string {
 	if it.Gate != nil {
 		return "gate:" + strconv.FormatInt(it.Gate.ID, 10)
 	}
-	situation := ""
+	var s api.QueueSituation
 	if it.Situation != nil {
-		situation = it.Situation.Kind
+		s = *it.Situation
 	}
-	return "task:" + it.Task.ID + ":" + it.Kind + ":" + situation
+	return "task:" + strings.Join([]string{it.Task.ID, it.Kind, s.Provider, s.Kind, s.Unit}, ":")
 }
 
 // redraw draws the menu and the banners again after the float moved, unless

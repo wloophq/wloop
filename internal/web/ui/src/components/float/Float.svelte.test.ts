@@ -69,6 +69,26 @@ test("the size the page reports names the mode it draws, and a drop reports it a
   expect(sizes().at(-1)!.mode).toBe("pill");
 });
 
+test("the panel draws a task's two units waiting the same way as two items and moves between them", async () => {
+  const thread = (n: number): J => ({
+    kind: "answer", word: "thread", task: { id: "t-1", title: "Answer the team", units: [] },
+    situation: { provider: "slack", kind: "waits_on_viewer", label: "Waits on you", unit: "slack:C1/" + n },
+    primary: { kind: "open", label: "Open" },
+  });
+  served = { title: "Needs you", items: [thread(1), thread(2)] };
+  await floatLoad();
+  const c = render(Float).container;
+  floatState().setMode("panel");
+  await settle();
+  expect(c.querySelectorAll(".fl-queue > li")).toHaveLength(2);
+  expect(c.querySelector(".fl-queue > li:nth-child(1) .fl-hand")).not.toBeNull();
+  floatState().move(1);
+  await settle();
+  expect(floatState().current).toBe(1);
+  expect(c.querySelector(".fl-queue > li:nth-child(2) .fl-hand")).not.toBeNull();
+  expect(c.querySelector(".fl-queue > li:nth-child(1) .fl-line")).not.toBeNull();
+});
+
 test("the hide menu and an Option-click ask the host to hide the widget", async () => {
   await floatLoad();
   const c = render(Float).container;

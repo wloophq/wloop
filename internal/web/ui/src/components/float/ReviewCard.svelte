@@ -49,7 +49,7 @@
     {#if summary.verdict || summary.tally.length}
       <div class="fl-chips">
         {#if summary.verdict}<span class={["fl-chip", "fl-verdict", toneClass(summary.tone)]}>{summary.verdict}</span>{/if}
-        {#each summary.tally as g (g.label + g.blocking)}
+        {#each summary.tally as g (g.label + (g.blocking ? "!" : ""))}
           <span class={["fl-count-label", g.blocking && "blocking"]}>{fmtNumber(g.n)} {g.label}</span>
         {/each}
       </div>

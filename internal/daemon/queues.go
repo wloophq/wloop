@@ -117,7 +117,7 @@ func (s *Server) queueItems(ctx context.Context, g *coretasks.Service, its []hom
 				return nil, err
 			}
 		} else {
-			qi.Situation = &api.QueueSituation{Provider: string(it.Found.Unit.Provider), Kind: it.Found.Situation, Label: it.Situation}
+			qi.Situation = &api.QueueSituation{Provider: string(it.Found.Unit.Provider), Kind: it.Found.Situation, Label: it.Situation, Unit: it.Found.Unit.String()}
 		}
 		out = append(out, qi)
 	}

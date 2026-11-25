@@ -115,11 +115,13 @@ type QueueOption struct {
 // QueueOptionPrimary is the strings.toml key of an option's button, {option} its word.
 const QueueOptionPrimary = "Post {option}"
 
-// QueueSituation is the situation of a provider's unit that makes the decision.
+// QueueSituation is the situation of a provider's unit that makes the decision; Unit is that unit's string
+// form, which tells apart the items of one task whose units are in the same situation.
 type QueueSituation struct {
 	Provider string `json:"provider"`
 	Kind     string `json:"kind"`
 	Label    string `json:"label"`
+	Unit     string `json:"unit"`
 }
 
 // QueueAction is an item's primary action: Kind "gate" (ID a gate intent), "action" (ID a catalog

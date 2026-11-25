@@ -79,10 +79,12 @@ const marks = {
   chain: Promise.resolve(),
 };
 
-// itemKey names an item across reads: its gate, else its task's decision of its kind.
+// itemKey names an item across reads, as the menu bar does: its gate, else its task's decision of its kind and
+// its situation's provider, kind and unit.
 export function itemKey(it: J): string {
   if (it && it.gate) return "gate:" + it.gate.id;
-  return ["task", it && it.task && it.task.id, it && it.kind, it && it.situation ? it.situation.kind : ""].join(":");
+  const s = (it && it.situation) || {};
+  return ["task", it && it.task && it.task.id, it && it.kind, s.provider || "", s.kind || "", s.unit || ""].join(":");
 }
 
 // successor is where the current item at, of prev, lands in next: itself, else the first item after it that next
