@@ -386,7 +386,8 @@ func (s *Plugin) Payload(ctx context.Context, req src.PayloadRequest) (src.Paylo
 }
 
 // EffectUnitClosed is the draft effect that marks a unit's closure, which
-// no extraction pass clears.
+// no extraction pass clears, and stops watching a conversation no item came
+// from.
 const EffectUnitClosed = "unit.closed"
 
 func (s *Plugin) ApplyEffect(ctx context.Context, req src.EffectRequest) error {
@@ -401,7 +402,14 @@ func (s *Plugin) ApplyEffect(ctx context.Context, req src.EffectRequest) error {
 	if at.IsZero() {
 		at = p.now()
 	}
-	return p.db.Extraction().MarkClosed(ctx, unit.Of(req.Unit), at)
+	u := unit.Of(req.Unit)
+	if err := p.db.Extraction().MarkClosed(ctx, u, at); err != nil {
+		return err
+	}
+	if p.job == nil {
+		return nil
+	}
+	return p.job.Closed(ctx, u)
 }
 
 // Proposals are none: the plugin's drafts come from the profile's workflows.

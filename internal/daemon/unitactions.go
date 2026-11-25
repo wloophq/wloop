@@ -9,7 +9,9 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
+	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -19,7 +21,7 @@ import (
 
 // unitAction refuses an action on u, no unit of the forge when forge is
 // false, that only the forge's units take. Any other unit takes a
-// question gate's intent, track and untrack when its source follows it, and an intent
+// question gate's intent, track and untrack when its source follows it, close, and an intent
 // unitIntent admits. The row of such a unit offers the
 // intents serving its provider, but this route does not check their
 // visible and enabled predicates; the tasks' bridge does.
@@ -30,7 +32,7 @@ func unitAction(l *intentload.Loaded, name string, u unit.Unit, forge bool, foll
 	if _, ok := questionIntent(l, name); ok {
 		return nil
 	}
-	if sourceFollowed(name, u, follows) {
+	if sourceFollowed(name, u, follows) || name == catalog.UnitClose {
 		return nil
 	}
 	if isBuiltin(l, name) {
@@ -171,4 +173,23 @@ func (s *Server) sourceFollow(ctx context.Context, name string, u unit.Unit) err
 		return nil
 	}
 	return pluginErr(read.Save(ctx), "track "+u.Label()+": no source tracks it")
+}
+
+// closeUnit records u's closure with no message, as a workflow's effects.apply step does: unit.closed through
+// u's plugin, which ends the tasks that hold u.
+func (s *Server) closeUnit(ctx context.Context, u unit.Unit) error {
+	o := s.deps.Outbox
+	if o == nil {
+		return errOutboxUnavailable
+	}
+	err := o.ApplySilently(ctx, u, []string{builtin.EffectUnitClosed})
+	if errors.Is(err, outbox.ErrInvalid) {
+		return conflict{NotOffered(catalog.UnitClose, u) + ": " + err.Error(), api.RefusalNotOffered}
+	}
+	return err
+}
+
+// closes says whether a unit of p closes with no message.
+func (s *Server) closes(p unit.ProviderID) bool {
+	return s.deps.Outbox != nil && s.deps.Outbox.SilentlyApplicable(p, []string{builtin.EffectUnitClosed}) == nil
 }

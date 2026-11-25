@@ -32,6 +32,10 @@ summary = "Seguir este pull request como um do escopo, embora nenhum outro motiv
 label = "Deixar de acompanhar"
 summary = "Parar de seguir este pull request por você ter pedido para acompanhá-lo; outro motivo ainda pode mantê-lo."
 
+["unit.close"]
+label = "Encerrar"
+summary = "Encerrar esta conversa sem mensagem: as tarefas que a seguram terminam e, enquanto nenhum item dela estiver aberto, ela deixa de ser acompanhada e sai da sua visão, até um item se abrir de novo."
+
 [open]
 label = "Abrir"
 summary = "Abrir o workspace do pull request no gerenciador de workspaces dele, ou o próprio pull request quando ele não tem um."

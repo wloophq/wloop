@@ -1,5 +1,5 @@
 {
-  "version": "e67ef4df4627",
+  "version": "51ccbd5fee10",
   "specs": [
     {
       "id": "answer",
@@ -371,6 +371,20 @@
       "source": "builtin",
       "scope": "unit",
       "plugin": "github"
+    },
+    {
+      "id": "unit.close",
+      "label": "Close",
+      "summary": "Close this conversation without a message: it ends the tasks that hold it and, while none of its items is open, it stops being watched and leaves its view, until an item opens again.",
+      "group": "control",
+      "surfaces": [
+        "row",
+        "detail",
+        "tui",
+        "menubar"
+      ],
+      "source": "builtin",
+      "scope": "unit"
     },
     {
       "id": "open",

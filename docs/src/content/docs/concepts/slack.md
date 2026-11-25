@@ -29,6 +29,20 @@ The model extracts every item of a conversation, for the brief, but only an item
 
 Spend is capped: $0.10 per call, $3.00 and 500 calls per local day; a day's cap frees at local midnight, and the job's skip line says when. After 3 failed calls in a row the job pauses for 15 minutes before a trial call. `plugins.slack.extraction.enabled: false` turns it off. The [configuration reference](/reference/configuration/) lists every knob, and the [extraction eval](/reference/slack-eval/) measures the extraction against your own conversations.
 
+## Closing a conversation
+
+A conversation is closed when a closure was posted there, as the extraction reads it, or marked by `unit.closed`, the effect a sent closing draft, the `effects.apply` step of a workflow and the **Close** action apply. A closure ends the tasks that hold the conversation and makes it ended (`slack.ended`). While none of its items is open, a closed conversation leaves the Slack view, its row, card and facts kept for its tasks and the Logbook; an item that opens there brings it back, as it watches the conversation again.
+
+The plugin stops watching a closed conversation once its items resolved and stayed so for `items.heat.warm_for`, so a late follow-up still comes in; one no item ever came from is unwatched at once. A conversation of a DM is its open segments: it is unwatched only when every one of them is closed and none holds an item. A thread you follow (`{{command}} slack follow`) or a session watches stays watched.
+
+Three paths close a conversation without a message, none of them waiting for your approval, since none posts:
+
+- **Close** on a conversation's row applies `unit.closed` at once;
+- `slack-closure-quiet` closes a thread you started once its items resolved, nobody's newest message there is to you and the extraction read its newest message;
+- `slack-ended-empty` closes a conversation no item came from once it ended, quiet for `plugins.slack.ended_after` (7 days), whoever started it, once the extraction read its newest message (`!slack.closure_posted && slack.ended && slack.items_open == 0 && slack.items_resolved == 0 && slack.extracted`).
+
+`slack-closure`, off by default, closes with a message instead; sending it applies the same effect.
+
 ## The agent tools
 
 While Slack is configured and the plugin is on, the daemon's MCP server serves these tools to agent sessions:

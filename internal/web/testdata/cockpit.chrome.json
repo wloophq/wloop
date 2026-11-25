@@ -94,7 +94,7 @@
      "status": ""
     }
    },
-   "specs_version": "e67ef4df4627",
+   "specs_version": "51ccbd5fee10",
    "summary": {
     "closed": false,
     "line": "",
@@ -206,7 +206,7 @@
      "status": ""
     }
    },
-   "specs_version": "e67ef4df4627",
+   "specs_version": "51ccbd5fee10",
    "summary": {
     "closed": false,
     "line": "",
@@ -3088,6 +3088,20 @@
     "toggle": "track"
    },
    {
+    "group": "control",
+    "id": "unit.close",
+    "label": "Close",
+    "scope": "unit",
+    "source": "builtin",
+    "summary": "Close this conversation without a message: it ends the tasks that hold it and, while none of its items is open, it stops being watched and leaves its view, until an item opens again.",
+    "surfaces": [
+     "row",
+     "detail",
+     "tui",
+     "menubar"
+    ]
+   },
+   {
     "group": "workspace",
     "id": "open",
     "key": "O",
@@ -3294,7 +3308,7 @@
     ]
    }
   ],
-  "version": "e67ef4df4627"
+  "version": "51ccbd5fee10"
  },
  "stringsEn": {
   "\"state\" to wait until the situation changes": "\"state\" to wait until the situation changes",

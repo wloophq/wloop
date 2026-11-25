@@ -87,7 +87,7 @@ func derive(in *Input) Row {
 		Label:  label(pl),
 		Title:  title(in, pl),
 		Kind:   kind,
-		Views:  []string{ViewSlack},
+		Views:  views(pl, open),
 		Facets: map[string][]string{FacetConversation: {label(pl)}},
 	}
 	r.Summary = Summary{
@@ -115,6 +115,15 @@ func derive(in *Input) Row {
 	}
 	r.Payload, _ = json.Marshal(pl)
 	return r
+}
+
+// views are the views a row is in: the Slack view, unless a closure ended its conversation and no item of it
+// is open.
+func views(pl Payload, open []items.Item) []string {
+	if pl.ClosurePosted && len(open) == 0 {
+		return []string{}
+	}
+	return []string{ViewSlack}
 }
 
 // turn is whose turn a row of kind k that waits on summary is: the viewer's when the conversation waits on

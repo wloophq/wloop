@@ -263,3 +263,32 @@ func TestATurnEndingRefreshesTheRowWithoutThePlugin(t *testing.T) {
 		t.Errorf("the plugin reported again: rev %d", s.Rev)
 	}
 }
+
+func TestARowOffersCloseWhenItsPluginClosesWithNoMessage(t *testing.T) {
+	u := acmeUnit("one")
+	r := &reports{snaps: map[unit.Unit]src.Snapshot{u: report("one")}}
+	p := reportedProvider(t, r, &books{by: map[unit.Unit]turn.Book{}}, nil, nil, nil)
+	ins, err := p.Load(context.Background(), []unit.Unit{u})
+	if err != nil {
+		t.Fatal(err)
+	}
+	offers := func(base readmodel.Base) (api.ActionState, bool) {
+		t.Helper()
+		base.Intents = acmeRole(t)
+		row, err := p.Derive(base, ins[u], reportedAt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		i := slices.IndexFunc(row.Actions, func(st api.ActionState) bool { return st.ID == catalog.UnitClose })
+		if i < 0 {
+			return api.ActionState{}, false
+		}
+		return row.Actions[i], true
+	}
+	if st, ok := offers(readmodel.Base{Closes: func(p unit.ProviderID) bool { return p == "acme" }}); !ok || !st.Enabled {
+		t.Errorf("close %+v %v, want enabled on a unit whose plugin closes it", st, ok)
+	}
+	if st, ok := offers(readmodel.Base{}); ok {
+		t.Errorf("close %+v offered on a unit nothing closes", st)
+	}
+}

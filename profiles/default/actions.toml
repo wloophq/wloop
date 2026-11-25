@@ -37,6 +37,10 @@ summary = "Follow this pull request like one in scope, though no other reason br
 label   = "Untrack"
 summary = "Stop following this pull request because you tracked it; another reason may still keep it."
 
+["unit.close"]
+label   = "Close"
+summary = "Close this conversation without a message: it ends the tasks that hold it and, while none of its items is open, it stops being watched and leaves its view, until an item opens again."
+
 [open]
 label   = "Open"
 summary = "Open the pull request's workspace in its workspace manager, or the pull request itself when it has none."

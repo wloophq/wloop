@@ -35,5 +35,5 @@ var GatedActions = []string{"draft.edit", "draft.retry", "draft.close-silently",
 
 // SafeActions are the other built-in actions, which an omnibox verb may run. Every built-in action is in
 // exactly one of GatedActions and SafeActions.
-var SafeActions = []string{"take_over", "pause", "resume", "mute", "unmute", "track", "untrack", "open", "remove",
+var SafeActions = []string{"take_over", "pause", "resume", "mute", "unmute", "track", "untrack", "unit.close", "open", "remove",
 	"brief_refresh", "copy_review_request", "intake_without", "intake_cancel", "plan_guide", "run.open", "run.enter", "run.transcript"}
