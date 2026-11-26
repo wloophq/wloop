@@ -53,9 +53,10 @@ type Host interface {
 	LoadFloatPanel(url string)
 	// TellFloatPanel tells the panel's page what to show.
 	TellFloatPanel(p PanelPlace)
-	// ShowFloatPanel moves and sizes the panel window to r and shows it,
-	// without taking the keyboard.
-	ShowFloatPanel(r Rect)
+	// ShowFloatPanel moves and sizes the panel window to r and shows it in
+	// mode, without taking the keyboard; it may become key only in ModePanel.
+	ShowFloatPanel(r Rect, mode string)
+	// HideFloatPanel hides the panel window, which hands back the keyboard.
 	HideFloatPanel()
 	// Listen binds the hotkey, the reopen and opened links; an error leaves
 	// the reopen and the links bound.

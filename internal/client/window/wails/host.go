@@ -479,16 +479,22 @@ func (h *host) TellFloatPanel(p window.PanelPlace) {
 	})
 }
 
-// ShowFloatPanel frames the panel window at r and orders it front; a
-// non-activating panel shown this way does not take the keyboard.
-func (h *host) ShowFloatPanel(r window.Rect) {
-	h.do(func() {
-		if h.panelNative.show == nil {
-			return
-		}
-		h.panelNative.setFrame(r)
-		h.panelNative.show()
-	})
+// ShowFloatPanel frames the panel window at r and orders it front in mode;
+// a non-activating panel shown this way does not take the keyboard.
+func (h *host) ShowFloatPanel(r window.Rect, mode string) {
+	h.do(func() { h.showPanel(r, mode) })
+}
+
+// showPanel shows the panel window at r in mode, which alone decides whether
+// it may become key: the controller shows it only at a size its page drew
+// for what it was last asked, so a late size of the page never does.
+func (h *host) showPanel(r window.Rect, mode string) {
+	if h.panelNative.show == nil {
+		return
+	}
+	h.panelNative.setFrame(r)
+	h.panelNative.show()
+	h.setPanelMode(mode)
 }
 
 func (h *host) HideFloatPanel() { h.do(h.hidePanel) }
@@ -583,8 +589,7 @@ func panelShowJS(p window.PanelPlace) string {
 
 // pageMessage hands the controller a message one of the float's pages sent
 // from the origin its window loaded, in its main frame, naming the window it
-// came from and keeping the mode the panel's page says it draws in; any
-// other message is dropped.
+// came from; any other message is dropped.
 func (h *host) pageMessage(windowName, message, origin string, mainFrame bool) {
 	from := map[string]string{floatName: window.FloatTab, floatPanelName: window.FloatPanel}[windowName]
 	if from == "" || !mainFrame {
@@ -603,24 +608,10 @@ func (h *host) pageMessage(windowName, message, origin string, mainFrame bool) {
 		if !sameOrigin(origin, loaded) {
 			return
 		}
-		if from == window.FloatPanel {
-			h.panelMessage(m)
-		}
 		if on := h.handlers().OnFloat; on != nil {
 			on(m)
 		}
 	})
-}
-
-// panelMessage keeps the mode the panel's page says it draws in: the mode of
-// its size, or none as it closes.
-func (h *host) panelMessage(m window.FloatMessage) {
-	switch m.Kind {
-	case window.FloatSize:
-		h.setPanelMode(m.Mode)
-	case window.FloatClose:
-		h.setPanelMode("")
-	}
 }
 
 // setPanelMode keeps mode; a full panel that shows with the pointer already

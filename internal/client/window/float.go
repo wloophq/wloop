@@ -588,7 +588,7 @@ func (c *Controller) closePanel() {
 // placePanel moves a shown panel beside the tab's frame at the size its page
 // last sent, telling the page a room that changed; it runs under c.mu.
 func (c *Controller) placePanel() {
-	if c.panel.want == "" || c.panel.w == 0 {
+	if c.panel.want == "" || c.panel.w == 0 || len(c.screens) == 0 {
 		return
 	}
 	side, room := PanelRoom(c.tabFrame, c.placement.Edge, c.screens)
@@ -597,7 +597,7 @@ func (c *Controller) placePanel() {
 		c.panel.pending = &PanelPlace{Mode: c.panel.want, Side: side, MaxW: room.W, MaxH: room.H}
 		c.tellPanel()
 	}
-	c.cfg.Host.ShowFloatPanel(PanelFrame(c.tabFrame, c.placement.Edge, c.panel.w, c.panel.h, c.screens))
+	c.cfg.Host.ShowFloatPanel(PanelFrame(c.tabFrame, c.placement.Edge, c.panel.w, c.panel.h, c.screens), c.panel.want)
 }
 
 // panelMessage follows the panel's page: its first message says it loaded,
@@ -653,7 +653,6 @@ func (c *Controller) floatDropped(frame Rect) {
 		SavePlacement(c.cfg.Defaults, c.placement)
 	}
 	c.placeFloat()
-	c.placePanel()
 }
 
 func (c *Controller) setScreens(screens []Screen) {

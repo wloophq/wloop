@@ -249,7 +249,7 @@ func TestStoppingTheHostEndsAWaitingPoll(t *testing.T) {
 		h.do(func() { h.floatShown = true })
 		h.do(h.floatMoved)
 		h.do(func() {
-			h.panelMessage(window.FloatMessage{Kind: window.FloatSize, W: 1, H: 1, Mode: window.ModePanel})
+			h.showPanel(window.Rect{W: 1, H: 1}, window.ModePanel)
 		})
 		h.do(func() { h.pointer(window.FloatTab, false) })
 		synctest.Wait()
@@ -265,11 +265,11 @@ func TestThePanelWindowIsMadeOnItsFirstLoad(t *testing.T) {
 		made := 0
 		h := runningHost(t, &fakeFloat{up: true}, panel, window.Handlers{})
 		h.makePanel = func() floatNative { made++; return panel.native() }
-		h.ShowFloatPanel(window.Rect{W: 1, H: 1})
+		h.ShowFloatPanel(window.Rect{W: 1, H: 1}, window.ModePanel)
 		h.HideFloatPanel()
 		h.LoadFloatPanel(cockpitPanel)
 		h.LoadFloatPanel(cockpitPanel)
-		h.ShowFloatPanel(window.Rect{X: 1002, Y: 260.75, W: 476, H: 600})
+		h.ShowFloatPanel(window.Rect{X: 1002, Y: 260.75, W: 476, H: 600}, window.ModePanel)
 		h.HideFloat()
 		synctest.Wait()
 		_, did := panel.taken()
@@ -282,32 +282,28 @@ func TestThePanelWindowIsMadeOnItsFirstLoad(t *testing.T) {
 	})
 }
 
-// Only the full panel may take the keyboard; a peek and a closed or hidden
-// panel never do.
+// Only the full panel may take the keyboard; a peek and a hidden panel never
+// do, and a size the panel's page sends never makes its window keyable: only
+// a show of the controller's does.
 func TestOnlyTheFullPanelMayBecomeKey(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		h := runningHost(t, &fakeFloat{up: true}, &fakeFloat{up: true}, window.Handlers{})
 		h.LoadFloatPanel(cockpitPanel)
-		for _, c := range []struct {
-			m    window.FloatMessage
-			want bool
-		}{
-			{window.FloatMessage{Kind: window.FloatSize, W: 356, H: 60, Mode: window.ModePeek}, false},
-			{window.FloatMessage{Kind: window.FloatSize, W: 476, H: 600, Mode: window.ModePanel}, true},
-			{window.FloatMessage{Kind: window.FloatClose}, false},
-			{window.FloatMessage{Kind: window.FloatSize, W: 476, H: 600, Mode: window.ModePanel}, true},
-		} {
-			h.do(func() { h.panelMessage(c.m) })
+		keyable := func(step string, want bool) {
+			t.Helper()
 			synctest.Wait()
-			if got := h.panelKeyable.Load(); got != c.want {
-				t.Fatalf("after %+v keyable %v, want %v", c.m, got, c.want)
+			if got := h.panelKeyable.Load(); got != want {
+				t.Fatalf("after %s keyable %v, want %v", step, got, want)
 			}
 		}
+		h.ShowFloatPanel(window.Rect{W: 356, H: 60}, window.ModePeek)
+		keyable("a peek", false)
+		h.ShowFloatPanel(window.Rect{W: 476, H: 600}, window.ModePanel)
+		keyable("the full panel", true)
 		h.HideFloatPanel()
-		synctest.Wait()
-		if h.panelKeyable.Load() {
-			t.Fatal("a hidden panel stays keyable")
-		}
+		keyable("a hide", false)
+		h.pageMessage(floatPanelName, `{"type":"float:size","w":476,"h":600,"mode":"panel"}`, cockpitPanel, true)
+		keyable("a late size of the page", false)
 	})
 }
 
@@ -320,7 +316,7 @@ func TestLeavingBothWindowsAsksThePanelToLeaveAfterTheGrace(t *testing.T) {
 		h := runningHost(t, &fakeFloat{up: true}, panel, window.Handlers{})
 		h.LoadFloatPanel(cockpitPanel)
 		mode := func(m string) {
-			h.do(func() { h.panelMessage(window.FloatMessage{Kind: window.FloatSize, W: 476, H: 600, Mode: m}) })
+			h.do(func() { h.showPanel(window.Rect{W: 476, H: 600}, m) })
 		}
 		pointer := func(w string, in bool) { h.do(func() { h.pointer(w, in) }) }
 		leaves := func() int {
@@ -377,7 +373,7 @@ func TestAPanelThatShowsWithThePointerGoneIsAskedToLeave(t *testing.T) {
 		h.do(func() { h.pointer(window.FloatTab, true) })
 		h.do(func() { h.pointer(window.FloatTab, false) })
 		h.do(func() {
-			h.panelMessage(window.FloatMessage{Kind: window.FloatSize, W: 476, H: 600, Mode: window.ModePanel})
+			h.showPanel(window.Rect{W: 476, H: 600}, window.ModePanel)
 		})
 		synctest.Wait()
 		time.Sleep(floatGrace)
@@ -387,7 +383,7 @@ func TestAPanelThatShowsWithThePointerGoneIsAskedToLeave(t *testing.T) {
 		}
 		h.do(func() { h.pointer(window.FloatTab, true) })
 		h.do(func() {
-			h.panelMessage(window.FloatMessage{Kind: window.FloatSize, W: 476, H: 640, Mode: window.ModePanel})
+			h.showPanel(window.Rect{W: 476, H: 640}, window.ModePanel)
 		})
 		time.Sleep(2 * floatGrace)
 		synctest.Wait()
@@ -404,10 +400,10 @@ func TestTheOpenPanelHearsItsWindowResignKey(t *testing.T) {
 		panel := &fakeFloat{up: true}
 		h := runningHost(t, &fakeFloat{}, panel, window.Handlers{})
 		h.LoadFloatPanel(cockpitPanel)
-		h.do(func() { h.panelMessage(window.FloatMessage{Kind: window.FloatSize, W: 1, H: 1, Mode: window.ModePeek}) })
+		h.do(func() { h.showPanel(window.Rect{W: 1, H: 1}, window.ModePeek) })
 		h.do(h.panelResigned)
 		h.do(func() {
-			h.panelMessage(window.FloatMessage{Kind: window.FloatSize, W: 1, H: 1, Mode: window.ModePanel})
+			h.showPanel(window.Rect{W: 1, H: 1}, window.ModePanel)
 		})
 		h.do(h.panelResigned)
 		synctest.Wait()

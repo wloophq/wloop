@@ -260,7 +260,8 @@ type floatTracked struct {
 // trackTargets maps each tracking area's owner to what it tracks.
 var trackTargets sync.Map
 
-// pointerTo tells the window's hearer the pointer entered or left it, and
+// pointerTo tells the window's hearer the pointer is over it or left it (a
+// move counts, since a window shown under a still pointer gets no entry), and
 // dispatches the pointer's kind of move in its page, as pointerKind says:
 // WebKit drops the mouse's moves in a window that is not key, so its page
 // would see no hover. It runs on the main thread.
@@ -271,9 +272,7 @@ func pointerTo(s objc.SEL, kind string) objc.MethodDef {
 			return
 		}
 		t := v.(floatTracked)
-		if kind != pointerMoved {
-			t.over(kind == pointerEntered)
-		}
+		t.over(kind != pointerExited)
 		k := pointerKind(kind, objc.Send[bool](t.win, sel("isKeyWindow")))
 		if k == "" {
 			return

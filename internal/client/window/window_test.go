@@ -58,8 +58,10 @@ func (h *fakeHost) LoadFloatPanel(url string) { h.record("fpanel-load " + url) }
 func (h *fakeHost) TellFloatPanel(p PanelPlace) {
 	h.record(fmt.Sprintf("fpanel-tell %q %q %q %vx%v", p.Mode, p.Item, p.Side, p.MaxW, p.MaxH))
 }
-func (h *fakeHost) ShowFloatPanel(r Rect) { h.record(fmt.Sprint("fpanel-show ", r)) }
-func (h *fakeHost) HideFloatPanel()       { h.record("fpanel-hide") }
+func (h *fakeHost) ShowFloatPanel(r Rect, mode string) {
+	h.record(fmt.Sprint("fpanel-show ", r, " ", mode))
+}
+func (h *fakeHost) HideFloatPanel() { h.record("fpanel-hide") }
 func (h *fakeHost) Listen(hs Handlers) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()

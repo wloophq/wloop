@@ -654,7 +654,7 @@ func TestThePanelLoadsOnItsFirstOpenAndShowsBesideTheTab(t *testing.T) {
 		want(t, r.host.taken(), `fpanel-tell "panel" "" "left" 1478x911`)
 		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatSize, W: 476, H: 600, Mode: ModePanel}))
 		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatSize, W: 476, H: 640, Mode: ModePanel}))
-		want(t, r.host.taken(), "fpanel-show {1002 260.75 476 600}", "fpanel-show {1002 260.75 476 640}")
+		want(t, r.host.taken(), "fpanel-show {1002 260.75 476 600} panel", "fpanel-show {1002 260.75 476 640} panel")
 
 		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatClose}))
 		want(t, r.host.taken(), "fpanel-hide", `fpanel-tell "" "" "" 0x0`)
@@ -671,7 +671,7 @@ func TestAPeekShowsInThePanelWindowUnlessThePanelIsOpen(t *testing.T) {
 		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatPeek, Item: "gate:7"})
 		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatClose}))
 		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatSize, W: 356, H: 60, Mode: ModePeek}))
-		want(t, r.host.taken(), "fpanel-load "+panelURL, `fpanel-tell "peek" "gate:7" "left" 1478x911`, "fpanel-show {1122 260.75 356 60}")
+		want(t, r.host.taken(), "fpanel-load "+panelURL, `fpanel-tell "peek" "gate:7" "left" 1478x911`, "fpanel-show {1122 260.75 356 60} peek")
 
 		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatOpenPanel})
 		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatSize, W: 476, H: 600, Mode: ModePanel}))
@@ -834,4 +834,17 @@ func TestThePanelPlacesWithoutScreens(t *testing.T) {
 		t.Fatal("no side without screens")
 	}
 	_ = PanelFrame(tab, "", 476, 600, nil)
+}
+
+// A shown panel without screens stays where it is.
+func TestAPanelIsNotPlacedWithoutScreens(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := dockedRig(t)
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatOpenPanel})
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatClose}))
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatSize, W: 476, H: 600, Mode: ModePanel}))
+		r.host.taken()
+		r.host.handlers().OnScreens(nil)
+		want(t, r.host.taken())
+	})
 }
