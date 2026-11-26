@@ -292,7 +292,7 @@ var floatTracker struct {
 
 // floatOnly gives a float window, and no other window, what a panel that is
 // not key needs: it becomes key only while keyable says so, its web view
-// takes the first click, and a tracking area active in any window tells over
+// draws no background of its own and takes the first click, and a tracking area active in any window tells over
 // the pointer entered or left it and hands its page the pointer (pointerTo).
 // The first two replace a method on the class the float windows share with
 // the omnibox panel and every web view, answering as before for every other
@@ -310,6 +310,9 @@ func floatOnly(win objc.ID, keyable func() bool, over func(inside bool), log war
 		u.Warn("the float has no web view")
 		return
 	}
+	// Wails leaves the web view drawing its default background in a transparent panel, which with a dark color
+	// scheme frames the page in a dark rounded square the size of the window.
+	webview.Send(sel("setValue:forKey:"), class("NSNumber").Send(sel("numberWithBool:"), false), nsString("drawsBackground"))
 	if err := loadObjcRuntime(); err != nil {
 		u.Warn("the Objective-C runtime did not load", "error", err)
 		return
