@@ -2,8 +2,10 @@ package daemon
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http/httptest"
 	"net/url"
 	"slices"
 	"strings"
@@ -24,6 +26,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/wake"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/meter/metertest"
 )
 
 // sweepingGates are the gates service as the tasks service reads it, with what a merge supersedes.
@@ -230,6 +233,48 @@ func TestATaskViewListsTheTasksMergedIntoIt(t *testing.T) {
 	}
 	if rec := post(t, r.s, api.TaskPath(string(mergeY), "split"), mergeBody(mergeW)); rec.Code == 200 {
 		t.Fatal("a nested merge split from the outer task")
+	}
+}
+
+// TestATaskViewReadsEachMergedTasksRecordOnce reads the merge record of each task merged into the viewed one
+// once, however deep the tasks merged into each other nest.
+func TestATaskViewReadsEachMergedTasksRecordOnce(t *testing.T) {
+	t.Parallel()
+	r := newMergeRig(t)
+	r.seedMerge(t)
+	var merged []task.ID
+	for i := range 4 {
+		id := task.ID(fmt.Sprintf("t-00000000000000d%d", i))
+		r.put(t, task.Task{ID: id, Title: fmt.Sprintf("Note %d", i), State: "next", Category: task.CategoryReady, Origin: task.OriginUser,
+			Created: tasksNow.Add(-30 * time.Minute), Updated: tasksNow.Add(-30 * time.Minute)})
+		merged = append(merged, id)
+	}
+	r.mergeRoute(t, merged[0], merged[1])
+	r.mergeRoute(t, mergeX, merged[0])
+	r.mergeRoute(t, mergeX, merged[2])
+	r.mergeRoute(t, mergeX, merged[3])
+	r.mergeRoute(t, mergeY, mergeX)
+	ctx, sc := metertest.Start(t, context.Background())
+	rec := httptest.NewRecorder()
+	r.s.Handler().ServeHTTP(rec, apiRequest("GET", api.TaskPath(string(mergeY)), nil).WithContext(ctx))
+	if rec.Code != 200 {
+		t.Fatalf("view: %d %s", rec.Code, rec.Body)
+	}
+	var v api.TaskView
+	if err := json.Unmarshal(rec.Body.Bytes(), &v); err != nil {
+		t.Fatal(err)
+	}
+	if len(v.MergedFrom) != 1 || len(v.MergedFrom[0].Within) != 3 || len(v.MergedFrom[0].Within[0].Within) != 1 {
+		t.Fatalf("merged from %+v, want X within d0 (within d1), d2 and d3", v.MergedFrom)
+	}
+	reads := 0
+	for _, x := range sc.Samples() {
+		if strings.HasPrefix(x.Detail, "SELECT count(*) FROM tasks WHERE id = ?") {
+			reads++
+		}
+	}
+	if want := 5; reads != want {
+		t.Errorf("%d merge record reads for a view of a task with %d tasks merged into it, want one each", reads, want)
 	}
 }
 
