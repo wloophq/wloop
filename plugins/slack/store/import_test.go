@@ -83,3 +83,27 @@ func TestSlackImportsTheExportedStore(t *testing.T) {
 		t.Fatalf("a second start imported again: cursor %q %v", team, err)
 	}
 }
+
+func TestAnImportedClosureHoldsUntilANewerMessage(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	dir := t.TempDir()
+	plantImport(t, dir)
+	raw, err := sql.Open("sqlite", filepath.Join(dir, store.ImportFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := raw.Exec(`UPDATE extraction_cursors SET closure_marked = 1`); err != nil {
+		t.Fatal(err)
+	}
+	raw.Close()
+	db, err := Open(ctx, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	u := unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/1700000000.000100"}
+	if st, err := db.Extraction().States(ctx, []unit.Unit{u}); err != nil || !st[u].ClosureMarked || st[u].ClosedTS != "1700000000.000100" {
+		t.Fatalf("imported state %+v %v", st[u], err)
+	}
+}

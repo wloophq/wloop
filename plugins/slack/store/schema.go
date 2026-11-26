@@ -43,9 +43,11 @@ var migrations = []store.Migration{
 }
 
 // backfillClosedTS gives each closure marked before closed_ts was kept the newest message the extraction had
-// read, the nearest to what that closure saw.
+// read, the nearest to what that closure saw, else, as a DM segment keeps none, the ts of now.
 func backfillClosedTS(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.ExecContext(ctx, `UPDATE extraction_cursors SET closed_ts = last_ts WHERE closure_marked = 1 AND closed_ts = ''`)
+	_, err := tx.ExecContext(ctx, `UPDATE extraction_cursors
+		SET closed_ts = CASE WHEN last_ts != '' THEN last_ts ELSE strftime('%s', 'now') || '.000000' END
+		WHERE closure_marked = 1 AND closed_ts = ''`)
 	return err
 }
 
@@ -65,7 +67,8 @@ func Tables() []string {
 const briefsTable = "extraction_briefs"
 
 // importTables copies every table of the export the store has, the columns
-// both share, then the briefs the export holds.
+// both share, then the briefs the export holds, and backfills the closures
+// the export marked.
 func importTables(ctx context.Context, tx *sql.Tx) error {
 	have, err := importedTables(ctx, tx)
 	if err != nil {
@@ -85,7 +88,7 @@ func importTables(ctx context.Context, tx *sql.Tx) error {
 		}
 	}
 	if !slices.Contains(have, briefsTable) {
-		return nil
+		return backfillClosedTS(ctx, tx)
 	}
 	_, err = tx.ExecContext(ctx, fmt.Sprintf(`INSERT INTO main.extraction_cursors (provider, unit_key, brief, at)
 		SELECT provider, unit_key, brief, '' FROM %s.%s WHERE true
@@ -93,7 +96,7 @@ func importTables(ctx context.Context, tx *sql.Tx) error {
 	if err != nil {
 		return fmt.Errorf("import %s: %w", briefsTable, err)
 	}
-	return nil
+	return backfillClosedTS(ctx, tx)
 }
 
 func importedTables(ctx context.Context, tx *sql.Tx) ([]string, error) {

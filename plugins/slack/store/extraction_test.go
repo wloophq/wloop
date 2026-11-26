@@ -2,8 +2,11 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
+
+	"github.com/wloophq/wloop/pkg/plugin/store"
 
 	"github.com/wloophq/wloop/plugins/slack/unit"
 )
@@ -171,24 +174,41 @@ func TestMarkClosedKeepsTheNewestMessageItSaw(t *testing.T) {
 	}
 }
 
-func TestClosedTSBackfillsAMarkedClosureFromItsLastExtractedMessage(t *testing.T) {
+// TestAClosureMarkedBeforeClosedTSHoldsUntilANewerMessage: migrating a store marked before closed_ts gives a
+// thread's closure the newest message the extraction read, and one with none, a DM segment's, the ts of the
+// migration.
+func TestAClosureMarkedBeforeClosedTSHoldsUntilANewerMessage(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db := openExtraction(t)
-	marked, open := unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/1.1"}, unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/2.1"}
-	_, err := db.Write(ctx, func(tx *Tx) error {
-		_, err := tx.ExecContext(ctx, `INSERT INTO extraction_cursors (provider, unit_key, last_ts, closure_marked, at) VALUES
-			('slack', ?, '1700000003.000100', 1, ''), ('slack', ?, '1700000004.000100', 0, '')`, marked.Key, open.Key)
-		if err != nil {
-			return err
-		}
-		return backfillClosedTS(ctx, tx.Tx)
-	})
+	dir := t.TempDir()
+	old, err := store.Open(ctx, dir, store.Options{Migrations: migrations[:4]})
 	if err != nil {
 		t.Fatal(err)
 	}
-	st, err := db.Extraction().States(ctx, []unit.Unit{marked, open})
-	if err != nil || st[marked].ClosedTS != "1700000003.000100" || st[open].ClosedTS != "" {
+	thread, segment, open := unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/1.1"}, unit.Unit{Provider: "slack", Key: "T000AAA/D000AAA/seg/s1"},
+		unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/2.1"}
+	if _, err := old.ExecContext(ctx, `INSERT INTO extraction_cursors (provider, unit_key, last_ts, closure_marked, at) VALUES
+		('slack', ?, '1700000003.000100', 1, ''), ('slack', ?, '', 1, ''), ('slack', ?, '1700000004.000100', 0, '')`, thread.Key, segment.Key, open.Key); err != nil {
+		t.Fatal(err)
+	}
+	old.Close()
+	before := time.Now().Add(-time.Second)
+	db, err := Open(ctx, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	st, err := db.Extraction().States(ctx, []unit.Unit{thread, segment, open})
+	if err != nil || st[thread].ClosedTS != "1700000003.000100" || st[open].ClosedTS != "" {
 		t.Fatalf("states %+v %v", st, err)
 	}
+	if at := tsTime(st[segment].ClosedTS); at.Before(before) || at.After(time.Now().Add(time.Second)) {
+		t.Errorf("the segment's closure is at %q, want the migration's ts", st[segment].ClosedTS)
+	}
+}
+
+func tsTime(ts string) time.Time {
+	var sec, usec int64
+	fmt.Sscanf(ts, "%d.%d", &sec, &usec)
+	return time.Unix(sec, usec*1000)
 }

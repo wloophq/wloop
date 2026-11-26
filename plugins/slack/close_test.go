@@ -102,3 +102,19 @@ func TestSomeoneElsesMessageAfterTheClosureReopensTheConversation(t *testing.T) 
 		t.Errorf("after a new message: closure_posted %v, want false", got["slack.closure_posted"])
 	}
 }
+
+// TestAClosureOfAUnitWithNoMessageHoldsUntilALaterOne: unit.closed on a unit with no stored message keeps the ts
+// of when it applied, so a message posted before it that comes in later keeps it closed.
+func TestAClosureOfAUnitWithNoMessageHoldsUntilALaterOne(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t)
+	u := dslack.ThreadUnit(team, chan1, ts(1))
+	d := src.Draft{Evidence: src.Evidence{At: tsAt(5)}}
+	if err := (&Plugin{p: f.p}).ApplyEffect(context.Background(), src.EffectRequest{Effect: EffectUnitClosed, Unit: u.Wire(), Draft: &d}); err != nil {
+		t.Fatal(err)
+	}
+	st, err := f.db.Extraction().States(context.Background(), []unit.Unit{u})
+	if err != nil || !dslack.TSTime(st[u].ClosedTS).Equal(tsAt(5).Truncate(time.Microsecond)) {
+		t.Fatalf("closed at %q (%v), want the ts of %v", st[u].ClosedTS, err, tsAt(5))
+	}
+}

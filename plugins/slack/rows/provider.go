@@ -249,6 +249,19 @@ func (p *Provider) conversation(ctx context.Context, cache map[string]store.Conv
 
 // facts are the unit's object and messages: a thread's replies, or the
 // messages a DM segment's range anchors.
+// Newest is the ts of u's newest stored message, "" when it has none.
+func (p *Provider) Newest(ctx context.Context, u unit.Unit) (string, error) {
+	k, err := dslack.ParseUnit(u)
+	if err != nil {
+		return "", err
+	}
+	_, msgs, err := p.facts(ctx, k)
+	if err != nil || len(msgs) == 0 {
+		return "", err
+	}
+	return msgs[len(msgs)-1].TS, nil
+}
+
 func (p *Provider) facts(ctx context.Context, k dslack.Key) (store.ObjectRow, []store.MessageRow, error) {
 	db := p.src.DB.Slack()
 	if k.Segment == "" {

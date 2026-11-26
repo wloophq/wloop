@@ -15,6 +15,7 @@ import (
 	sdk "github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	"github.com/wloophq/wloop/plugins/slack/config"
+	dslack "github.com/wloophq/wloop/plugins/slack/domain"
 	"github.com/wloophq/wloop/plugins/slack/draft"
 	"github.com/wloophq/wloop/plugins/slack/host"
 	"github.com/wloophq/wloop/plugins/slack/store"
@@ -403,7 +404,7 @@ func (s *Plugin) ApplyEffect(ctx context.Context, req src.EffectRequest) error {
 		at = p.now()
 	}
 	u := unit.Of(req.Unit)
-	newest, err := p.newestTS(ctx, u)
+	newest, err := p.closedTS(ctx, u, at)
 	if err != nil {
 		return err
 	}
@@ -469,16 +470,12 @@ func (s *Plugin) Within(ctx context.Context, u sdk.Unit, target string) (bool, e
 	return ok && got == unit.Of(u), err
 }
 
-// newestTS is the ts of u's newest stored message, "" when it has none.
-func (p *plugin) newestTS(ctx context.Context, u unit.Unit) (string, error) {
-	ins, err := p.rowsSource().Load(ctx, []unit.Unit{u})
-	if err != nil {
-		return "", err
+// closedTS is the ts of u's newest stored message, the newest a closure of u at at saw; the ts of at when u
+// has none stored.
+func (p *plugin) closedTS(ctx context.Context, u unit.Unit, at time.Time) (string, error) {
+	newest, err := p.rowsSource().Newest(ctx, u)
+	if err != nil || newest != "" {
+		return newest, err
 	}
-	in, ok := ins[u]
-	if !ok || len(in.Messages()) == 0 {
-		return "", nil
-	}
-	msgs := in.Messages()
-	return msgs[len(msgs)-1].TS, nil
+	return dslack.TS(at), nil
 }
