@@ -174,7 +174,7 @@ test("the tab is one circle with the count, and two side by side while turns run
 
 test("the tab is a flat circle: round, as wide as tall per slot, with no outline, shadow or backdrop blur", () => {
   const css = readFileSync("../static/app.css", "utf8");
-  const rule = (sel: string) => (css.match(new RegExp("\\n" + sel.replace(/[.[\]]/g, "\\$&") + "\\s*\\{([^}]*)\\}")) || ["", ""])[1];
+  const rule = (sel: string) => (css.match(new RegExp("\\n" + sel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*\\{([^}]*)\\}")) || ["", ""])[1];
   const pillRule = rule(".fl-pill");
   expect(pillRule).toMatch(/border-radius:\s*var\(--fl-slot\)/);
   expect(pillRule).not.toMatch(/(^|[;\s])border:\s*(?!0)/);
