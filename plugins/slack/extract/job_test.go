@@ -598,7 +598,7 @@ func TestAClosureMarkUnwatchesAThreadTheViewerStartedAfterWarmFor(t *testing.T) 
 	if len(r.watch.calls) != 0 {
 		t.Fatalf("unwatched with no closure: %+v", r.watch.calls)
 	}
-	if err := r.job.Store.DB.MarkClosed(context.Background(), thread(ts(10)), jT0.Add(2*time.Hour), ""); err != nil {
+	if err := r.job.Store.DB.MarkClosed(context.Background(), thread(ts(10)), jT0.Add(2*time.Hour), ts(11)); err != nil {
 		t.Fatal(err)
 	}
 	r.facts.post(jChan, ts(12), ts(10), jOther, "thanks", jT0.Add(2*time.Hour))
@@ -630,7 +630,7 @@ func TestAClosureUnwatchesAThreadWithNoItemAtOnce(t *testing.T) {
 		t.Fatalf("unwatched with no closure: %+v", r.watch.calls)
 	}
 	for _, u := range []unit.Unit{empty, held} {
-		if err := r.job.Store.DB.MarkClosed(ctx, u, jT0.Add(time.Hour), ""); err != nil {
+		if err := r.job.Store.DB.MarkClosed(ctx, u, jT0.Add(time.Hour), ts(30)); err != nil {
 			t.Fatal(err)
 		}
 		if err := r.job.Closed(ctx, u); err != nil {

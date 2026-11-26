@@ -43,14 +43,16 @@ var migrations = []store.Migration{
 }
 
 // backfillClosedTS gives each closure marked before closed_ts was kept the newest message the extraction had
-// read, else, as a DM segment keeps none, the newest message of its segment's range, else a ts every message
-// is after.
+// read, else the newest message of its thread or of its DM segment's range, else a ts every message is after.
+// A unit's key past its team is <conversation>/<thread ts> or <conversation>/seg/<segment>.
 func backfillClosedTS(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.ExecContext(ctx, `UPDATE extraction_cursors SET closed_ts = COALESCE(NULLIF(last_ts, ''),
+		(SELECT MAX(m.ts) FROM slack_messages m
+			WHERE substr(extraction_cursors.unit_key, instr(extraction_cursors.unit_key, '/') + 1) = m.conversation || '/' || `+slackAnchor+`),
 		(SELECT MAX(m.ts) FROM segment_map s JOIN slack_messages m ON m.conversation = s.conversation
 			AND `+slackAnchor+` >= s.from_ts AND (s.to_ts = '' OR `+slackAnchor+` <= s.to_ts)
 			WHERE s.provider = extraction_cursors.provider
-			AND extraction_cursors.unit_key LIKE '%/' || s.conversation || '/seg/' || s.segment_id),
+			AND substr(extraction_cursors.unit_key, instr(extraction_cursors.unit_key, '/') + 1) = s.conversation || '/seg/' || s.segment_id),
 		'0.000000')
 		WHERE closure_marked = 1 AND closed_ts = ''`)
 	return err
