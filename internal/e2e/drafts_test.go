@@ -280,9 +280,7 @@ func TestDrafts(t *testing.T) {
 			if len(b.Turns) != 2 || b.Turns[1].Workflow != "review-draft-stale" || b.Turns[0].State != dturn.Replaced || b.Turns[0].ReplacedBy != b.Turns[1].Seq {
 				t.Fatalf("the push past the held review reopened no round that replaces its question: turns %+v", b.Turns)
 			}
-			if r.questionOpen() {
-				t.Fatal("the question pinning the stale draft is still open")
-			}
+			r.questionCloses()
 			r.unpinned(d.ID)
 			r.sweepWithoutRound("review-draft-stale", 2)
 			r.s = r.d.Launched(t, draftsPR)

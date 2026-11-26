@@ -276,6 +276,17 @@ func (r *draftsRig) unpinned(id int64) api.Draft {
 	}
 }
 
+// questionCloses waits until the pull request has no open question gate, which the daemon closes after the turn
+// that replaces its round is recorded; it fails the test when that never comes.
+func (r *draftsRig) questionCloses() {
+	r.t.Helper()
+	for deadline := time.Now().Add(time.Minute); r.questionOpen(); time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			r.t.Fatal("the question pinning the stale draft is still open")
+		}
+	}
+}
+
 // questionOpen says whether the pull request's question gate is open.
 func (r *draftsRig) questionOpen() bool {
 	r.t.Helper()
