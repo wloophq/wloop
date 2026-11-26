@@ -1003,3 +1003,19 @@ func TestQuietWakesOnlyOnWhatTheFilterShows(t *testing.T) {
 		}
 	})
 }
+
+// A task's one Needs you banner stands for every decision of it, so a float
+// whose filter shows only some of them does not carry it: the banner posts.
+func TestATaskWithADecisionTheFilterLeavesOutKeepsItsBanner(t *testing.T) {
+	r, h := floatRig(t, nil)
+	h.setFilter(window.FloatFilter{Kinds: []string{"answer"}})
+	r.c.vis, r.c.started = Visibility{Mode: VisibilityShown}, true
+	r.d.tasks["inbox"] = []api.TaskView{pendingTask(1)}
+	q := decisions("answer", "send-draft")
+	q.Items[1].Task = q.Items[0].Task
+	r.d.queue = q
+	r.c.Refresh(context.Background())
+	if got, want := neededIDs(r.notes), []string{pendingTask(1).Attention.ID}; !slices.Equal(got, want) {
+		t.Fatalf("posted %q, want the banner of the task whose draft the filter leaves out", got)
+	}
+}

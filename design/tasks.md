@@ -62,7 +62,7 @@ On the task's page each unit is one of its links: the unit's label opens it in t
 
 ## Lists and perspectives
 
-The lists are the profile's **views**, each a predicate over task facts with a label, an optional grouping and the key that jumps to it, in the order of `views.toml`. The client names none of them: it lists what the catalog serves, groups by the fact a view names (a state or a category groups in the order of the states), and binds each view's key. With the bundled profile they read Focus, Inbox, Next, Waiting, Projects, Someday and Logbook; a profile adds its own (a Needs me over open gates and your next actions, say) with no client change.
+The lists are the profile's **views**, each a predicate over task facts with a label, an optional grouping and the key that jumps to it, in the order of `views.toml`. The client names none of them: it lists what the catalog serves, groups by the fact a view names (a state or a category groups in the order of the states), and binds each view's key. With the bundled profile they read Needs you, Next actions, Inbox, Focus, Waiting, Projects, Someday and Logbook, in the rail sections each view names; a profile adds its own (a view of the asks of one person, say) with no client change.
 
 - The **area switcher** sits at the top of the rail, as in Nirvana, and filters every view; the filter shows in the view's heading ("Next · work").
 - **Review** is a mode, not a list: a button above the lists that walks the profile's review steps, each a view, with the step chips across the top.

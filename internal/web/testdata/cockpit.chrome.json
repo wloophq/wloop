@@ -6140,7 +6140,7 @@
     "label": "Next actions",
     "summary": "Your tasks whose next step is yours, with nothing waiting on a decision.",
     "empty": "No next action of yours.",
-    "when": "task.owed_by == 'me' \u0026\u0026 task.category in ['ready', 'active', 'waiting'] \u0026\u0026 task.gates_open == 0",
+    "when": "task.owed_by == 'me' \u0026\u0026 task.category in ['ready', 'active', 'waiting'] \u0026\u0026 size(task.decisions) == 0",
     "sort": "-task.sequential_next",
     "over": "tasks",
     "rail": false,

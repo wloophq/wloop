@@ -9,6 +9,7 @@ import (
 	facttask "github.com/wloophq/wloop/internal/adapter/facts/task"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -107,13 +108,13 @@ var prCases = []prCase{
 	{name: "approved in my review workspace", kind: situation.KindReview, source: situation.KindReview, waitingOn: "reviewer", review: true, approved: true,
 		category: task.CategoryWaiting, owes: []string{"github:bruno"}, items: 1, lens: []string{"in-loop", "approved"}},
 	{name: "no reviewer on mine", kind: situation.KindNoReviewer, source: situation.KindNoReviewer, waitingOn: "author", author: prViewer,
-		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"next"}},
+		category: task.CategoryReady, owes: []string{"me"}, items: 1},
 	{name: "mine can merge", kind: situation.KindMerge, source: situation.KindMerge, waitingOn: "me", author: prViewer, workspace: true,
-		approved: true, category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"next", "approved"}},
+		approved: true, category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"approved"}},
 	{name: "mine draft", kind: situation.KindDraft, source: situation.KindDraft, waitingOn: "author", author: prViewer, workspace: true,
 		category: task.CategoryWaiting, owes: []string{}, items: 1},
 	{name: "mine can merge, waiting on its author", kind: situation.KindMerge, source: situation.KindMerge, waitingOn: "author", author: prViewer,
-		workspace: true, approved: true, category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"next", "approved"}},
+		workspace: true, approved: true, category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"approved"}},
 	{name: "reply due on mine", kind: situation.KindReply, source: situation.KindReply, waitingOn: "author", author: prViewer,
 		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"next"}},
 	{name: "a draft to approve on a review asked of another", kind: situation.KindReview, source: situation.KindReview, waitingOn: "reviewer",
@@ -292,6 +293,7 @@ func (c prCase) facts(t *testing.T, l *intentload.Loaded, row api.Row) workflow.
 		}
 	}
 	f["task.link_signals"] = reported
+	f["task.decisions"] = c.decisions(l, row)
 	who, err := catalog.OwedByOf(func() *intentload.Loaded { return l })(context.Background(), f)
 	if err != nil {
 		t.Fatal(err)
@@ -301,6 +303,28 @@ func (c prCase) facts(t *testing.T, l *intentload.Loaded, row api.Row) workflow.
 		f["task.check_on"] = task.AddWorkdays(row.Summary.Since, prStaleDays, time.UTC)
 	}
 	return f
+}
+
+// decisions are what the task waits on you to decide, as the profile maps them: one per open gate, and, while
+// the task is open, its pull request's situation and each link signal on.
+func (c prCase) decisions(l *intentload.Loaded, row api.Row) []string {
+	out := []string{}
+	if c.gates > 0 {
+		out = append(out, string(l.Decisions.Map.Gates[gate.KindQuestion]))
+	}
+	if c.category == task.CategoryDone || c.category == task.CategoryDropped {
+		return out
+	}
+	m := l.Decisions.Map
+	if k, ok := m.Situations[unit.GitHub][string(row.Kind)]; ok {
+		out = append(out, string(k))
+	}
+	for name, on := range prrow.Signals(row) {
+		if k, ok := m.Signals[unit.GitHub][name]; ok && on {
+			out = append(out, string(k))
+		}
+	}
+	return out
 }
 
 // prStaleDays is tasks.stale_waiting_days as the bundled configuration sets it.

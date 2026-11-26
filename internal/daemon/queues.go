@@ -93,8 +93,9 @@ func (s *Server) handleQueueAll(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	served := make([]api.QueueKind, len(d.Order))
-	for i, k := range d.Order {
+	order := decision.Ordered(d.Order)
+	served := make([]api.QueueKind, len(order))
+	for i, k := range order {
 		served[i] = api.QueueKind{ID: string(k), Label: d.Kinds[k].Queue}
 	}
 	writeJSON(w, api.Queue{View: s.loaded().Views.QueueView(), Title: d.QueueAll, Empty: d.EmptyAll, Total: len(items), Items: items, Kinds: served})

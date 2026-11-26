@@ -7,20 +7,24 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/wloophq/wloop/internal/brand"
 )
 
 // removedViews are core views removed with no alias; what replaces each is in the release notes.
 var removedViews = []string{"needs-me", "blocked-by-me", "home-blocked", "outbox"}
 
 // TestNothingLinksToARemovedView checks that the bundled profiles, the cockpit, the menu bar and the CLI name no
-// removed view: no route, view table, view reference or key binding to one.
+// removed view, no route, view table, view reference or key binding to one, and no removed command; the upgrade
+// guide names them to say what replaces each.
 func TestNothingLinksToARemovedView(t *testing.T) {
 	ids := strings.Join(removedViews, "|")
 	link := regexp.MustCompile(`(view=|views\.|nav:|view\s*=\s*"|View:\s*"|views\s*=\s*\[[^\]]*")(` + ids + `)\b`)
-	roots := []string{"../../profiles", "../../plugins", "../web/ui/src", "../client/menubar", "../cli"}
+	command := regexp.MustCompile(`(%s|\{\{command\}\}|` + regexp.QuoteMeta(brand.Command) + `) outbox\b`)
+	roots := []string{"../../profiles", "../../plugins", "../web/ui/src", "../client/menubar", "../cli", "../../skills", "../../docs/src/content/docs"}
 	for _, root := range roots {
 		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-			if err != nil || d.IsDir() || isTest(path) {
+			if err != nil || d.IsDir() || isTest(path) || filepath.Base(path) == "upgrade.md" {
 				return err
 			}
 			switch filepath.Ext(path) {
@@ -35,6 +39,9 @@ func TestNothingLinksToARemovedView(t *testing.T) {
 			for i, line := range strings.Split(string(b), "\n") {
 				if m := link.FindString(line); m != "" {
 					t.Errorf("%s:%d names a removed view: %s", path, i+1, m)
+				}
+				if m := command.FindString(line); m != "" {
+					t.Errorf("%s:%d names the removed outbox command: %s", path, i+1, m)
 				}
 			}
 			return nil

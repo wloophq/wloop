@@ -329,7 +329,7 @@ label         = "Next actions"
 summary       = "Your tasks whose next step is yours, with nothing waiting on a decision."
 empty         = "No next action of yours."
 key           = "g x"
-when          = "task.owed_by == 'me' && task.category in ['ready', 'active', 'waiting'] && task.gates_open == 0"
+when          = "task.owed_by == 'me' && task.category in ['ready', 'active', 'waiting'] && size(task.decisions) == 0"
 sort          = "-task.sequential_next"
 hide_disabled = true
 section       = "What's on you"

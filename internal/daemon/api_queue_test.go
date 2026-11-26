@@ -856,14 +856,16 @@ func TestAQueuePageReadsRelatedTasksFromItsPass(t *testing.T) {
 
 func TestQueueAllServesItsKindsInProfileOrder(t *testing.T) {
 	t.Parallel()
-	q := newQueueRig(t, nil)
+	l := *bundledLoaded()
+	l.Decisions.Order = []decision.Kind{decision.Kind("send-draft"), decision.Kind("answer")}
+	q := newQueueRig(t, func(d *Deps) { d.Intents = func() *intentload.Loaded { return &l } })
 	got := q.all(t)
-	l := q.s.loaded().Decisions
-	if len(got.Kinds) != len(l.Order) {
-		t.Fatalf("kinds %+v, want one per kind of %v", got.Kinds, l.Order)
+	want := decision.Ordered(l.Decisions.Order)
+	if len(got.Kinds) != len(decision.Kinds) || len(want) != len(decision.Kinds) {
+		t.Fatalf("kinds %+v, want every kind, those order leaves out after it", got.Kinds)
 	}
-	for i, k := range l.Order {
-		if got.Kinds[i] != (api.QueueKind{ID: string(k), Label: l.Kinds[k].Queue}) {
+	for i, k := range want {
+		if got.Kinds[i] != (api.QueueKind{ID: string(k), Label: l.Decisions.Kinds[k].Queue}) {
 			t.Errorf("kind %d %+v, want %s worded by its queue", i, got.Kinds[i], k)
 		}
 	}

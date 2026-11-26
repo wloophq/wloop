@@ -15,10 +15,10 @@ The interface runs on four surfaces that share one vocabulary: the web cockpit (
 ## Content fundamentals
 
 - **Voice.** Plain, short, declarative English. Say what happened and what will happen: "Automatic rounds paused", "A new version is running.", "Round in 60 s".
-- **Casing.** Sentence case everywhere: views ("Needs me", "My PRs", "In loop"), buttons ("Run now", "Copy review request"), headings. Overlines are the only uppercase, set by the `overline` style, not typed.
+- **Casing.** Sentence case everywhere: views ("Next actions", "My PRs", "In the loop"), buttons ("Run now", "Copy review request"), headings. Overlines are the only uppercase, set by the `overline` style, not typed.
 - **Buttons are verbs**, one or two words: Review, Address, Nudge, Pause, Mute, Skip, Continue, Dismiss, Apply, Reload. A longer button names its object: "Copy list", "Send answer".
 - **Tooltips explain consequences** in a full sentence: "The agent goes on with the turn without an answer", "Close the question; the pull request goes back to whoever it waits on".
-- **Person.** "You" and "me" are the user ("Needs me", "waits for you", `author:@me`). The agent is "the agent"; the background service is "the loop" or "the daemon", never "we".
+- **Person.** "You" and "me" are the user ("Needs you", "waits for you", `author:@me`). The agent is "the agent"; the background service is "the loop" or "the daemon", never "we".
 - **Numbers.** Ages as compact units, largest two: `10d 13h`, `2h 56m`, `3h 18m`. Counts bare and right-aligned in `muted` mono. "6 of 9" for a filtered total.
 - **No emoji.** States use words and the waiter hues. The only glyphs are functional (see Iconography).
 - **Empty states** say what would appear and why it is empty, in one `muted` line.
