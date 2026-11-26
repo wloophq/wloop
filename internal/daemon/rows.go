@@ -229,7 +229,7 @@ func (m modelSettings) Settings(ctx context.Context) (readmodel.Base, error) {
 	}
 	l := m.s.loaded()
 	off := m.s.disabledPlugins(l)
-	b := readmodel.Base{Specs: catalog.SpecsFor(l, off), SpecsVersion: catalog.VersionFor(l, off), Intents: l}
+	b := readmodel.Base{Specs: catalog.SpecsFor(l, off), SpecsVersion: catalog.VersionFor(l, off), Intents: l, Closes: m.s.closes}
 	b.Identify(m.s.deps.Forge, id)
 	return b, nil
 }

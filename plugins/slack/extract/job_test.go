@@ -598,7 +598,7 @@ func TestAClosureMarkUnwatchesAThreadTheViewerStartedAfterWarmFor(t *testing.T) 
 	if len(r.watch.calls) != 0 {
 		t.Fatalf("unwatched with no closure: %+v", r.watch.calls)
 	}
-	if err := r.job.Store.DB.MarkClosed(context.Background(), thread(ts(10)), jT0.Add(2*time.Hour)); err != nil {
+	if err := r.job.Store.DB.MarkClosed(context.Background(), thread(ts(10)), jT0.Add(2*time.Hour), ts(11)); err != nil {
 		t.Fatal(err)
 	}
 	r.facts.post(jChan, ts(12), ts(10), jOther, "thanks", jT0.Add(2*time.Hour))
@@ -606,6 +606,54 @@ func TestAClosureMarkUnwatchesAThreadTheViewerStartedAfterWarmFor(t *testing.T) 
 	r.run(jT0.Add(4 * time.Hour))
 	if !slices.Equal(r.watch.calls, []watchCall{{obj: ref, off: true}}) {
 		t.Fatalf("after unit.closed: %+v", r.watch.calls)
+	}
+}
+
+func TestAClosureUnwatchesAThreadWithNoItemAtOnce(t *testing.T) {
+	r := newRig(t)
+	ctx := context.Background()
+	empty, held := thread(ts(20)), thread(ts(30))
+	r.facts.post(jChan, ts(20), "", jOther, "lunch at noon", jT0)
+	r.facts.post(jChan, ts(30), "", jOther, "review please", jT0)
+	r.asker.reply = func(_ int, q host.Ask) ([]byte, error) {
+		if strings.Contains(q.Prompt, "review please") {
+			return answerJSON(t, []obj{jItem("n1", ts(30))}, nil, nil, nil), nil
+		}
+		return answerJSON(t, nil, nil, nil, nil), nil
+	}
+	r.run(jT0.Add(2 * time.Minute))
+	r.watch.calls = nil
+	if err := r.job.Closed(ctx, empty); err != nil {
+		t.Fatal(err)
+	}
+	if len(r.watch.calls) != 0 {
+		t.Fatalf("unwatched with no closure: %+v", r.watch.calls)
+	}
+	for _, u := range []unit.Unit{empty, held} {
+		if err := r.job.Store.DB.MarkClosed(ctx, u, jT0.Add(time.Hour), ts(30)); err != nil {
+			t.Fatal(err)
+		}
+		if err := r.job.Closed(ctx, u); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if want := []watchCall{{obj: slack.ObjectRef{Conversation: jChan, TS: ts(20)}, off: true}}; !slices.Equal(r.watch.calls, want) {
+		t.Fatalf("watch calls %+v, want only the thread with no item unwatched", r.watch.calls)
+	}
+	if st, _ := r.job.Store.DB.States(ctx, []unit.Unit{empty}); st[empty].Watched {
+		t.Error("the closed thread's cursor stays watched")
+	}
+}
+
+func TestAPostedClosureUnwatchesAThreadWithNoItem(t *testing.T) {
+	r := newRig(t)
+	r.facts.post(jChan, ts(50), "", jOther, "deploy went fine, closing this", jT0)
+	r.asker.reply = func(int, host.Ask) ([]byte, error) {
+		return answerJSON(t, nil, nil, nil, obj{"closure_posted": true}), nil
+	}
+	r.run(jT0.Add(2 * time.Minute))
+	if want := []watchCall{{obj: slack.ObjectRef{Conversation: jChan, TS: ts(50)}, off: true}}; !slices.Equal(r.watch.calls, want) {
+		t.Fatalf("watch calls %+v, want the thread with no item unwatched once a closure was read", r.watch.calls)
 	}
 }
 

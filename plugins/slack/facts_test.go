@@ -116,6 +116,18 @@ func resolve(t *testing.T, v src.Value, now time.Time) any {
 	return nil
 }
 
+func TestSlackOpenTaskCountsASnoozedTask(t *testing.T) {
+	t.Parallel()
+	f := newFactsFixture(t)
+	f.listed(t, factsThread, factsOther)
+	f.host.SetTasks(hostTask("t-01", "deferred", factsThread), hostTask("t-02", "done", factsOther), hostTask("t-03", "dropped", factsOther))
+	for u, want := range map[unit.Unit]bool{factsThread: true, factsOther: false} {
+		if got, _ := f.facts(t, u); got["slack.open_task"] != want {
+			t.Errorf("%s open_task %v, want %v", u, got["slack.open_task"], want)
+		}
+	}
+}
+
 func TestSlackLiveTaskReadsTheHostsTasks(t *testing.T) {
 	t.Parallel()
 	f := newFactsFixture(t)
@@ -189,7 +201,7 @@ func TestSlackFactsReadTheExtractionTheConversationAndTheItems(t *testing.T) {
 	if g["slack.closure_posted"] != true || g["slack.live_task"] != false || g["slack.items_unowned_age_days"] != 0 {
 		t.Errorf("other: closure_posted %v, live_task %v, age %v", g["slack.closure_posted"], g["slack.live_task"], g["slack.items_unowned_age_days"])
 	}
-	if err := f.db.Extraction().MarkClosed(ctx, factsThread, monday); err != nil {
+	if err := f.db.Extraction().MarkClosed(ctx, factsThread, monday, "1700000000.000100"); err != nil {
 		t.Fatal(err)
 	}
 	if got, _ := f.facts(t, factsThread); got["slack.closure_posted"] != true {

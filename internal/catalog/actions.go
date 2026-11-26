@@ -9,6 +9,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -26,6 +27,14 @@ const (
 	SurfaceCLI          = "cli"
 	SurfaceExplore      = "explore"
 )
+
+// UnitClose is the built-in action that records a unit's closure with no message: the unit.closed effect, applied
+// as a workflow's effects.apply step applies it. A row offers it while it is in one of its plugin's views and no
+// item of it is open, so the closure takes it out of the view.
+const UnitClose = "unit.close"
+
+// unitBuiltins are the built-in actions a row of a provider other than GitHub may offer.
+var unitBuiltins = []string{UnitClose}
 
 // CopyReviewRequest is the built-in action whose only effect is its copy: a review request to paste in a chat.
 const CopyReviewRequest = "copy_review_request"
@@ -147,6 +156,12 @@ var builtinActions = []builtinAction{
 			return absent()
 		}
 		return on("untrack")
+	}},
+	{api.ActionSpec{ID: UnitClose, Group: "control", Surfaces: []string{SurfaceRow, SurfaceDetail, SurfaceTask, SurfaceTUI, SurfaceMenubar}}, func(f Facts) (api.ActionState, bool) {
+		if !f.PR.IsZero() || f.Row.Unit.IsZero() || len(f.Row.Views) == 0 || !f.Closes || slices.ContainsFunc(f.Row.Items, openItem) {
+			return absent()
+		}
+		return on(UnitClose)
 	}},
 	{api.ActionSpec{ID: "open", Group: "workspace", Key: "O", Surfaces: everywhere()}, func(Facts) (api.ActionState, bool) {
 		return on("open")
@@ -418,3 +433,5 @@ func intentScope(d dintent.Def) string {
 func recommend(st *api.ActionState, d dintent.Def, mode string) {
 	st.Primary = st.Primary || mode == "headless" && d.Runs("headless")
 }
+
+func openItem(it api.RowItem) bool { return it.State == string(items.Open) }

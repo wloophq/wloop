@@ -34,6 +34,28 @@ var migrations = []store.Migration{
 		_, err := tx.ExecContext(ctx, `ALTER TABLE slack_reactions ADD COLUMN seen_at TEXT NOT NULL DEFAULT ''`)
 		return err
 	}},
+	{Version: 5, Up: func(ctx context.Context, tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, `ALTER TABLE extraction_cursors ADD COLUMN closed_ts TEXT NOT NULL DEFAULT ''`); err != nil {
+			return err
+		}
+		return backfillClosedTS(ctx, tx)
+	}},
+}
+
+// backfillClosedTS gives each closure marked before closed_ts was kept the newest message the extraction had
+// read, else the newest message of its thread or of its DM segment's range, else a ts every message is after.
+// A unit's key past its team is <conversation>/<thread ts> or <conversation>/seg/<segment>.
+func backfillClosedTS(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, `UPDATE extraction_cursors SET closed_ts = COALESCE(NULLIF(last_ts, ''),
+		(SELECT MAX(m.ts) FROM slack_messages m
+			WHERE substr(extraction_cursors.unit_key, instr(extraction_cursors.unit_key, '/') + 1) = m.conversation || '/' || `+slackAnchor+`),
+		(SELECT MAX(m.ts) FROM segment_map s JOIN slack_messages m ON m.conversation = s.conversation
+			AND `+slackAnchor+` >= s.from_ts AND (s.to_ts = '' OR `+slackAnchor+` <= s.to_ts)
+			WHERE s.provider = extraction_cursors.provider
+			AND substr(extraction_cursors.unit_key, instr(extraction_cursors.unit_key, '/') + 1) = s.conversation || '/seg/' || s.segment_id),
+		'0.000000')
+		WHERE closure_marked = 1 AND closed_ts = ''`)
+	return err
 }
 
 var tableRE = regexp.MustCompile(`CREATE TABLE (\w+) \(`)
@@ -52,7 +74,8 @@ func Tables() []string {
 const briefsTable = "extraction_briefs"
 
 // importTables copies every table of the export the store has, the columns
-// both share, then the briefs the export holds.
+// both share, then the briefs the export holds, and backfills the closures
+// the export marked.
 func importTables(ctx context.Context, tx *sql.Tx) error {
 	have, err := importedTables(ctx, tx)
 	if err != nil {
@@ -72,7 +95,7 @@ func importTables(ctx context.Context, tx *sql.Tx) error {
 		}
 	}
 	if !slices.Contains(have, briefsTable) {
-		return nil
+		return backfillClosedTS(ctx, tx)
 	}
 	_, err = tx.ExecContext(ctx, fmt.Sprintf(`INSERT INTO main.extraction_cursors (provider, unit_key, brief, at)
 		SELECT provider, unit_key, brief, '' FROM %s.%s WHERE true
@@ -80,7 +103,7 @@ func importTables(ctx context.Context, tx *sql.Tx) error {
 	if err != nil {
 		return fmt.Errorf("import %s: %w", briefsTable, err)
 	}
-	return nil
+	return backfillClosedTS(ctx, tx)
 }
 
 func importedTables(ctx context.Context, tx *sql.Tx) ([]string, error) {

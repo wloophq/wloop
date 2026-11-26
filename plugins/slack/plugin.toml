@@ -134,6 +134,12 @@ doc = "A live task is attached to the unit: neither done, in the trash nor defer
 untrusted = true
 
 [[source.facts]]
+name = "slack.open_task"
+type = "bool"
+doc = "An open task is attached to the unit: neither done nor in the trash, a snoozed or muted one included."
+untrusted = true
+
+[[source.facts]]
 name = "slack.items_open"
 type = "int"
 doc = "Open items whose unit is this unit."

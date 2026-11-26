@@ -238,7 +238,8 @@ func isBuiltin(l *intentload.Loaded, name string) bool {
 	_, isDelegated := delegatedActions[name]
 	_, isIntake := intakeRouteActions[name]
 	_, isGate := catalog.RowGateIntent(l, name)
-	return isHold || isDelegated || followActions[name] || isIntake || isGate || name == "brief_refresh" || slices.Contains(builtin.CopyActions, name)
+	return isHold || isDelegated || followActions[name] || isIntake || isGate || name == "brief_refresh" || name == catalog.UnitClose ||
+		slices.Contains(builtin.CopyActions, name)
 }
 
 func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
@@ -301,7 +302,7 @@ func (s *Server) runAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	row := api.Row{Unit: u}
-	if plugin || s.forge(u) {
+	if plugin || s.forge(u) || name == catalog.UnitClose {
 		if intakeIntent(l, name) && !slices.Contains(intakeSources, req.Source) {
 			writeError(w, http.StatusBadRequest, fmt.Sprintf("source %q is not one of %s", req.Source, strings.Join(intakeSources, ", ")))
 			return
@@ -589,6 +590,9 @@ func (s *Server) act(ctx context.Context, name string, u unit.Unit, req api.Acti
 	}
 	if _, ok := holdActions[name]; ok {
 		return s.applyHold(ctx, name, u)
+	}
+	if name == catalog.UnitClose {
+		return s.closeUnit(ctx, u)
 	}
 	d := delegatedActions[name]
 	call := Call{Guidance: req.Guidance, AgentHome: req.AgentHome, Out: out}

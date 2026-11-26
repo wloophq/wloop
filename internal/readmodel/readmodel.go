@@ -59,6 +59,9 @@ type Base struct {
 	AgentsOK bool
 	// Asked is the action a request asks for; zero for a served row.
 	Asked catalog.Asked
+	// Closes says a unit of the provider closes with no message, its plugin applying unit.closed without a
+	// post; nil closes none.
+	Closes func(unit.ProviderID) bool
 }
 
 // Identify sets the viewer and the teams of provider p from id, the
