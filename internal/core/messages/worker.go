@@ -9,9 +9,9 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// Run reconciles every book and proposal, then the units of each TopicTurns, TopicTasks and TopicDrafts note, so a
-// gate leaves a task that closed, and the proposals on each TopicItems note, on its own goroutine, until ctx ends:
-// the subscriber only queues them. After each pass over books it closes the questions whose drafts left.
+// Run reconciles every book and proposal, then the units of each TopicTurns and TopicTasks note, so a gate leaves a
+// task that closed, and the proposals on each TopicItems note, on its own goroutine, until ctx ends: the subscriber
+// only queues them. After each pass over books, and each TopicDrafts note, it closes the questions whose drafts left.
 func (s *Service) Run(ctx context.Context, changes port.Changes) {
 	if !s.WaitReady(ctx) {
 		return

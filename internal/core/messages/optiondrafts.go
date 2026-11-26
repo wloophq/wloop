@@ -354,6 +354,8 @@ func (s *Service) closeLeft(ctx context.Context, m message.Message) error {
 	}
 	if closed {
 		s.logf("messages: question %d on %s: no draft its answers post waits on the user; its turn dismissed, gate %d superseded", m.ID, m.Unit, g.ID)
+	} else {
+		s.logf("messages: question %d on %s: no draft its answers post waits on the user; its turn dismissed, gate %d closed otherwise meanwhile", m.ID, m.Unit, g.ID)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()

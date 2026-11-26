@@ -268,42 +268,58 @@ func TestADraftOfAnotherUnitClosesItsQuestion(t *testing.T) {
 	requireMoot(t, r, m)
 }
 
-// reconcilingGates start one pass over r7 right after the first question gate the close supersedes, as the worker
-// may, while the close still runs.
-type reconcilingGates struct {
+// racingGates let a close run while a pass is between building its list of open messages and opening their gates:
+// the pass's sweep of missing gates, its last read before it opens them, starts the close and waits until the close
+// has superseded the question's gate.
+type racingGates struct {
 	serviceGates
-	r    *rig
-	once *atomic.Bool
-	wg   *sync.WaitGroup
+	armed      *atomic.Bool
+	superseded chan struct{}
+	closing    func()
 }
 
-func (g reconcilingGates) SupersedeQuestion(ctx context.Context, id int64, settle func(context.Context) (bool, error)) (bool, error) {
-	closed, err := g.serviceGates.SupersedeQuestion(ctx, id, settle)
-	if g.once.CompareAndSwap(false, true) {
-		g.wg.Go(func() {
-			if err := g.r.svc.Reconcile(ctx, r7); err != nil {
-				panic(err)
-			}
-		})
+func (g racingGates) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {
+	if q.Kind == gate.KindQuestion && q.Unit.IsZero() && g.armed.CompareAndSwap(true, false) {
+		go g.closing()
+		<-g.superseded
 	}
+	return g.serviceGates.Where(ctx, q)
+}
+
+func (g racingGates) SupersedeQuestion(ctx context.Context, id int64, settle func(context.Context) (bool, error)) (bool, error) {
+	closed, err := g.serviceGates.SupersedeQuestion(ctx, id, settle)
+	close(g.superseded)
 	return closed, err
 }
 
-// TestAPassDuringTheCloseOpensNoGate: a pass that runs once the question's gate is superseded, while the close still
-// runs, opens the message no new gate.
+// TestAPassDuringTheCloseOpensNoGate: a pass that listed the question open, its turn still asking, reaches the
+// question's gates after the close superseded the gate and before it closed the message; it opens the message no new
+// gate.
 func TestAPassDuringTheCloseOpensNoGate(t *testing.T) {
+	ctx := context.Background()
 	r, od, m := pinsRig(t, postQuestion())
-	var wg sync.WaitGroup
-	r.svc.Gates = reconcilingGates{serviceGates{r.gates, r.gateStore}, r, &atomic.Bool{}, &wg}
 	od.leave(42, draft.Dropped, "user", gate.Rejected)
 	od.leave(43, draft.Dropped, "user", gate.Rejected)
-	r.pass(t, r7)
-	wg.Wait()
-	requireMoot(t, r, m)
-	all, err := r.gateStore.Where(context.Background(), gates.Query{Kind: gate.KindQuestion, Statuses: []gate.Status{gate.Open, gate.Answered,
-		gate.Dismissed, gate.Superseded}})
+	closed := make(chan struct{})
+	g := racingGates{serviceGates: serviceGates{r.gates, r.gateStore}, armed: &atomic.Bool{}, superseded: make(chan struct{})}
+	g.closing = func() {
+		defer close(closed)
+		if err := r.svc.CloseLeftQuestions(ctx); err != nil {
+			t.Errorf("the close: %v", err)
+		}
+	}
+	r.svc.Gates = g
+	g.armed.Store(true)
+	err := r.svc.Reconcile(ctx, r7)
+	<-closed
 	if err != nil {
 		t.Fatal(err)
+	}
+	requireMoot(t, r, m)
+	all, werr := r.gateStore.Where(ctx, gates.Query{Kind: gate.KindQuestion, Statuses: []gate.Status{gate.Open, gate.Answered,
+		gate.Dismissed, gate.Superseded}})
+	if werr != nil {
+		t.Fatal(werr)
 	}
 	if len(all) != 1 {
 		t.Fatalf("question gates %+v, want the first alone, no gate reopened", all)
