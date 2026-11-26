@@ -57,7 +57,7 @@ func (r Rect) overlap(o Rect) float64 {
 	return w * h
 }
 
-// The edges a float docks on, and the corners it grows away from.
+// The edges the tab docks on, and the corners it is anchored at.
 const (
 	EdgeLeft          = "left"
 	EdgeRight         = "right"
@@ -138,7 +138,7 @@ func ClampToScreens(p FloatPlacement, screens []Screen) Rect {
 
 // PlacementOf is the placement of a frame the person dropped: docked on the
 // edge it was dropped near, anchored at the corner of its screen's quarter,
-// so a panel opening from it grows toward the screen's middle.
+// so the tab grows toward the screen's middle as its counts widen it.
 func PlacementOf(frame Rect, screens []Screen) FloatPlacement {
 	p := FloatPlacement{W: frame.W, H: frame.H}
 	if len(screens) == 0 {
@@ -189,9 +189,9 @@ const (
 // or below or above a free tab, whichever has more room. It depends on the
 // tab alone, so the panel's page can be bounded by it before it draws.
 func PanelRoom(tab Rect, edge string, screens []Screen) (side string, room Rect) {
-	s := screenOf(tab, screens)
-	if len(screens) == 0 {
-		s = tab
+	s := tab
+	if len(screens) > 0 {
+		s = screenOf(tab, screens)
 	}
 	room = s
 	switch {
@@ -215,9 +215,9 @@ func PanelRoom(tab Rect, edge string, screens []Screen) (side string, room Rect)
 // larger than the room.
 func PanelFrame(tab Rect, edge string, w, h float64, screens []Screen) Rect {
 	side, room := PanelRoom(tab, edge, screens)
-	s := screenOf(tab, screens)
-	if len(screens) == 0 {
-		s = room
+	s := room
+	if len(screens) > 0 {
+		s = screenOf(tab, screens)
 	}
 	r := Rect{W: min(w, room.W), H: min(h, room.H)}
 	switch side {
@@ -527,8 +527,9 @@ func (c *Controller) shared(m FloatMessage) {
 
 // floatPanel is the panel window as the controller knows it: the URL its
 // page was loaded at, whether that page has reported in since, the mode it
-// was asked to show ("" while closed), the request its page has not been
-// told yet, the size it last drew at and the room it was last told.
+// shows or was asked to show ("" while closed), the request its page has not
+// been told yet, the size it last drew at for that mode (0 until it drew)
+// and the room it was last told.
 type floatPanel struct {
 	url     string
 	ready   bool
@@ -544,7 +545,7 @@ type floatPanel struct {
 // once it has reported in, and the window shows at the size it then sends.
 // It runs under c.mu.
 func (c *Controller) openPanel(p PanelPlace) {
-	if !c.floatShown || len(c.screens) == 0 {
+	if !c.floatShown || len(c.screens) == 0 || c.dragging {
 		return
 	}
 	u, err := c.url(FloatPanelRoute)
@@ -557,6 +558,9 @@ func (c *Controller) openPanel(p PanelPlace) {
 	}
 	p.Side, c.panel.room = PanelRoom(c.tabFrame, c.placement.Edge, c.screens)
 	p.MaxW, p.MaxH, c.panel.side = c.panel.room.W, c.panel.room.H, p.Side
+	if p.Mode != c.panel.want {
+		c.panel.w, c.panel.h = 0, 0
+	}
 	c.panel.want, c.panel.pending = p.Mode, &p
 	c.tellPanel()
 }
@@ -574,7 +578,7 @@ func (c *Controller) closePanel() {
 	if c.panel.want == "" {
 		return
 	}
-	c.panel.want, c.panel.pending = "", nil
+	c.panel.want, c.panel.pending, c.panel.w, c.panel.h = "", nil, 0, 0
 	c.cfg.Host.HideFloatPanel()
 	if c.panel.ready {
 		c.cfg.Host.TellFloatPanel(PanelPlace{})
@@ -605,10 +609,10 @@ func (c *Controller) panelMessage(m FloatMessage) {
 	switch m.Kind {
 	case FloatSize:
 		defer c.mu.Unlock()
-		if c.panel.want == "" || !c.floatShown {
+		if c.panel.want == "" || !c.floatShown || m.Mode != ModePeek && m.Mode != ModePanel {
 			return
 		}
-		c.panel.w, c.panel.h = m.W, m.H
+		c.panel.want, c.panel.w, c.panel.h = m.Mode, m.W, m.H
 		c.placePanel()
 		return
 	case FloatClose:
@@ -617,10 +621,7 @@ func (c *Controller) panelMessage(m FloatMessage) {
 			c.tellPanel()
 			return
 		}
-		if c.panel.want != "" {
-			c.panel.want, c.panel.pending = "", nil
-			c.cfg.Host.HideFloatPanel()
-		}
+		c.closePanel()
 		return
 	}
 	c.mu.Unlock()
@@ -652,6 +653,7 @@ func (c *Controller) floatDropped(frame Rect) {
 		SavePlacement(c.cfg.Defaults, c.placement)
 	}
 	c.placeFloat()
+	c.placePanel()
 }
 
 func (c *Controller) setScreens(screens []Screen) {

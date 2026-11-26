@@ -366,6 +366,37 @@ func TestLeavingBothWindowsAsksThePanelToLeaveAfterTheGrace(t *testing.T) {
 	})
 }
 
+// A full panel that shows after the pointer already left both windows, as
+// when the pointer left the tab before the panel's page drew, is asked to
+// leave after the grace too.
+func TestAPanelThatShowsWithThePointerGoneIsAskedToLeave(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		panel := &fakeFloat{up: true}
+		h := runningHost(t, &fakeFloat{up: true}, panel, window.Handlers{})
+		h.LoadFloatPanel(cockpitPanel)
+		h.do(func() { h.pointer(window.FloatTab, true) })
+		h.do(func() { h.pointer(window.FloatTab, false) })
+		h.do(func() {
+			h.panelMessage(window.FloatMessage{Kind: window.FloatSize, W: 476, H: 600, Mode: window.ModePanel})
+		})
+		synctest.Wait()
+		time.Sleep(floatGrace)
+		synctest.Wait()
+		if ran, _ := panel.taken(); !slices.Contains(ran, bridgeJS("leave")) {
+			t.Fatalf("ran %q, want a leave", ran)
+		}
+		h.do(func() { h.pointer(window.FloatTab, true) })
+		h.do(func() {
+			h.panelMessage(window.FloatMessage{Kind: window.FloatSize, W: 476, H: 640, Mode: window.ModePanel})
+		})
+		time.Sleep(2 * floatGrace)
+		synctest.Wait()
+		if ran, _ := panel.taken(); slices.Contains(ran, bridgeJS("leave")) {
+			t.Fatal("asked to leave with the pointer on the tab")
+		}
+	})
+}
+
 // The panel window resigning key tells the full panel's page, which closes
 // unless pinned; a peek, never key, is told nothing.
 func TestTheOpenPanelHearsItsWindowResignKey(t *testing.T) {

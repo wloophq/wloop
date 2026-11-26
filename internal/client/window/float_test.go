@@ -657,7 +657,7 @@ func TestThePanelLoadsOnItsFirstOpenAndShowsBesideTheTab(t *testing.T) {
 		want(t, r.host.taken(), "fpanel-show {1002 260.75 476 600}", "fpanel-show {1002 260.75 476 640}")
 
 		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatClose}))
-		want(t, r.host.taken(), "fpanel-hide")
+		want(t, r.host.taken(), "fpanel-hide", `fpanel-tell "" "" "" 0x0`)
 		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatOpenPanel})
 		want(t, r.host.taken(), `fpanel-tell "panel" "" "left" 1478x911`)
 	})
@@ -761,4 +761,77 @@ func TestALatePanelSizeShowsNothing(t *testing.T) {
 		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatSize, W: 476, H: 600, Mode: ModePanel}))
 		want(t, r.host.taken())
 	})
+}
+
+// A peek the page turns into the full panel is the full panel for the
+// controller too: a click on the tab closes it, and an arrival peeks at
+// nothing.
+func TestAPeekThePageOpenedIntoThePanelClosesOnAToggle(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := dockedRig(t)
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatPeek, Item: "gate:7"})
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatClose}))
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatSize, W: 356, H: 60, Mode: ModePeek}))
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatSize, W: 476, H: 600, Mode: ModePanel}))
+		r.host.taken()
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatPeek, Item: "gate:8"})
+		want(t, r.host.taken())
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatOpenPanel, Toggle: true})
+		want(t, r.host.taken(), "fpanel-hide", `fpanel-tell "" "" "" 0x0`)
+	})
+}
+
+// The window shows only at a size the page sent for what it was asked to
+// show: a size from an earlier open never shows it, even as the tab moves.
+func TestThePanelNeverShowsAtTheSizeOfAnEarlierOpen(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := dockedRig(t)
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatOpenPanel})
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatClose}))
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatSize, W: 476, H: 600, Mode: ModePanel}))
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatClose}))
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatPeek, Item: "gate:7"})
+		r.host.taken()
+		r.host.handlers().OnFloat(size(34, 120))
+		r.host.handlers().OnScreens([]Screen{laptop})
+		for _, c := range r.host.taken() {
+			if strings.HasPrefix(c, "fpanel-show") {
+				t.Fatalf("showed the panel at an earlier size: %q", c)
+			}
+		}
+	})
+}
+
+// The page closing on its own is told it is closed, so a show it took in the
+// meantime does not leave it drawing in a hidden window.
+func TestAPanelThatClosedIsToldSo(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := dockedRig(t)
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatOpenPanel})
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatClose}))
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatSize, W: 476, H: 600, Mode: ModePanel}))
+		r.host.taken()
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatClose}))
+		want(t, r.host.taken(), "fpanel-hide", `fpanel-tell "" "" "" 0x0`)
+	})
+}
+
+// No peek opens beside a tab being dragged.
+func TestNoPeekOpensDuringADrag(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := dockedRig(t)
+		r.host.handlers().OnFloatMoving()
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatPeek, Item: "gate:7"})
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatOpenPanel})
+		want(t, r.host.taken())
+	})
+}
+
+// Without screens the panel goes where the tab is told, and nothing panics.
+func TestThePanelPlacesWithoutScreens(t *testing.T) {
+	tab := Rect{X: 10, Y: 10, W: 112, H: 32}
+	if side, _ := PanelRoom(tab, "", nil); side == "" {
+		t.Fatal("no side without screens")
+	}
+	_ = PanelFrame(tab, "", 476, 600, nil)
 }

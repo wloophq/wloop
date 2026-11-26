@@ -530,6 +530,12 @@ func (h *host) pointer(win string, inside bool) {
 		h.overPanel = inside
 	}
 	h.grace++
+	h.startGrace()
+}
+
+// startGrace asks the full panel's page to leave after floatGrace while the
+// pointer is over neither window, unless it moves before then.
+func (h *host) startGrace() {
 	if h.overTab || h.overPanel || h.panelMode != window.ModePanel {
 		return
 	}
@@ -617,9 +623,16 @@ func (h *host) panelMessage(m window.FloatMessage) {
 	}
 }
 
+// setPanelMode keeps mode; a full panel that shows with the pointer already
+// off both windows gets the grace the pointer's last move could not start.
 func (h *host) setPanelMode(mode string) {
+	opened := mode == window.ModePanel && h.panelMode != window.ModePanel
 	h.panelMode = mode
 	h.panelKeyable.Store(window.FloatKeyable(mode))
+	if opened {
+		h.grace++
+		h.startGrace()
+	}
 }
 
 // sameOrigin says whether two addresses share their scheme, host and port.
