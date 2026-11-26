@@ -24,9 +24,9 @@ export const FLOAT_RETRY_MAX_MS = 60000;
 export const FLOAT_STATE_EVERY_MS = 5000;
 // FLOAT_HOVER_OPEN_MS is how long the pointer rests on the tab before it asks for the panel; the host closes it.
 export const FLOAT_HOVER_OPEN_MS = 120;
-// FLOAT_ARM_MS is how long the panel shows before its actions take a click: a panel the pointer opened by resting
-// on the tab must not take, as a decision, a click meant for what was under it. The click itself makes the window
-// key, so having the keyboard says nothing about a click.
+// FLOAT_ARM_MS is how long the panel shows, from when the host says it showed it, before its actions take a click:
+// a panel the pointer opened by resting on the tab must not take, as a decision, a click meant for what was under it.
+// The click itself makes the window key, so having the keyboard says nothing about a click.
 export const FLOAT_ARM_MS = 600;
 
 // FloatMode is what the panel's page shows: nothing while its window is hidden, a peek, or the full panel.
@@ -320,8 +320,13 @@ function openPanel(key = ""): void {
   const i = at ? fl.items.findIndex((it) => itemKey(it) === at) : -1;
   if (i >= 0) fl.current = i;
   endPeek();
-  if (fl.mode !== "panel") fl.shownAt = Date.now();
+  if (fl.mode !== "panel") fl.shownAt = 0;
   Object.assign(fl, { mode: "panel", peekKey: "" });
+}
+
+// shown starts the full panel's arming clock as the host says its window shows it.
+function shown(): void {
+  if (fl.mode === "panel") fl.shownAt = Date.now();
 }
 
 // shut shows nothing, unpinned, as the host hid the window.
@@ -359,8 +364,8 @@ function pick(item: J, option: string): void {
   fl.picked[itemKey(item)] = option;
 }
 
-// clickArmed says the panel has shown FLOAT_ARM_MS, so its actions take a click.
-const clickArmed = (): boolean => Date.now() - fl.shownAt >= FLOAT_ARM_MS;
+// clickArmed says the host has shown the panel for FLOAT_ARM_MS, so its actions take a click.
+const clickArmed = (): boolean => fl.shownAt > 0 && Date.now() - fl.shownAt >= FLOAT_ARM_MS;
 
 // armed says the panel's actions run: it is armed for a click, or its window has the keyboard, as for a key.
 const armed = (): boolean => clickArmed() || floatDeps.focused();
@@ -499,6 +504,7 @@ export function floatState() {
     holdPeek,
     releasePeek,
     show,
+    shown,
     openPanel,
     close,
     leave,
