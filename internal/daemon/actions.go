@@ -302,7 +302,7 @@ func (s *Server) runAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	row := api.Row{Unit: u}
-	if plugin || s.forge(u) {
+	if plugin || s.forge(u) || name == catalog.UnitClose {
 		if intakeIntent(l, name) && !slices.Contains(intakeSources, req.Source) {
 			writeError(w, http.StatusBadRequest, fmt.Sprintf("source %q is not one of %s", req.Source, strings.Join(intakeSources, ", ")))
 			return
