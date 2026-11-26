@@ -10,23 +10,24 @@ import (
 )
 
 // Run reconciles every book and proposal, then the units of each TopicTurns and TopicTasks note, so a gate
-// leaves a task that closed, and the proposals on each TopicItems note, on its own goroutine, until ctx ends:
-// the subscriber only queues them.
+// leaves a task that closed, the units of each TopicDrafts note, so a question whose drafts left closes, and the
+// proposals on each TopicItems note, on its own goroutine, until ctx ends: the subscriber only queues them.
 func (s *Service) Run(ctx context.Context, changes port.Changes) {
 	var mu sync.Mutex
 	var units []unit.Unit
 	all, proposals := true, true
 	kick := make(chan struct{}, 1)
 	cancel := changes.Subscribe(func(c port.Change) {
-		turnsNoted, itemsNoted, tasksNoted := c.Has(port.TopicTurns), c.Has(port.TopicItems), c.Has(port.TopicTasks) && !c.All
-		if !turnsNoted && !itemsNoted && !tasksNoted {
+		turnsNoted, itemsNoted := c.Has(port.TopicTurns), c.Has(port.TopicItems)
+		unitsNoted := (c.Has(port.TopicTasks) || c.Has(port.TopicDrafts)) && !c.All
+		if !turnsNoted && !itemsNoted && !unitsNoted {
 			return
 		}
 		mu.Lock()
 		if turnsNoted {
 			all = all || c.All
 		}
-		if turnsNoted || tasksNoted {
+		if turnsNoted || unitsNoted {
 			units = append(units, c.Units...)
 		}
 		proposals = proposals || itemsNoted

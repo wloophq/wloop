@@ -243,6 +243,7 @@ describe("qcard_test.go, the question's card", () => {
     expect(second.getAttribute("data-rev")).toBe("4");
     expect(texts(all(c, ".d-pin")[2], ".d-note.err")).toEqual(["Picking this option posts draft #44, which is gone."]);
     expect(texts(c, ".d-pin .pv").length).toBeGreaterThan(0);
+    expect(all(c, ".opt").map((o) => (o as HTMLButtonElement).disabled)).toEqual([false, false, true]);
   });
 });
 

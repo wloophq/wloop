@@ -41,6 +41,7 @@ type Turns interface {
 	Answer(ctx context.Context, r turns.AnswerRequest) (turns.AnswerResult, error)
 	Continue(ctx context.Context, u unit.Unit) error
 	Dismiss(ctx context.Context, u unit.Unit) error
+	DismissTurn(ctx context.Context, u unit.Unit, seq int64, reason string) error
 	MarkRead(ctx context.Context, u unit.Unit, ids []int64) error
 }
 
@@ -62,6 +63,7 @@ type Tasks interface {
 type Gates interface {
 	Open(ctx context.Context, g gate.Gate, p gates.Policy) (gate.Gate, error)
 	Supersede(ctx context.Context, id int64, by task.Actor) error
+	SupersedeQuestion(ctx context.Context, id int64, gone func(context.Context) (bool, error)) (bool, error)
 	Where(ctx context.Context, q gates.Query) ([]gate.Gate, error)
 }
 
@@ -138,6 +140,7 @@ func (s *Service) Reconcile(ctx context.Context, units ...unit.Unit) error {
 			errs = append(errs, err)
 		}
 	}
+	errs = append(errs, s.closeLeftQuestions(ctx, units))
 	return errors.Join(errs...)
 }
 

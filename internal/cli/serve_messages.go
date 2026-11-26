@@ -35,3 +35,16 @@ func (e *Env) serveMessages(ctx context.Context, d daemon.Deps, db *sqlite.DB, c
 	}
 	return d
 }
+
+// closeLeftQuestions reconciles every question once the outbox is built, so a question whose pinned drafts all left
+// while no daemon ran closes on start: the messages worker's first pass may run before the outbox reads its drafts.
+func (e *Env) closeLeftQuestions(ctx context.Context, logf func(string, ...any)) {
+	if e.messages == nil || e.changes == nil {
+		return
+	}
+	e.background.Go(func() {
+		if err := e.messages.Reconcile(ctx); err != nil {
+			logf("messages: reconciling the questions once the outbox is built: %v", err)
+		}
+	})
+}

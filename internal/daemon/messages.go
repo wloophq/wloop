@@ -378,7 +378,7 @@ type pluginOff struct{ provider unit.ProviderID }
 func (p pluginOff) Error() string { return string(p.provider) + " is disabled" }
 
 // pinnedDrafts are the drafts m's confirm and options pin, each once, as their cards serve them now; a draft
-// that is gone is left out.
+// that is gone is left out, and so is one that no longer waits on the user while m is open, since no answer posts it.
 func (s *Server) pinnedDrafts(ctx context.Context, m dmessage.Message) []api.Draft {
 	o := s.deps.Outbox
 	if o == nil {
@@ -400,6 +400,9 @@ func (s *Server) pinnedDrafts(ctx context.Context, m dmessage.Message) []api.Dra
 			if !errors.Is(err, outbox.ErrNotFound) {
 				s.logf("the draft message %d pins: %v", m.ID, err)
 			}
+			continue
+		}
+		if m.Open() && d.State != draft.Held {
 			continue
 		}
 		g, _, err := o.GateOf(ctx, d)

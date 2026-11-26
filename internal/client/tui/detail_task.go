@@ -206,6 +206,9 @@ func (m *Model) answer(c askCard, n int, read uint64) (Command, bool) {
 	}
 	if pin := c.pin(n); pin != nil && !c.shows(pin) {
 		m.status = m.unseenPin(pin)
+		if c.row == nil {
+			m.status = m.w().T("Picking this option posts draft #{id}, which is gone.", map[string]any{"id": pin.ID})
+		}
 		return Command{}, false
 	}
 	if c.row != nil {

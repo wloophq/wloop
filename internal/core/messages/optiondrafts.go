@@ -3,16 +3,19 @@ package messages
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strconv"
 
 	"github.com/wloophq/wloop/internal/core/gates"
+	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 // ReasonOtherOption is why a draft another option pointed to is withdrawn once one option's draft is approved.
@@ -294,4 +297,90 @@ type forThePerson struct{}
 
 func (forThePerson) Decide(context.Context, gate.Gate) (gates.Decision, error) {
 	return gates.Decision{Mode: gate.ModeWait}, nil
+}
+
+// ReasonPinsLeft is why the turn of a question is dismissed once no draft its answers would post waits on the user.
+const ReasonPinsLeft = "pins_left"
+
+// closeLeftQuestions closes each open question on units, every one when none, whose every answer but a refusal posts
+// a draft (each option pins one, or the confirm does) and none of whose drafts waits on the user any longer: dropped,
+// withdrawn or sent without a pick. Its gate is superseded under the question's claim, so a pick in flight keeps it,
+// then the turn that asked it is dismissed for ReasonPinsLeft and the message closes with no answer.
+func (s *Service) closeLeftQuestions(ctx context.Context, units []unit.Unit) error {
+	if s.Drafts == nil {
+		return nil
+	}
+	open, err := s.Store.Open(ctx)
+	if err != nil {
+		return err
+	}
+	var errs []error
+	for _, m := range open {
+		if m.Kind != message.Question || len(units) > 0 && !slices.Contains(units, m.Unit) || !postsOnly(m) {
+			continue
+		}
+		if left, err := s.pinsLeft(ctx, m); err != nil || !left {
+			errs = append(errs, err)
+			continue
+		}
+		g, ok, err := s.openGate(ctx, m)
+		if err != nil || !ok {
+			errs = append(errs, err)
+			continue
+		}
+		closed, err := s.Gates.SupersedeQuestion(ctx, g.ID, func(ctx context.Context) (bool, error) { return s.pinsLeft(ctx, m) })
+		if err != nil || !closed {
+			errs = append(errs, err)
+			continue
+		}
+		s.logf("messages: question %d on %s: no draft its answers post waits on the user; gate %d superseded, its turn dismissed", m.ID, m.Unit, g.ID)
+		var refused turns.Refusal
+		if err := s.Turns.DismissTurn(ctx, m.Unit, m.Origin.TurnSeq, ReasonPinsLeft); err != nil && !errors.As(err, &refused) {
+			errs = append(errs, fmt.Errorf("dismissing the turn of question %d: %w", m.ID, err))
+			continue
+		}
+		s.mu.Lock()
+		errs = append(errs, s.close(ctx, m, ""))
+		s.mu.Unlock()
+	}
+	return errors.Join(errs...)
+}
+
+// postsOnly says whether every answer to question m but a refusal posts a draft: a confirm that pins one, or options
+// that each pin one. An option that posts nothing keeps the question worth answering whatever its drafts become.
+func postsOnly(m message.Message) bool {
+	if m.Confirm {
+		return m.Draft != nil
+	}
+	return len(m.Options) > 0 && !slices.ContainsFunc(m.Options, func(o record.Option) bool { return o.Draft == nil })
+}
+
+// pinsLeft says whether no draft question m pins, in its confirm or its options, is one its turn chain holds that
+// still waits on the user, and no answer to m picked one: a picked draft leaves through the pick.
+func (s *Service) pinsLeft(ctx context.Context, m message.Message) (bool, error) {
+	answered, err := s.Gates.Where(ctx, gates.Query{Kind: gate.KindQuestion, Unit: m.Unit, Statuses: []gate.Status{gate.Answered}})
+	if err != nil {
+		return false, err
+	}
+	if slices.ContainsFunc(answered, func(g gate.Gate) bool { return g.Subject == subjectOf(m) }) {
+		return false, nil
+	}
+	held := s.turnDrafts(m)
+	refs := []*record.DraftRef{m.Draft}
+	for _, o := range m.Options {
+		refs = append(refs, o.Draft)
+	}
+	for _, ref := range refs {
+		if ref == nil {
+			continue
+		}
+		d, _, ok, err := held.of(ctx, ref.ID)
+		if err != nil {
+			return false, err
+		}
+		if ok && d.State == draft.Held {
+			return false, nil
+		}
+	}
+	return true, nil
 }

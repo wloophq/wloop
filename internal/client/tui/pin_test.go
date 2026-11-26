@@ -85,7 +85,7 @@ func TestATasksPinnedOptionShowsItsDraft(t *testing.T) {
 	chord(m, "gi")
 	press(m, Key{Name: KeyEnter})
 	m.SetDetail("e2", task(nil), nil)
-	if c, ok := press(m, Key{Rune: '2'}); ok || !strings.Contains(m.status, "draft #42") {
-		t.Fatalf("2 with the draft not shown: %+v %v status %q", c, ok, m.status)
+	if c, ok := press(m, Key{Rune: '2'}); ok || !strings.Contains(m.status, "draft #42, which is gone") {
+		t.Fatalf("2 with the draft not served, as one that left: %+v %v status %q", c, ok, m.status)
 	}
 }

@@ -134,3 +134,32 @@ func TestAReviserQuestionsPinnedDraftIsApprovedOnItsCardOrByAnEditedPick(t *test
 		}
 	})
 }
+
+// A question whose subject is gone closes as superseded by the workflow, with no consequence; one whose subject is
+// not gone, a gate of another kind, and a gate closed already are left as they are.
+func TestSupersedeQuestionClosesOnlyAnOpenQuestionWhoseSubjectIsGone(t *testing.T) {
+	ctx := context.Background()
+	f, d, q := pickFixture(t)
+	gone := func(v bool) func(context.Context) (bool, error) {
+		return func(context.Context) (bool, error) { return v, nil }
+	}
+	if closed, err := f.svc.SupersedeQuestion(ctx, q.ID, gone(false)); err != nil || closed {
+		t.Fatalf("a question whose subject stays: closed %v, %v", closed, err)
+	}
+	if _, err := f.svc.SupersedeQuestion(ctx, d.ID, gone(true)); !errors.Is(err, gates.ErrRefused) {
+		t.Fatalf("a draft gate: %v, want ErrRefused", err)
+	}
+	if closed, err := f.svc.SupersedeQuestion(ctx, q.ID, gone(true)); err != nil || !closed {
+		t.Fatalf("a question whose subject is gone: closed %v, %v", closed, err)
+	}
+	got, err := f.store.Get(ctx, q.ID)
+	if err != nil || got.Status != gate.Superseded || got.By != task.ActorWorkflow {
+		t.Fatalf("question %+v %v, want superseded by the workflow", got, err)
+	}
+	if len(f.cons.Calls) != 0 {
+		t.Fatalf("consequences %v, want none", f.cons.Calls)
+	}
+	if closed, err := f.svc.SupersedeQuestion(ctx, q.ID, gone(true)); err != nil || closed {
+		t.Fatalf("a question closed already: closed %v, %v", closed, err)
+	}
+}

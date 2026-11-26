@@ -403,6 +403,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	e.serveProposals(ctx, db, cfg, mods, logf)
 	d = e.serveOutbox(d, db, cfg, mods, logf)
 	d = e.serveAgentDrafts(d, db, cfg, logf)
+	e.closeLeftQuestions(ctx, logf)
 	e.servePlacement(mods)
 	d = links.serve(d, mods)
 	serveProjects(d.Tasks, db)
