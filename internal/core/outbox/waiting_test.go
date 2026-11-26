@@ -55,3 +55,32 @@ func TestWaitingIsReadOncePerPass(t *testing.T) {
 		t.Fatalf("read the gates %d times and the pins %d, want each once per pass", wheres, pins)
 	}
 }
+
+// Outside a pass, what one task waits on reads none of the open gates but
+// that task's, which its caller read.
+func TestWaitingOfOneTaskOutsideAPassReadsItsOwnGates(t *testing.T) {
+	t.Parallel()
+	var open int
+	r := WaitingReads{Where: func(_ context.Context, q gates.Query) ([]gate.Gate, error) {
+		if len(q.Subjects) == 0 {
+			open++
+		}
+		return []gate.Gate{{ID: 7, Task: "t-2", Kind: gate.KindQuestion, Status: gate.Open, Subject: "70"}}, nil
+	}}
+	own := []gate.Gate{{ID: 1, Task: "t-1", Kind: gate.KindQuestion, Status: gate.Open, Subject: "40"}}
+	m := decision.Map{Gates: map[gate.Kind]decision.Kind{gate.KindQuestion: "answer"}}
+	w, err := ReadWaitingOf(context.Background(), r, "t-1", own)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := w.Of(m, "t-1", nil); len(got) != 1 || got[0].Gate.ID != 1 || open != 0 {
+		t.Fatalf("t-1 waits on %+v after %d reads of every open gate, want its own gate and none", got, open)
+	}
+	ctx := coretasks.WithPass(context.Background(), &coretasks.Pass{})
+	if w, err = ReadWaitingOf(ctx, r, "t-1", own); err != nil {
+		t.Fatal(err)
+	}
+	if got := w.Of(m, "t-2", nil); len(got) != 1 || open != 1 {
+		t.Fatalf("in a pass, t-2 waits on %+v after %d reads of every open gate, want the pass's one read", got, open)
+	}
+}

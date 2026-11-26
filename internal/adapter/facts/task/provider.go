@@ -394,7 +394,7 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		sources = nil
 	}
 	if p.d.Decisions != nil {
-		w, err := p.waiting(ctx)
+		w, err := p.waiting(ctx, e.ID, gs)
 		if err != nil {
 			return nil, err
 		}
@@ -827,8 +827,9 @@ func (p *Provider) gates(ctx context.Context, id task.ID) ([]gate.Gate, error) {
 	return slices.DeleteFunc(gs, func(g gate.Gate) bool { return g.Status != gate.Open }), err
 }
 
-// waiting is what the gates and the drafts make the tasks wait on; in a pass, read once.
-func (p *Provider) waiting(ctx context.Context) (outbox.Waiting, error) {
+// waiting is what the gates and the drafts make task id, whose open gates are open, wait on; in a pass, read once
+// for every task.
+func (p *Provider) waiting(ctx context.Context, id task.ID, open []gate.Gate) (outbox.Waiting, error) {
 	var r outbox.WaitingReads
 	if p.d.Gates != nil {
 		r.Where, r.Pinned = p.d.Gates.Where, p.d.Pinned
@@ -836,7 +837,7 @@ func (p *Provider) waiting(ctx context.Context) (outbox.Waiting, error) {
 			r.Drafts = p.d.Drafts
 		}
 	}
-	return outbox.ReadWaiting(ctx, r)
+	return outbox.ReadWaitingOf(ctx, r, id, open)
 }
 
 // wake is task id's wake; in a pass, every task's is read once.

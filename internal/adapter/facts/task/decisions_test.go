@@ -35,6 +35,9 @@ func TestDecisionsFactFromGatesAndLinks(t *testing.T) {
 	if got := f["task.decision_since"].(time.Time); !got.Equal(opened) {
 		t.Fatalf("task.decision_since = %v, want the gate's opening %v", got, opened)
 	}
+	if n := e.reads["every open gate"]; n != 0 {
+		t.Fatalf("one task's facts outside a pass read every open gate %d times, want the task's own gates alone", n)
+	}
 }
 
 func TestDecisionsFactEmptyWithoutMapping(t *testing.T) {
