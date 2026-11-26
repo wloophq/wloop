@@ -156,6 +156,9 @@ func TestParseFloatMessage(t *testing.T) {
 		{`{"type":"float:peek","item":"gate:7"}`, FloatMessage{Kind: FloatPeek, Item: "gate:7"}, true},
 		{`{"type":"float:peek"}`, FloatMessage{}, false},
 		{`{"type":"float:close"}`, FloatMessage{Kind: FloatClose}, true},
+		{`{"type":"float:state","read":"failed"}`, FloatMessage{Kind: FloatState, Read: ReadFailed}, true},
+		{`{"type":"float:state","read":"ok"}`, FloatMessage{Kind: FloatState, Read: ReadOK}, true},
+		{`{"type":"float:state","read":"later"}`, FloatMessage{}, false},
 		{`{"type":"float:size","w":0,"h":32}`, FloatMessage{}, false},
 		{`{"type":"float:move","x":1}`, FloatMessage{}, false},
 		{`float:size {"w":460,"h":600}`, FloatMessage{}, false},
@@ -521,6 +524,43 @@ func TestTheFloatIsReadyOnceItsPageReportsIn(t *testing.T) {
 		r.ctl.HideFloat()
 		if r.ctl.FloatReady() {
 			t.Fatal("a hidden float reports ready")
+		}
+	})
+}
+
+// A tab whose page says the daemon refused its read of the queue, or whose
+// web content process ended, carries nothing, so it is not ready and its hook
+// hears it; one that says the daemon is offline still carries the queue as
+// the menu bar would, since both read the same daemon. A page whose process
+// ended is reloaded by its web view, not loaded anew here.
+func TestATabThatCannotShowTheQueueIsNotReady(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := shownRig(t, nil, laptop)
+		changes := 0
+		r.ctl.OnFloatReady(func() { changes++ })
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatState, Read: ReadOffline})
+		if !r.ctl.FloatReady() || changes != 0 {
+			t.Fatalf("ready %v, hook ran %d times; want an offline tab still ready", r.ctl.FloatReady(), changes)
+		}
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatState, Read: ReadFailed})
+		if r.ctl.FloatReady() || changes != 1 {
+			t.Fatalf("ready %v, hook ran %d times; want not ready, once", r.ctl.FloatReady(), changes)
+		}
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatState, Read: ReadOK})
+		if !r.ctl.FloatReady() || changes != 2 {
+			t.Fatalf("ready %v, hook ran %d times; want ready again", r.ctl.FloatReady(), changes)
+		}
+		r.host.taken()
+		r.host.handlers().OnFloatGone(FloatTab)
+		if r.ctl.FloatReady() || changes != 3 {
+			t.Fatalf("ready %v, hook ran %d times; want not ready once its process ended", r.ctl.FloatReady(), changes)
+		}
+		if calls := r.host.taken(); len(calls) != 0 {
+			t.Fatalf("host calls %q, want none: the web view reloads its page", calls)
+		}
+		r.host.handlers().OnFloat(size(112, 32))
+		if !r.ctl.FloatReady() || changes != 4 {
+			t.Fatalf("ready %v, hook ran %d times; want ready as the reloaded page reports in", r.ctl.FloatReady(), changes)
 		}
 	})
 }

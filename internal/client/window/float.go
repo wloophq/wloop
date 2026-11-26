@@ -288,8 +288,10 @@ func LoadPlacement(d Defaults) (FloatPlacement, bool) {
 // draws in. The tab sends its size (float:size), asks for the panel
 // (float:panel, toggling it on a click) and for a peek at an item that
 // arrived (float:peek); the panel sends its size and mode (float:size) and
-// that it closed (float:close), as it does once as it loads. Either opens a
-// route in the main window (float:open) or hides the widget (float:hide).
+// that it closed (float:close), as it does once as it loads. The tab also
+// says how its last read of the queue went (float:state: ok, offline or
+// failed) whenever it changes. Either opens a route in the main window
+// (float:open) or hides the widget (float:hide).
 const (
 	FloatSize      = "float:size"
 	FloatOpen      = "float:open"
@@ -297,6 +299,10 @@ const (
 	FloatOpenPanel = "float:panel"
 	FloatPeek      = "float:peek"
 	FloatClose     = "float:close"
+	FloatState     = "float:state"
+	ReadOK         = "ok"
+	ReadOffline    = "offline"
+	ReadFailed     = "failed"
 	ModePanel      = "panel"
 	ModePeek       = "peek"
 )
@@ -311,6 +317,7 @@ type FloatMessage struct {
 	Route  string
 	Item   string
 	Toggle bool
+	Read   string
 }
 
 // ParseFloatMessage reads raw, a JSON object naming its message in "type";
@@ -323,11 +330,12 @@ func ParseFloatMessage(raw string) (FloatMessage, bool) {
 		Route  string
 		Item   string
 		Toggle bool
+		Read   string
 	}
 	if json.Unmarshal([]byte(raw), &body) != nil {
 		return FloatMessage{}, false
 	}
-	m := FloatMessage{Kind: body.Type, W: body.W, H: body.H, Mode: body.Mode, Route: body.Route, Item: body.Item, Toggle: body.Toggle}
+	m := FloatMessage{Kind: body.Type, W: body.W, H: body.H, Mode: body.Mode, Route: body.Route, Item: body.Item, Toggle: body.Toggle, Read: body.Read}
 	ok := false
 	switch m.Kind {
 	case FloatSize:
@@ -336,6 +344,8 @@ func ParseFloatMessage(raw string) (FloatMessage, bool) {
 		ok = m.Item != ""
 	case FloatOpen, FloatHide, FloatOpenPanel, FloatClose:
 		ok = true
+	case FloatState:
+		ok = m.Read == ReadOK || m.Read == ReadOffline || m.Read == ReadFailed
 	}
 	if !ok {
 		return FloatMessage{}, false
@@ -367,7 +377,7 @@ func (c *Controller) ShowFloat() error {
 	}
 	reload := u != c.floatURL || !c.pageReady
 	if reload {
-		c.floatURL, c.pageReady = u, false
+		c.floatURL, c.pageReady, c.pageRead = u, false, ""
 	}
 	c.floatShown, c.tellPlace = true, true
 	c.placeFloat()
@@ -404,15 +414,23 @@ func (c *Controller) HideFloat() {
 }
 
 // FloatReady says whether the float shows a tab whose page has reported in
-// since it last loaded, so it carries what waits on the user.
+// since it last loaded and has not said the daemon refused its read of the
+// queue, so it carries what waits on the user. A page that says the daemon is
+// offline still counts: the menu bar reads the same daemon, and a stream that
+// drops must not post every banner the float carries.
 func (c *Controller) FloatReady() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.floatShown && c.pageReady
+	return c.carries()
 }
 
-// OnFloatReady sets what runs when the tab's page first reports in after a
-// load; until set, nothing.
+// carries is FloatReady under c.mu.
+func (c *Controller) carries() bool {
+	return c.floatShown && c.pageReady && c.pageRead != ReadFailed
+}
+
+// OnFloatReady sets what runs when the tab's page or its web content process
+// changes whether the float is ready (FloatReady); until set, nothing.
 func (c *Controller) OnFloatReady(fn func()) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -471,11 +489,15 @@ func (c *Controller) floatMessage(m FloatMessage) {
 		return
 	}
 	c.mu.Lock()
+	was := c.carries()
+	c.pageReady = true
+	if m.Kind == FloatState {
+		c.pageRead = m.Read
+	}
 	ready := c.floatReady
-	if c.pageReady || !c.floatShown {
+	if c.carries() == was {
 		ready = nil
 	}
-	c.pageReady = true
 	c.mu.Unlock()
 	if ready != nil {
 		ready()
@@ -506,6 +528,28 @@ func (c *Controller) floatMessage(m FloatMessage) {
 		}
 	default:
 		c.shared(m)
+	}
+}
+
+// floatGone follows the web content process of the float's window win
+// ending: its web view reloads the page, so the tab carries nothing until the
+// page reports in again, and the panel is closed until its page does.
+func (c *Controller) floatGone(win string) {
+	c.mu.Lock()
+	if win == FloatPanel {
+		c.closePanel()
+		c.panel.ready = false
+		c.mu.Unlock()
+		return
+	}
+	ready := c.floatReady
+	if !c.carries() {
+		ready = nil
+	}
+	c.pageReady, c.pageRead = false, ""
+	c.mu.Unlock()
+	if ready != nil {
+		ready()
 	}
 }
 

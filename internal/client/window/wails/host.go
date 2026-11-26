@@ -205,6 +205,7 @@ func newHost(app *application.App, name string) *host {
 	h.makePanel = h.newFloatPanel
 	h.float.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) { e.Cancel() })
 	h.float.OnWindowEvent(events.Mac.WindowDidMove, func(*application.WindowEvent) { h.do(h.floatMoved) })
+	h.float.OnWindowEvent(events.Mac.WebViewWebContentProcessDidTerminate, func(*application.WindowEvent) { h.do(func() { h.floatGone(window.FloatTab) }) })
 	h.main.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
 		e.Cancel()
 		h.do(h.hideMain)
@@ -299,6 +300,7 @@ func (h *host) newFloatPanel() floatNative {
 	w := h.app.Window.NewWithOptions(floatOptions(h.name, floatPanelName))
 	w.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) { e.Cancel() })
 	w.OnWindowEvent(events.Mac.WindowDidResignKey, func(*application.WindowEvent) { h.do(h.panelResigned) })
+	w.OnWindowEvent(events.Mac.WebViewWebContentProcessDidTerminate, func(*application.WindowEvent) { h.do(func() { h.floatGone(window.FloatPanel) }) })
 	over := h.handlers().FloatOverFullScreen
 	application.InvokeSync(func() {
 		floatOnly(nsWindow(w), h.panelKeyable.Load, h.pointerIn(window.FloatPanel), h.app.Logger)
@@ -627,6 +629,14 @@ func (h *host) pageMessage(windowName, message, origin string, mainFrame bool) {
 			on(m)
 		}
 	})
+}
+
+// floatGone tells the controller the web content process of the float's
+// window win ended; it runs on the worker.
+func (h *host) floatGone(win string) {
+	if on := h.handlers().OnFloatGone; on != nil {
+		on(win)
+	}
 }
 
 // setPanelMode keeps mode; a full panel that shows with the pointer already

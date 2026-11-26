@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render } from "@testing-library/svelte";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { J } from "../../lib/util";
 import { FLOAT_HOVER_OPEN_MS, floatDeps, floatLoad, floatState, resetFloat } from "../../state/float.svelte";
-import { FakeDaemon } from "../../testing/fakedaemon";
+import { FakeDaemon, Reply } from "../../testing/fakedaemon";
 import { resetStore } from "../../testing/reset.svelte";
 import { settle } from "../../testing/settle";
 import FloatTab from "./FloatTab.svelte";
@@ -14,6 +14,7 @@ let posted: J[] = [];
 let raw: string[] = [];
 let served: J;
 let live: J[] = [];
+let daemon: FakeDaemon;
 const turns = (running: J[] = []) => ({ running, done: [], asked: 0, usual: {} });
 const item = (id: number): J => ({
   kind: "review-step", word: "step", tone: "me", task: { id: "t-" + id, title: "Ana's change " + id, units: [] },
@@ -31,7 +32,7 @@ beforeEach(() => {
   floatDeps.post = (m) => posted.push(m);
   (window as J).webkit = { messageHandlers: { external: { postMessage: (m: string) => raw.push(m) } } };
   served = { title: "Needs you", items: [item(1)] };
-  new FakeDaemon({ "/api/queue": () => served, "/api/turns/live": () => turns(live) });
+  daemon = new FakeDaemon({ "/api/queue": () => served, "/api/turns/live": () => turns(live) });
 });
 
 afterEach(() => {
@@ -105,7 +106,7 @@ test("a click toggles the panel, and an Option-click hides the widget until some
   await settle();
   await click(pill(c));
   await click(pill(c), { altKey: true });
-  expect(posted.filter((m) => m.type !== "float:size")).toEqual([{ type: "float:panel", toggle: true }, { type: "float:hide", mode: "quiet" }]);
+  expect(posted.filter((m) => m.type !== "float:size" && m.type !== "float:state")).toEqual([{ type: "float:panel", toggle: true }, { type: "float:hide", mode: "quiet" }]);
 });
 
 test("a drag asks for no panel", async () => {
@@ -181,4 +182,21 @@ test("the tab is a flat circle: round, as wide as tall per slot, with no outline
   const slot = rule(".fl-slot");
   expect(slot).toMatch(/width:\s*var\(--fl-slot\)/);
   expect(slot).toMatch(/height:\s*var\(--fl-slot\)/);
+});
+
+test("the tab tells the host how its read of the queue went, as it changes, so banners post while it cannot show the queue", async () => {
+  const states = () => posted.filter((m) => m.type === "float:state").map((m) => m.read);
+  await floatLoad();
+  render(FloatTab);
+  await settle();
+  expect(states()).toEqual(["ok"]);
+  daemon.pages["/api/queue"] = () => new Reply(503, { error: "busy" });
+  await floatLoad();
+  await settle();
+  expect(states()).toEqual(["ok", "failed"]);
+  daemon.pages["/api/queue"] = () => served;
+  await floatLoad();
+  await floatLoad();
+  await settle();
+  expect(states()).toEqual(["ok", "failed", "ok"]);
 });
