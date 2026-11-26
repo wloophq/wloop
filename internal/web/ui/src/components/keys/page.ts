@@ -1,3 +1,4 @@
+import { isQueueView } from "../../lib/catalog";
 import { QUEUE, readRoute } from "../../lib/routes";
 import { taskById } from "../../lib/tasks";
 import type { J } from "../../lib/util";
@@ -30,7 +31,7 @@ export function pageQuestion(el: Element | null | undefined, hash: string = nav.
   const at = gateAt(el, pageGates(hash));
   if (at || (el && el.closest && el.closest(".d-gate"))) return at;
   const route = readRoute(hash);
-  if (route.view !== QUEUE || route.task || route.unit || (el && el.closest && el.closest("#detail"))) return null;
+  if ((route.view !== QUEUE && !isQueueView(route.view)) || route.task || route.unit || (el && el.closest && el.closest("#detail"))) return null;
   const queue = queueShown(route);
   const item = queue && (queue.items || [])[queueState.at];
   return item && item.gate && !queueDraft(item.gate) ? { task: item.task, gate: item.gate } : null;

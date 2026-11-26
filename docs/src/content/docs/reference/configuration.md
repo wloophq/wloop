@@ -221,6 +221,10 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `window` | table |  | The app's own window on macOS, which the app reads when it starts. |
 | `window.enabled` | bool | `true` | Show the cockpit in the app's own window on macOS; false opens it in the browser. |
 | `window.hotkey` | string | `ctrl+option+space` | The global shortcut that opens the omnibox panel, such as cmd+shift+space; empty for none. |
+| `window.float` | one of `on`, `off` | `off` | on shows the floating widget, which carries what waits on you: no Needs you banner posts while it is hidden for a while, or shown with a page that has loaded; they post while it is off, and while a shown widget's page has not loaded once a few seconds have passed since it was asked to. Needs the app's own window. |
+| `window.float_hotkey` | string | `cmd+option+.` | The global shortcut that hides the floating widget until something new arrives, and shows it again, such as cmd+shift+j; empty for none. Bound only while window.float is on. The default leaves out ctrl+option, VoiceOver's modifier. |
+| `window.float_morning` | string | `09:00` | The local HH:MM at which Hide until tomorrow shows the floating widget again. |
+| `window.float_over_full_screen` | bool | `false` | The floating widget shows over a full-screen app or a presentation too; off, it stays off a full-screen space. |
 
 ### Units and tasks
 

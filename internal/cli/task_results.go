@@ -14,6 +14,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
@@ -30,6 +31,11 @@ func override(ctx context.Context, o placement.Overrides, u unit.Unit) (placemen
 	return coretasks.Lookup(ctx, "cli.placements", u, all, func() (placement.Placement, bool, error) { return o.Override(ctx, u) })
 }
 
+// pluginFacts are u's facts as its plugin's module m reads them; in a pass, read once for every reader.
+func pluginFacts(ctx context.Context, m pluginModule, u unit.Unit) (workflow.Facts, error) {
+	return coretasks.Once(ctx, "cli.pluginfacts."+u.String(), func() (workflow.Facts, error) { return m.Facts.Facts(ctx, u) })
+}
+
 // unitsEnded says whether a unit has ended by its plugin's ended fact
 // (builtin.EndedFact); a unit whose plugin has no such fact, or whose facts
 // are gone, has not.
@@ -43,7 +49,7 @@ func unitsEnded(mods []pluginModule) func(ctx context.Context, u unit.Unit) (boo
 			if m.ID != u.Provider || m.Facts == nil {
 				continue
 			}
-			f, err := m.Facts.Facts(ctx, u)
+			f, err := pluginFacts(ctx, m, u)
 			if errors.Is(err, automation.ErrUnitGone) {
 				return false, nil
 			}
@@ -121,7 +127,7 @@ func unitsPlacement(mods []pluginModule, cfg func() config.Config, overrides pla
 			if m.ID != u.Provider || m.Facts == nil {
 				continue
 			}
-			f, err := m.Facts.Facts(ctx, u)
+			f, err := pluginFacts(ctx, m, u)
 			if errors.Is(err, automation.ErrUnitGone) {
 				return "", nil
 			}

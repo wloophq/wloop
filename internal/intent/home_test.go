@@ -18,15 +18,15 @@ func TestHomeLoadsTheBundledBriefingInEachLocale(t *testing.T) {
 		t.Fatalf("problems: %v", problems)
 	}
 	h := en.Home
-	if len(h.Counters) != 9 || h.Counters[0].Kind != decision.Answer || h.Counters[0].ID != "answer" || h.Counters[7].View != "in-loop" ||
-		len(h.Sections) != 2 || h.Sections[0].View != "home-blocked" || h.Sections[0].Time != "owed" || h.LastJoin != " and " {
+	if len(h.Counters) != 3 || h.Counters[0].View != "needs-you" || h.Counters[0].ID != "needs-you" || h.Counters[1].View != "in-loop" ||
+		len(h.Sections) != 2 || h.Sections[0].View != "needs-you" || h.Sections[1].View != "home-stalled" || h.Sections[1].Time != "moved" || h.LastJoin != " and " {
 		t.Fatalf("home = %+v", h)
 	}
 	pt, problems := loadProfile(t, "pt-BR", nil)
 	if len(problems) > 0 {
 		t.Fatalf("problems: %v", problems)
 	}
-	if h := pt.Home; h.LastJoin != " e " || h.CaptureHint != "Anote o que está na sua cabeça" || h.Counters[8].Clause["other"] != "{counter} estão com outras pessoas" {
+	if h := pt.Home; h.LastJoin != " e " || h.CaptureHint != "Anote o que está na sua cabeça" || h.Counters[2].Clause["other"] != "{counter} estão com outras pessoas" || h.Counters[0].Clause["one"] != "{counter} espera por você" {
 		t.Fatalf("pt-BR home = %+v", h)
 	}
 }
@@ -53,7 +53,7 @@ func TestACopiedHomeAndDecisionsKeepTheirTranslation(t *testing.T) {
 	if len(problems) > 0 {
 		t.Fatalf("problems: %v", problems)
 	}
-	if l.Home.CaptureHint != "Anote o que está na sua cabeça" || l.Home.Counters[7].Noun["other"] != "tarefas" {
+	if l.Home.CaptureHint != "Anote o que está na sua cabeça" || l.Home.Counters[1].Noun["other"] != "tarefas" {
 		t.Fatalf("home %+v", l.Home)
 	}
 	if k := l.Decisions.Kinds[decision.Answer]; k.Queue != "Perguntas do agente" || k.Noun["one"] != "pergunta" {

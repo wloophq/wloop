@@ -27,6 +27,7 @@ func (s *Server) handleReview(w http.ResponseWriter, r *http.Request) {
 		writeTasksError(w, err)
 		return
 	}
+	s.queueCountedReview(r.Context(), g, &rv)
 	writeJSON(w, s.wireReview(rv))
 }
 
@@ -44,7 +45,26 @@ func (s *Server) handleReviewStepDone(w http.ResponseWriter, r *http.Request) {
 		writeTasksError(w, err)
 		return
 	}
+	s.queueCountedReview(r.Context(), g, &rv)
 	writeJSON(w, s.wireReview(rv))
+}
+
+// queueCountedReview counts rv's step over the queue view as the items its queue serves, as every other count of
+// that view does.
+func (s *Server) queueCountedReview(ctx context.Context, g *coretasks.Service, rv *coretasks.Review) {
+	snap, err := g.Snapshot(ctx)
+	if err != nil {
+		s.logf("review: counting the queue: %v", err)
+		return
+	}
+	c := task.Counters{Views: map[task.View]int{}}
+	for _, st := range rv.Steps {
+		c.Views[st.View] = st.Count
+	}
+	s.queueCounted(snap.Within(ctx), g, &c, nil)
+	for i, st := range rv.Steps {
+		rv.Steps[i].Count = c.Views[st.View]
+	}
 }
 
 func (s *Server) wireReview(rv coretasks.Review) api.Review {

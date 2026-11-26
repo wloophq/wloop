@@ -1,5 +1,5 @@
-// Package window decides when and where the cockpit's native window and its
-// omnibox panel show; a Host draws them.
+// Package window decides when and where the cockpit's native window, its
+// omnibox panel and the floating widget show; a Host draws them.
 package window
 
 import (
@@ -38,6 +38,26 @@ type Host interface {
 	ShowDetached(id, url string)
 	// OpenExternal opens url, a web address, in the default browser.
 	OpenExternal(url string)
+	// ShowFloat shows the floating widget's tab at url on every space,
+	// without activating the app or taking the keyboard; reload loads url anew
+	// though the tab shows it already.
+	ShowFloat(url string, reload bool)
+	// HideFloat hides the tab and the panel window.
+	HideFloat()
+	// SetFloatFrame moves and sizes the floating widget's tab to r.
+	SetFloatFrame(r Rect)
+	// PlaceFloat tells the tab's page where it sits.
+	PlaceFloat(p FloatPlace)
+	// LoadFloatPanel loads url in the float's panel window, creating the
+	// window, hidden, on the first call.
+	LoadFloatPanel(url string)
+	// TellFloatPanel tells the panel's page what to show.
+	TellFloatPanel(p PanelPlace)
+	// ShowFloatPanel moves and sizes the panel window to r and shows it in
+	// mode, without taking the keyboard; it may become key only in ModePanel.
+	ShowFloatPanel(r Rect, mode string)
+	// HideFloatPanel hides the panel window, which hands back the keyboard.
+	HideFloatPanel()
 	// Listen binds the hotkey, the reopen and opened links; an error leaves
 	// the reopen and the links bound.
 	Listen(h Handlers) error
@@ -56,6 +76,24 @@ type Handlers struct {
 	OnPanelHidden func()
 	// OnOpenURL runs for each deep link the system hands the app.
 	OnOpenURL func(link string)
+	// OnFloat runs for each message the float's pages send, and OnFloatGone
+	// when the web content process of the float's window named window
+	// (FloatTab or FloatPanel) ends.
+	OnFloat     func(m FloatMessage)
+	OnFloatGone func(window string)
+	// OnFloatMoving runs when the person starts moving the float, and
+	// OnFloatDropped with its frame once they let go.
+	OnFloatMoving  func()
+	OnFloatDropped func(frame Rect)
+	// OnScreens runs with the screens, the main screen first, when the host
+	// starts listening and whenever they change.
+	OnScreens func(screens []Screen)
+	// FloatOverFullScreen lets the float show over a full-screen app.
+	FloatOverFullScreen bool
+	// FloatHotkey is the accelerator that shows and hides the float; ""
+	// binds none.
+	FloatHotkey   string
+	OnFloatHotkey func()
 }
 
 // Events is the daemon's events stream.
@@ -72,13 +110,51 @@ type Config struct {
 	Log        func(format string, args ...any)
 	// After is time.After unless a test supplies its own.
 	After func(time.Duration) <-chan time.Time
+	// Defaults keeps the float's placement across launches; nil keeps it
+	// for this run only.
+	Defaults            Defaults
+	FloatOverFullScreen bool
+	FloatHotkey         string
 }
 
-// Controller keeps one main window and one panel.
+// Controller keeps one main window, one panel and the floating widget.
 type Controller struct {
 	cfg        Config
 	mu         sync.Mutex
 	panelShown bool
+
+	// floatWanted says the float should show, though the daemon could not
+	// serve its page yet; floatShown that the host shows it, at floatURL.
+	floatWanted, floatShown bool
+	floatURL                string
+	floatReady              func()
+	// placement is where the float goes once placed, its saved placement or
+	// the default one on the first screens known.
+	placement   FloatPlacement
+	placed      bool
+	screens     []Screen
+	floatHide   func(mode string)
+	floatHotkey func()
+	// tabFrame is where the tab was last put; panel is its panel window.
+	tabFrame Rect
+	panel    floatPanel
+	// dragging holds the frame still while the person drags it; tellPlace
+	// says the page is due its place, which it gets once it has loaded
+	// (pageReady: it sent a message since its last load) and the frame is set.
+	dragging, tellPlace, pageReady bool
+	// pageRead is how the tab's page last said its read of the queue went, ""
+	// until it said, at stateAt; downSince is when it last stopped saying ok.
+	pageRead           string
+	stateAt, downSince time.Time
+	// carried is whether the float carried the queue when last settled;
+	// recheck settles it again as that would change with no message.
+	carried bool
+	recheck *time.Timer
+	// unsaid is the hook a ShowFloat or HideFloat the menu bar called under its
+	// own lock did not run; refloat runs the one its ShowFloat left.
+	unsaid func()
+	// ended says Run returned, so no check is armed any more.
+	ended bool
 }
 
 // New returns a controller of cfg.Host.
@@ -89,32 +165,61 @@ func New(cfg Config) *Controller {
 	if cfg.After == nil {
 		cfg.After = time.After
 	}
-	return &Controller{cfg: cfg}
+	c := &Controller{cfg: cfg}
+	if cfg.Defaults != nil {
+		c.placement, c.placed = LoadPlacement(cfg.Defaults)
+	}
+	return c
 }
 
 // Run binds the host's handlers, then follows the window requests the daemon
-// relays until ctx ends, subscribing again whenever the daemon goes away; it
-// returns once the stream it follows has closed.
+// relays until ctx ends, subscribing again whenever the daemon goes away and
+// showing the float again once it answers; it returns once the stream it
+// follows has closed.
 func (c *Controller) Run(ctx context.Context) error {
 	err := c.cfg.Host.Listen(Handlers{
-		Hotkey:        c.cfg.Hotkey,
-		OnHotkey:      c.TogglePanel,
-		OnReopen:      func() { _ = c.Show("") },
-		OnPanelHidden: func() { c.setPanel(false) },
-		OnOpenURL:     c.OpenLink,
+		Hotkey:         c.cfg.Hotkey,
+		OnHotkey:       c.TogglePanel,
+		OnReopen:       func() { _ = c.Show("") },
+		OnPanelHidden:  func() { c.setPanel(false) },
+		OnOpenURL:      c.OpenLink,
+		OnFloat:        c.floatMessage,
+		OnFloatGone:    c.floatGone,
+		OnFloatMoving:  c.floatMoving,
+		OnFloatDropped: c.floatDropped,
+		OnScreens:      c.setScreens,
+
+		FloatOverFullScreen: c.cfg.FloatOverFullScreen,
+		FloatHotkey:         c.cfg.FloatHotkey,
+		OnFloatHotkey:       c.pressFloatHotkey,
 	})
 	if err != nil {
-		c.cfg.Log("window.hotkey %q: %v", c.cfg.Hotkey, err)
+		c.cfg.Log("window.hotkey %q, window.float_hotkey %q: %v", c.cfg.Hotkey, c.cfg.FloatHotkey, err)
 	}
+	back := false
 	for {
 		if changes, err := c.cfg.Daemon.Events(ctx, api.WindowClient, api.Since{}); err == nil {
+			c.refloat(back)
 			c.follow(ctx, changes)
 		}
+		back = true
 		select {
 		case <-ctx.Done():
+			c.end()
 			return nil
 		case <-c.cfg.After(reconnectAfter):
 		}
+	}
+}
+
+// end stops the check settle armed, and arms none again.
+func (c *Controller) end() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.ended = true
+	if c.recheck != nil {
+		c.recheck.Stop()
+		c.recheck = nil
 	}
 }
 

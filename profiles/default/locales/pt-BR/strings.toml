@@ -42,6 +42,7 @@
 "Sweep now" = "Varrer agora"
 "Pause automatic rounds" = "Pausar as rodadas automáticas"
 "Resume automatic rounds" = "Retomar as rodadas automáticas"
+"Floating widget" = "Widget flutuante"
 "Not synced yet" = "Ainda não sincronizado"
 "Synced {time}" = "Sincronizado às {time}"
 "Loading {plugin}" = "Carregando {plugin}"
@@ -792,6 +793,36 @@
 "matched" = "correspondeu"
 "frees" = "libera"
 "wait" = "espera"
+# The floating widget.
+"{n} wait on you" = { one = "{n} espera por você", other = "{n} esperam por você" }
+"Nothing waits on you" = "Nada espera por você"
+"Pin" = "Fixar"
+"Offline" = "Offline"
+"The daemon is not answering." = "O daemon não está respondendo."
+"Agents" = "Agentes"
+"{n} running" = { one = "{n} rodando", other = "{n} rodando" }
+"{n} waiting on you" = { one = "{n} esperando por você", other = "{n} esperando por você" }
+"{n} done today" = { one = "{n} concluído hoje", other = "{n} concluídos hoje" }
+"Hide" = "Ocultar"
+"Show" = "Mostrar"
+"Show {n} more done" = { one = "Mostrar mais {n} concluído", other = "Mostrar mais {n} concluídos" }
+"Fewer" = "Menos"
+"{elapsed} / {usual}" = "{elapsed} / {usual}"
+"{seconds}s" = "{seconds}s"
+"All clear" = "Tudo em dia"
+"The loop brings the next thing here." = "O loop traz a próxima coisa para cá."
+"Open in the cockpit" = "Abrir no cockpit"
+"Open at its source" = "Abrir na origem"
+"Open {ref} at its source" = "Abrir {ref} na origem"
+"Could not read the queue." = "Não foi possível ler a fila."
+"Hide until something new" = "Ocultar até chegar algo novo"
+"Hide for 1 hour" = "Ocultar por 1 hora"
+"Hide until tomorrow" = "Ocultar até amanhã"
+"{file}:{line}" = "{file}:{line}"
+"Could not read the agents." = "Não foi possível ler os agentes."
+"Post {option}" = "Publicar {option}"
+"More" = "Mais"
+"Less" = "Menos"
 
 [formats]
 time = "15:04"

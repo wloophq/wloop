@@ -1,42 +1,38 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import { isCoreView, REVIEW, viewLabel, viewSpec } from "../../lib/catalog";
-  import { isOutboxView, outboxLensItems } from "../../lib/drafts";
+  import { isCoreView, isQueueView, REVIEW, viewLabel, viewSpec } from "../../lib/catalog";
   import { t } from "../../lib/i18n.svelte";
   import { lensOf, pipelineOf, viewQueryKey, type Lens, type Pipeline } from "../../lib/lens";
   import { taskById, taskLensItems } from "../../lib/tasks";
   import type { J } from "../../lib/util";
   import { minute } from "../../state/clock.svelte";
   import { readHash, writeHash } from "../../state/route.svelte";
-  import { detailState, outboxState, removeState, reviewState, tasksState } from "../../state/store.svelte";
+  import { detailState, removeState, reviewState, tasksState } from "../../state/store.svelte";
   import GateCard from "../gates/GateCard.svelte";
   import Board from "../rows/Board.svelte";
   import RowList from "../rows/RowList.svelte";
   import { taskModel } from "../rows/model";
-  import DraftList from "./DraftList.svelte";
   import Review from "./Review.svelte";
   import ViewIntro from "./ViewIntro.svelte";
   import { reviewTitle } from "./review";
   import { areaOptions, contextChips, removeAllClean } from "./views";
 
-  // A core view's page: its head, the lens bar over its tasks or the Outbox's drafts (tools, given the lens and
-  // what it shows, null while it loads or for a list of gates), and its body, drawn in the view's served layout;
-  // the review on the review's route.
+  // A core view's page: its head, the lens bar over its tasks (tools, given the lens and what it shows, null while
+  // it loads or for a list of gates), and its body, drawn in the view's served layout; the review on the review's
+  // route. A view drawn as the queue is the queue's screen.
   let { tools = undefined }: { tools?: Snippet<[Lens, Pipeline | null]> } = $props();
 
   const route = $derived(readHash());
-  const on = $derived(isCoreView(route.view));
+  const on = $derived(isCoreView(route.view) && !isQueueView(route.view));
   const review = $derived(route.view === REVIEW);
   const spec = $derived(viewSpec(route.view));
   const label = $derived(viewLabel(route.view));
   const loaded = $derived(tasksState.key === viewQueryKey(route.view, route.area, route.ctx));
   const n = $derived(loaded ? tasksState.tasks.length : 0);
   const lens = $derived(lensOf(route));
-  const outbox = $derived(isOutboxView(route.view));
   const gates = $derived(!!spec && spec.over === "gates");
   const res = $derived.by(() => {
     if (!on || review || !loaded) return null;
-    if (outbox) return outboxState.page ? pipelineOf(outboxLensItems(outboxState.page), lens, null) : null;
     return gates ? null : pipelineOf(taskLensItems(), lens, null);
   });
   const areas = $derived(on && !review ? areaOptions(route) : []);
@@ -93,18 +89,7 @@
         {#each tasksState.loading as l (l.plugin)}<p class="loading" data-plugin={l.plugin}
             >{l.reason ? t("Loading {plugin}: {reason}", { plugin: l.plugin, reason: l.reason }) : t("Loading {plugin}", { plugin: l.plugin })}</p
           >{/each}
-        {#if outbox}
-          {#if outboxState.error}<p class="plan-error">{outboxState.error}</p>{/if}
-          {#if !outboxState.page}
-            <p class="empty">{t("Loading.")}</p>
-          {:else if !(outboxState.page.drafts || []).length}
-            <p class="empty">{spec.empty}</p>
-          {:else if res && !res.shown}
-            <p class="empty">{t("Nothing here matches \"{query}\".", { query: route.q })}</p>
-          {:else}
-            <DraftList page={outboxState.page} {lens} />
-          {/if}
-        {:else if gates}
+        {#if gates}
           {#if tasksState.gates.length}
             <div class="gate-list">
               {#each tasksState.gates as g (g.id)}<GateCard task={taskById(g.task, detailState.task, detailState.unitTasks)} gate={g} />{/each}

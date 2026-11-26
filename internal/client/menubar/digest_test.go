@@ -85,3 +85,24 @@ func TestEmptyDigestIsSkipped(t *testing.T) {
 		t.Fatalf("posted %+v, asked %q", digests(r.notes), r.d.digestDays)
 	}
 }
+
+func TestRunWaitsOnTheDigestLoop(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r, _ := digestRig(t, "", "09:00", digestDay.Add(time.Hour))
+		r.d.events = make(chan api.Change)
+		r.d.digestHeld = make(chan struct{})
+		ctx, cancel := context.WithCancel(context.Background())
+		done := make(chan error, 1)
+		go func() { done <- r.c.Run(ctx) }()
+		synctest.Wait()
+		cancel()
+		synctest.Wait()
+		select {
+		case <-done:
+			t.Fatal("Run returned while the digest loop was still asking the daemon")
+		default:
+		}
+		close(r.d.digestHeld)
+		<-done
+	})
+}

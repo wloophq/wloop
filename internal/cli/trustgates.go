@@ -28,14 +28,15 @@ func (waitsForYou) Decide(context.Context, gate.Gate) (gates.Decision, error) {
 // round that has none open, its subject the block, and supersedes each open
 // trust gate whose block lifted or was replaced.
 func (e *Env) syncTrustGates(ctx context.Context) error {
-	if e.gates == nil || e.gateReader == nil || e.Rec == nil {
+	svc, reader := e.builtGates()
+	if svc == nil || reader == nil || e.Rec == nil {
 		return nil
 	}
 	blocks, err := e.Rec.FirstRoundBlocks(ctx)
 	if err != nil {
 		return err
 	}
-	open, err := e.gateReader.Where(ctx, gates.Query{Kind: gate.KindTrust})
+	open, err := reader.Where(ctx, gates.Query{Kind: gate.KindTrust})
 	if err != nil {
 		return err
 	}
@@ -59,7 +60,7 @@ func (e *Env) syncTrustGates(ctx context.Context) error {
 		if gated[u] {
 			continue
 		}
-		if _, err := e.gates.Open(ctx, gate.Gate{Kind: gate.KindTrust, Unit: u, Subject: blocks[u].Key}, waitsForYou{}); err != nil {
+		if _, err := svc.Open(ctx, gate.Gate{Kind: gate.KindTrust, Unit: u, Subject: blocks[u].Key}, waitsForYou{}); err != nil {
 			errs = append(errs, fmt.Errorf("opening the trust gate of %s: %w", u.Label(), err))
 		}
 	}
@@ -67,7 +68,7 @@ func (e *Env) syncTrustGates(ctx context.Context) error {
 		if blocked[g.Unit] && g.Subject == blocks[g.Unit].Key {
 			continue
 		}
-		if err := e.gates.Supersede(ctx, g.ID, task.ActorWorkflow); err != nil && !errors.Is(err, gates.ErrResolved) {
+		if err := svc.Supersede(ctx, g.ID, task.ActorWorkflow); err != nil && !errors.Is(err, gates.ErrResolved) {
 			errs = append(errs, fmt.Errorf("closing the trust gate of %s: %w", g.Unit.Label(), err))
 		}
 	}
@@ -78,10 +79,11 @@ func (e *Env) syncTrustGates(ctx context.Context) error {
 // the cap counts afresh, so the round runs or holds again on its own, and each whose task closed, such as the
 // task of a pull request that merged.
 func (e *Env) supersedeHeldGates(ctx context.Context) error {
-	if e.gates == nil || e.gateReader == nil {
+	svc, reader := e.builtGates()
+	if svc == nil || reader == nil {
 		return nil
 	}
-	open, err := e.gateReader.Where(ctx, gates.Query{Kind: gate.KindPlan})
+	open, err := reader.Where(ctx, gates.Query{Kind: gate.KindPlan})
 	if err != nil {
 		return err
 	}
@@ -91,7 +93,7 @@ func (e *Env) supersedeHeldGates(ctx context.Context) error {
 		if _, held := round.HeldDay(g.Subject); !held || g.Subject == today && e.taskOpen(ctx, g.Task) {
 			continue
 		}
-		if err := e.gates.Supersede(ctx, g.ID, task.ActorWorkflow); err != nil && !errors.Is(err, gates.ErrResolved) {
+		if err := svc.Supersede(ctx, g.ID, task.ActorWorkflow); err != nil && !errors.Is(err, gates.ErrResolved) {
 			errs = append(errs, fmt.Errorf("closing the gate of %s's held round: %w", g.Unit.Label(), err))
 		}
 	}

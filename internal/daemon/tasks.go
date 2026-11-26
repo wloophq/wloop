@@ -10,6 +10,7 @@ import (
 	"io"
 	"maps"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 	"time"
@@ -61,7 +62,10 @@ const planInputs = port.TopicPlan | port.TopicPending | port.TopicConfig
 // a draft and its items, a message (whose writes note TopicTasks) or a pending plan item.
 const gateInputs = port.TopicGates | port.TopicDrafts | port.TopicItems | port.TopicTasks | port.TopicPlan | port.TopicPending
 
-const flagInputs = planInputs | gateInputs
+// turnInputs are the notes after which a change says the turns moved: a turn sent, started, asked, answered or ended.
+const turnInputs = port.TopicTurns
+
+const flagInputs = planInputs | gateInputs | turnInputs
 
 // bridged are the handlers whose verbs a task with units runs as its unit's action when no handler takes them.
 var bridged = []string{handlerApprove, handlerDelegate, handlerDrop}
@@ -177,13 +181,26 @@ func (s *Server) buildViewsCatalog(l *intentload.Loaded) api.ViewsCatalog {
 
 // servedViews are the profile's views, in its order.
 func (s *Server) servedViews() []api.TaskViewSpec {
-	def := s.loaded().Views
+	l := s.loaded()
+	def := l.Views
 	out := []api.TaskViewSpec{}
 	for _, v := range def.Views {
 		out = append(out, api.TaskViewSpec{ID: v.ID, Label: v.Label, Summary: v.Summary, Empty: v.Empty, When: v.WhenText, Sort: v.SortText, Over: v.Over, Group: v.Group, Key: v.Key, Badge: def.Badged(v.ID), HideDisabled: v.HideDisabled,
-			RemoveClean: v.RemoveClean, Rail: v.Rail, Layout: v.Layout})
+			RemoveClean: v.RemoveClean, Rail: v.Rail, Layout: v.Layout, Opens: opens(v)})
 	}
 	return out
+}
+
+// opens is the route a page of view v opens instead of its own, as its opens names it; "" for its own.
+func opens(v intentload.ViewDef) string {
+	if v.Opens.View == "" {
+		return ""
+	}
+	route := "view=" + url.QueryEscape(v.Opens.View)
+	if v.Opens.Kind != "" {
+		route += "&kind=" + url.QueryEscape(v.Opens.Kind)
+	}
+	return route
 }
 
 func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
@@ -224,6 +241,9 @@ func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
 	if p.Pass != nil {
 		ctx = coretasks.WithPass(ctx, p.Pass)
 	}
+	ctx = coretasks.WithPage(ctx)
+	s.queueCounted(ctx, g, &p.Counters, nil)
+	page.Counters = wireCounters(p.Counters)
 	vs := s.taskViews(ctx, g, false)
 	vs.readRows(ctx, p.Tasks)
 	for _, e := range p.Tasks {
@@ -775,15 +795,21 @@ func (s *Server) handleCounters(w http.ResponseWriter, r *http.Request) {
 	ctx, q := r.Context(), r.URL.Query()
 	var c task.Counters
 	var err error
-	if text := strings.TrimSpace(q.Get(api.CountersQuery)); text == "" {
-		c, err = g.Counts(ctx, q.Get("area"))
-	} else {
-		c, err = g.CountsWhere(ctx, q.Get("area"), s.lensKeep(ctx, g, text))
-	}
+	snap, err := g.Snapshot(ctx)
 	if err != nil {
 		writeTasksError(w, err)
 		return
 	}
+	ctx = snap.Within(ctx)
+	var keep coretasks.Keep
+	if text := strings.TrimSpace(q.Get(api.CountersQuery)); text != "" {
+		keep = s.lensKeep(ctx, g, text)
+	}
+	if c, err = g.CountsWhere(ctx, q.Get("area"), keep); err != nil {
+		writeTasksError(w, err)
+		return
+	}
+	s.queueCounted(ctx, g, &c, keep)
 	writeJSON(w, wireCounters(c))
 }
 
@@ -842,20 +868,55 @@ func (s *Server) counters(ctx context.Context) *api.Counters {
 	if s.deps.Tasks == nil {
 		return nil
 	}
-	return s.countersOf(s.deps.Tasks.Counts(ctx, ""))
+	snap, err := s.deps.Tasks.Snapshot(ctx)
+	if err != nil {
+		return s.countersOf(ctx, task.Counters{}, err)
+	}
+	c, err := snap.Counts(ctx, "")
+	return s.countersOf(snap.Within(ctx), c, err)
 }
 
-func (s *Server) countersOf(c task.Counters, err error) *api.Counters {
+func (s *Server) countersOf(ctx context.Context, c task.Counters, err error) *api.Counters {
 	if err != nil {
 		s.logf("tasks: counters: %v", err)
 		return nil
 	}
+	s.queueCounted(ctx, s.deps.Tasks, &c, nil)
 	out := wireCounters(c)
 	return &out
 }
 
+// queueCounted counts the profile's queue view in c, when c counts it, as the items its queue serves over the
+// tasks keep takes in c's area, so the rail counts what the queue and the floating widget list; it reads inside
+// the pass ctx carries, which the counts were read in.
+func (s *Server) queueCounted(ctx context.Context, g *coretasks.Service, c *task.Counters, keep coretasks.Keep) {
+	l := s.loaded()
+	view := task.View(l.Views.QueueView())
+	if _, counted := c.Views[view]; g == nil || !counted {
+		return
+	}
+	take := keep
+	if area := c.Area; area != "" {
+		take = func(ctx context.Context, e task.Task) (bool, error) {
+			if e.Role(l.Tasks, task.RoleArea).Text != area {
+				return false, nil
+			}
+			if keep == nil {
+				return true, nil
+			}
+			return keep(ctx, e)
+		}
+	}
+	items, err := s.home(g).QueueAll(ctx, l.Decisions.Order, l.Decisions.Sort, take)
+	if err != nil {
+		s.logf("tasks: counting the queue: %v", err)
+		return
+	}
+	c.Views[view] = len(items)
+}
+
 func wireCounters(c task.Counters) api.Counters {
-	out := api.Counters{Area: c.Area, Views: map[string]int{}, Areas: map[string]int{}, Contexts: map[string]int{}, Badge: c.Badge}
+	out := api.Counters{Area: c.Area, Views: map[string]int{}, Areas: map[string]int{}, Contexts: map[string]int{}}
 	for v, n := range c.Views {
 		out.Views[string(v)] = n
 	}
@@ -1502,35 +1563,41 @@ func (s *Server) feedTasks(ctx context.Context) {
 }
 
 // publishTasks publishes the counters with the units c and the row changes since the last call moved, unless
-// nothing moved but rows no task holds, and says whether the plan and the gates moved by the topics of flags. A
+// nothing moved but rows no task holds, and says whether the plan, the gates and the turns moved by the topics of flags. A
 // reloaded profile moves every task, since it can change their facets.
 func (s *Server) publishTasks(ctx context.Context, c, flags port.Change) {
 	rows, all := s.moved.take()
 	var held []unit.Unit
 	var snap coretasks.Snapshot
 	err := errTasksUnavailable
-	if s.deps.Tasks == nil {
+	switch {
+	case s.deps.Tasks == nil:
 		all = false
-	} else if snap, err = s.deps.Tasks.Snapshot(ctx); err != nil {
-		s.logf("tasks feed: %v", err)
-		held = rows
-	} else {
-		held = snap.Held(rows)
+	case c.Empty() && !all && len(rows) == 0:
+		// only flags moved: nothing to list, so no pass over the tasks
+	default:
+		if snap, err = s.deps.Tasks.Snapshot(ctx); err != nil {
+			s.logf("tasks feed: %v", err)
+			held = rows
+		} else {
+			held = snap.Held(rows)
+		}
 	}
 	pos := s.hub.position()
 	ch := api.Change{Type: "changed", Epoch: pos.Epoch, Rev: pos.Rev,
-		Plan: flags.All || flags.Has(planInputs), Gates: flags.All || flags.Has(gateInputs)}
+		Plan: flags.All || flags.Has(planInputs), Gates: flags.All || flags.Has(gateInputs), Turns: flags.All || flags.Has(turnInputs)}
 	if !c.Empty() || all || len(held) > 0 {
 		ch.All = c.All || all || c.Has(port.TopicConfig)
 		if err == nil {
-			ch.Counters = s.countersOf(snap.Counts(ctx, ""))
+			c, err := snap.Counts(ctx, "")
+			ch.Counters = s.countersOf(snap.Within(ctx), c, err)
 		}
 		if !ch.All {
 			units := slices.Concat(c.Units, held)
 			slices.SortFunc(units, api.CompareUnits)
 			ch.Units = slices.Compact(units)
 		}
-	} else if !ch.Plan && !ch.Gates {
+	} else if !ch.Plan && !ch.Gates && !ch.Turns {
 		return
 	}
 	s.hub.publish(ch)

@@ -20,6 +20,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/record"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/workspace"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
@@ -203,6 +204,63 @@ func TestAFollowUpOnAMovedPullRequestReplacesTheQuestionItsReviewAsked(t *testin
 	for _, want := range []string{"nudge the author or drop?", "Drop (drop): ends the review", "This question is still open"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("the follow-up's instructions miss %q:\n%s", want, text)
+		}
+	}
+}
+
+// dueByWhen makes the rig's step a turn its workflow's when alone sends, on the unit's head head.
+func (r *startRig) dueByWhen(head string) {
+	r.st.Args["due"], r.st.Args["stage"] = builtin.TurnDueWhen, ""
+	r.units.Set(r.u, "pr.head", head)
+}
+
+func TestATurnDueByItsWhenReplacesAQuestionItsPullRequestMovedPast(t *testing.T) {
+	t.Parallel()
+	r := newStartRig(t, followupScenario(t), string(dintent.Review), "")
+	r.replacingMoved()
+	r.dueByWhen("c-new")
+	seq := r.askOn(t, string(dintent.Review), "c-gone")
+	if got := r.check(t, automation.CheckOpts{}); got != "" {
+		t.Fatalf("a question on a head the pull request moved past: %q", got)
+	}
+	if _, err := r.run(t, automation.RunOpts{}); err != nil {
+		t.Fatal(err)
+	}
+	b := r.sc.te.bookOf(t, r.sc.ref)
+	q, _ := b.ByID("q-c-gone")
+	next, ok := b.Newest(dturn.Intent(dintent.Review))
+	if q.Seq != seq || q.State != dturn.Replaced || !ok || next.Seq == seq || b.OpenQuestion(dturn.Intent(dintent.Review)) {
+		t.Fatalf("turns %+v", b.Turns)
+	}
+}
+
+func TestAQuestionOnTheUnitsHeadHoldsATurnDueByItsWhen(t *testing.T) {
+	t.Parallel()
+	for name, head := range map[string]string{"the head it was asked on": "c-asked", "an unknown head": ""} {
+		r := newStartRig(t, followupScenario(t), string(dintent.Review), "")
+		r.replacingMoved()
+		r.dueByWhen(head)
+		r.askOn(t, string(dintent.Review), "c-asked")
+		if got := r.check(t, automation.CheckOpts{}); got != "its review turn asks you something" {
+			t.Fatalf("%s: refusal %q", name, got)
+		}
+	}
+}
+
+func TestReviewDraftFailedReplacesAQuestionItsPullRequestMovedPast(t *testing.T) {
+	t.Parallel()
+	for name, head := range map[string]string{"the stored head moved": "c-new", "the stored head is the question's": "c-asked"} {
+		r := newStartRig(t, followupScenario(t), string(dintent.Review), "")
+		w := bundledWorkflow(t, r.sc.te, "review-draft-failed")
+		r.st = w.Steps[0]
+		r.units.Set(r.u, "pr.head", head)
+		r.askOn(t, string(dintent.Review), "c-asked")
+		want := "its review turn asks you something"
+		if head != "c-asked" {
+			want = ""
+		}
+		if got := r.check(t, automation.CheckOpts{}); got != want {
+			t.Fatalf("%s: refusal %q, want %q", name, got, want)
 		}
 	}
 }

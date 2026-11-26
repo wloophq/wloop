@@ -91,6 +91,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `nonProse` entry | Status | Reason |
 |---|---|---|
 | `(prefers-color-scheme: dark)` | ✅ | a CSS media query |
+| `(prefers-reduced-motion: reduce)` | ✅ | a CSS media query |
 | `Accept` | ✅ | an HTTP header name |
 | `Alt` | ✅ | KeyboardEvent.key |
 | `Backspace` | ✅ | KeyboardEvent.key |
@@ -102,6 +103,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `Enter` | ✅ | KeyboardEvent.key |
 | `Esc` | ✅ | the Escape key's name as the served bindings spell it |
 | `Escape` | ✅ | KeyboardEvent.key |
+| `Float` | ✅ | the suffix of the floating widget's window property after the brand's command |
 | `GET` | ✅ | an HTTP method |
 | `Home` | ✅ | KeyboardEvent.key |
 | `Meta` | ✅ | KeyboardEvent.key |
@@ -121,21 +123,24 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `Backspace` | ✅ | a key's name as the served bindings spell it |
 | `Enter` | ✅ | a key's name as the served bindings spell it |
 | `Esc` | ✅ | a key's name as the served bindings spell it |
-| `PR` | ✅ | the status item's mark before its first count, the same in every language |
+| `Float` | ✅ | the suffix of the floating widget's window property after the brand's command |
 | `Tab` | ✅ | a key's name as the served bindings spell it |
 | `answer` | ✅ | an action's id |
 | `app` | ✅ | the name the app subscribes to the daemon's events as |
 | `apply` | ✅ | a plan action's handler |
 | `blocked` | ✅ | a plan decision the API serves |
+| `blur` | ✅ | a method of the floating widget's page bridge the host calls |
 | `capture` | ✅ | a command's action id |
 | `detached ` | ✅ | a native window's internal name prefix, never shown |
 | `detail` | ✅ | a command's action id |
 | `dismiss` | ✅ | a plan action's handler |
 | `draft` | ✅ | a reply's send mode an action takes |
+| `drawsBackground` | ✅ | the key of a web view's own background in AppKit's key-value coding |
 | `edit` | ✅ | a draft verb's handler |
 | `filter` | ✅ | a core action's id |
 | `guide` | ✅ | a plan action's handler |
 | `help` | ✅ | a core action's id |
+| `leave` | ✅ | a method of the floating widget's page bridge the host calls |
 | `main` | ✅ | a native window's internal name, never shown |
 | `makeKeyWindow` | ✅ | an AppKit selector |
 | `match` | ✅ | a command's action id |
@@ -146,6 +151,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `palette` | ✅ | a core action's id |
 | `panel` | ✅ | a native window's internal name, never shown |
 | `pending` | ✅ | a plan decision the API serves |
+| `place` | ✅ | a method of the floating widget's page bridge the host calls |
 | `plan` | ✅ | the plan tab's key |
 | `quit` | ✅ | a core action's id |
 | `retry` | ✅ | a draft verb's handler |
@@ -154,6 +160,8 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `running` | ✅ | an app state the status API takes |
 | `sequential` | ✅ | a project verb's handler |
 | `session` | ✅ | the delegate prompt's mode |
+| `show` | ✅ | a method of the floating widget's page bridge the host calls |
+| `shown` | ✅ | a method of the floating widget's page bridge the host calls |
 | `sweep` | ✅ | a job the daemon triggers |
 | `true` | ✅ | a flag's value an action takes |
 | `tui` | ✅ | the terminal client's name as an events subscriber and a surface |
@@ -162,6 +170,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `nonProse` entry | Status | Reason |
 |---|---|---|
 | `(prefers-color-scheme: dark)` | ✅ | a CSS media query |
+| `(prefers-reduced-motion: reduce)` | ✅ | a CSS media query |
 | `Accept` | ✅ | an HTTP header name |
 | `Alt` | ✅ | KeyboardEvent.key |
 | `Backspace` | ✅ | KeyboardEvent.key |
@@ -173,6 +182,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `Enter` | ✅ | KeyboardEvent.key |
 | `Esc` | ✅ | the Escape key's name as the served bindings spell it |
 | `Escape` | ✅ | KeyboardEvent.key |
+| `Float` | ✅ | the suffix of the floating widget's window property after the brand's command |
 | `GET` | ✅ | an HTTP method |
 | `Home` | ✅ | KeyboardEvent.key |
 | `Meta` | ✅ | KeyboardEvent.key |
@@ -219,7 +229,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/cli/launcher.go` `cliLauncher.Launch` `pr.RefOf` `1` | 🧾 | the launcher reads a pull request's workspace outside the plugin |
 | `internal/cli/launcher.go` `githubRef` `pr.Codec{}.Provider` `1` | 🧾 | the launcher reads a pull request's workspace outside the plugin |
 | `internal/cli/launcher.go` `isPR` `pr.RefOf` `1` | 🧾 | the launcher reads a pull request's workspace outside the plugin |
-| `internal/cli/serve_ended.go` `openPRBooks.Books` `pr.RefOf` `1` | 🧾 | the ended turns' books are pull requests |
+| `internal/cli/serve_ended.go` `openPRBooks.read` `pr.RefOf` `1` | 🧾 | the ended turns' books are pull requests |
 
 ### `TestProviderIdsInStringsOutsideThePluginsOnlyShrink`
 

@@ -53,6 +53,7 @@ type hotPlan struct {
 }
 
 var hotPlans = []hotPlan{
+	{name: "timeline of turns", query: timelineSQL, args: 1, want: []string{"MULTI-INDEX OR", "turns_ended_at", "turns_open"}},
 	{name: "book of a turn", query: bookOfTurn, args: 1, want: []string{"SEARCH turns USING INDEX turns_turn_id (turn_id=?)"}},
 	{name: "book of a round and a handle", query: bookOfBoth, args: 3, want: []string{"turns_turn_id"}},
 	{name: "book of a handle", query: bookOfHandle, args: 2, want: []string{"turns_session (session=?)", "turns_sent_to (sent_to=?)"}},

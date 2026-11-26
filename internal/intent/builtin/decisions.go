@@ -29,6 +29,14 @@ func DecisionKinds() []Value {
 	return out
 }
 
+// DecisionSorts are the ways the queue of every kind lists its items.
+func DecisionSorts() []Value {
+	return []Value{
+		{Name: string(decision.SortKind), Doc: "By kind, in order; within a kind, oldest decision first."},
+		{Name: string(decision.SortNewest), Doc: "Every item, newest decision first, whatever its kind."},
+	}
+}
+
 func decisionKindNames() []string {
 	out := make([]string, len(decision.Kinds))
 	for i, k := range decision.Kinds {
@@ -49,6 +57,10 @@ func pluralText(s Surface, path, doc string) []Key {
 
 var decisionsGrammar = slices.Concat([]Key{
 	{Path: "open", In: SurfaceDecisions, Kind: KindText, Localized: true, Doc: "What a queue's button that opens a unit at its source says; only the default layer's file sets it."},
+	{Path: "order", In: SurfaceDecisions, Kind: KindList, Elem: KindEnum, Values: DecisionKinds, Doc: "The order of the decision kinds in the queue of every kind, each once; a kind it leaves out comes after the listed ones. Under sort \"kind\", items of one kind follow, oldest decision first. Only the default layer's file sets it."},
+	{Path: "sort", In: SurfaceDecisions, Kind: KindEnum, Values: DecisionSorts, Default: string(decision.SortKind), Doc: "How the queue of every kind lists its items. Only the default layer's file sets it."},
+	{Path: "queue_all", In: SurfaceDecisions, Kind: KindText, Localized: true, Doc: "The title of the queue of every kind; only the default layer's file sets it."},
+	{Path: "empty_all", In: SurfaceDecisions, Kind: KindText, Localized: true, Doc: "What the queue of every kind says when it holds nothing; only the default layer's file sets it."},
 	{Path: "gates", In: SurfaceDecisions, Kind: KindTable, Doc: "The decision kind of an open gate, by gate kind; only the default layer's file maps gates."},
 	{Path: "gates.*", In: SurfaceDecisions, Kind: KindEnum, Values: DecisionKinds, Doc: "One gate kind's decision kind."},
 	{Path: "situations", In: SurfaceDecisions, Kind: KindTable, Doc: "The decision kind of a unit in a situation its plugin derives, by situation; only a plugin's layer maps them."},
@@ -63,5 +75,6 @@ var decisionsGrammar = slices.Concat([]Key{
 	{Path: "kinds.*.primary", In: SurfaceDecisions, Kind: KindText, Doc: "The gate intent a queue offers first on a gate of the kind; empty offers the gate's first."},
 	{Path: "kinds.*.queue", In: SurfaceDecisions, Kind: KindText, Localized: true, Required: true, Doc: "The title of the kind's queue. Required."},
 	{Path: "kinds.*.empty", In: SurfaceDecisions, Kind: KindText, Localized: true, Required: true, Doc: "What the kind's queue says when it holds nothing. Required."},
+	{Path: "kinds.*.tone", In: SurfaceDecisions, Kind: KindEnum, Values: tokenTones, Default: DefaultTone, Doc: "The design token the floating widget draws the kind's items in, such as \"late\" for plans."},
 }, pluralText(SurfaceDecisions, "kinds.*.noun", "What one of the kind's tasks is, which the briefing counts, such as \"question\"."),
 	pluralText(SurfaceDecisions, "kinds.*.clause", "The briefing's clause on the kind, `{counter}` where its count goes, such as \"the agent has {counter} for you\"."))

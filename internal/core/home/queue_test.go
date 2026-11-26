@@ -49,13 +49,24 @@ func TestQueueOldestFirstOneItemPerDecision(t *testing.T) {
 func TestQueuePrimaryForGateIsFirstIntent(t *testing.T) {
 	e := task.Task{ID: "t-a"}
 	for intents, want := range map[string]string{"approve,edit": "approve", "edit,send": "send"} {
-		g := &gate.Gate{ID: 9, Kind: gate.KindDraft, Intents: strings.Split(intents, ",")}
+		g := &gate.Gate{ID: 9, Kind: gate.KindDraft, Status: gate.Open, Intents: strings.Split(intents, ",")}
 		d := fakeDecisions{"t-a": {{Kind: decision.SendDraft, Gate: g, Since: t0}}}
 		s := home.Service{Lists: &fakeLists{sets: map[task.View][]task.Task{"decide-send-draft": {e}}}, Decisions: d, Words: queueWords()}
 		q, _ := s.Queue(context.Background(), decision.SendDraft, nil)
 		if p := q.Items[0].Primary; p.Kind != "gate" || p.ID != want {
 			t.Errorf("intents %s: primary %+v, want gate %s", intents, p, want)
 		}
+	}
+}
+
+func TestQueuePrimaryOfAnUndeliveredDraftRetries(t *testing.T) {
+	e := task.Task{ID: "t-a"}
+	g := &gate.Gate{ID: 9, Kind: gate.KindDraft, Status: gate.Approved, Intents: []string{"approve", "discard"}}
+	d := fakeDecisions{"t-a": {{Kind: decision.SendDraft, Gate: g, Since: t0}}}
+	s := home.Service{Lists: &fakeLists{sets: map[task.View][]task.Task{"decide-send-draft": {e}}}, Decisions: d, Words: queueWords()}
+	q, _ := s.Queue(context.Background(), decision.SendDraft, nil)
+	if p := q.Items[0].Primary; p.Kind != home.ActionRetry {
+		t.Fatalf("primary %+v, want a retry: its gate is approved already", p)
 	}
 }
 
@@ -124,5 +135,26 @@ func TestHomeCounterCountsTheDecisionsItsQueueLists(t *testing.T) {
 	}
 	if c := h.Counts[0]; c.Label != "2 alpha drafts and 2 beta drafts" {
 		t.Fatalf("label %q: each plugin's share counts its decisions", c.Label)
+	}
+}
+
+func TestQueueItemWordsItsNounAsTheCountersDoAndCarriesItsKindsTone(t *testing.T) {
+	w := words()
+	lw := w.kinds[decision.LastStep]
+	lw.Tone = "late"
+	w.kinds[decision.LastStep] = lw
+	d := fakeDecisions{
+		"t-a": {{Kind: decision.LastStep, Unit: unit.Unit{Provider: "alpha", Key: "x"}, Since: t0}},
+		"t-b": {{Kind: decision.LastStep, Unit: unit.Unit{Provider: "gamma", Key: "y"}, Since: t0.Add(time.Hour)}},
+		"t-c": {{Kind: decision.LastStep, Gate: &gate.Gate{ID: 4, Intents: []string{"done"}}, Since: t0.Add(2 * time.Hour)}},
+	}
+	s := home.Service{Lists: &fakeLists{sets: map[task.View][]task.Task{"decide-last-step": {{ID: "t-a"}, {ID: "t-b"}, {ID: "t-c"}}}}, Decisions: d, Words: w}
+	q, _ := s.Queue(context.Background(), decision.LastStep, nil)
+	var got []string
+	for _, it := range q.Items {
+		got = append(got, it.Word+"/"+it.Tone)
+	}
+	if want := []string{"alpha item/late", "item/late", "item/late"}; !slices.Equal(got, want) {
+		t.Fatalf("words %v, want %v: a plugin's noun for its units, the kind's for the rest", got, want)
 	}
 }

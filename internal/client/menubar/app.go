@@ -54,6 +54,7 @@ type Daemon interface {
 	Plugins(ctx context.Context) ([]api.Plugin, error)
 	Views(ctx context.Context) (api.ViewsCatalog, error)
 	Counters(ctx context.Context, area, query string) (api.Counters, error)
+	QueueAll(ctx context.Context, query string) (api.Queue, error)
 }
 
 type Config struct {
@@ -67,6 +68,21 @@ type Config struct {
 	// Window shows the cockpit's own window at a route; nil opens the
 	// browser at CockpitURL instead.
 	Window func(route string) error
+	// Float turns the floating widget on, shown and hidden through
+	// ShowFloat and HideFloat; off unless the configuration turns it on.
+	Float     bool
+	ShowFloat func() error
+	HideFloat func()
+	// FloatReady says whether the float shows a page that has reported in,
+	// so it carries what waits on the user; nil takes every shown float as
+	// ready.
+	FloatReady func() bool
+	// Defaults keeps the float's visibility across launches; nil keeps it
+	// for this run only.
+	Defaults window.Defaults
+	// FloatMorning is the local "HH:MM" a snooze until tomorrow ends at,
+	// window.float_morning.
+	FloatMorning string
 	// Reword gets each catalog of client strings the daemon serves, as the
 	// strings change; nil rewords nothing.
 	Reword func(*texts.Catalog)
@@ -105,8 +121,14 @@ type Controller struct {
 	// plugins are the served plugins, read with the sections.
 	plugins []api.Plugin
 	tasks   map[string][]api.TaskView
-	// taskViews are the views the menu lists first: those the profile's badge counts.
+	// taskViews are the views whose tasks notify: those the profile's badge names.
 	taskViews []api.TaskViewSpec
+	// needs is what waits on the user, the queue of every decision kind, which the menu lists first.
+	needs api.Queue
+	// queueRead says the last pullTasks read the queue; queueErr is why the last read of it failed, "" when it did
+	// not, so each reason is logged once.
+	queueRead bool
+	queueErr  string
 	counters  *api.Counters
 	// tasksLoading and rowsLoading are the plugins the last pages of tasks and of rows said are still
 	// loading.
@@ -117,6 +139,26 @@ type Controller struct {
 	catalog atomic.Pointer[texts.Catalog]
 	// stringsStamp is the health's stamp of the strings catalog holds, under refreshMu.
 	stringsStamp string
+
+	// drawn says the last refresh drew the menu, under refreshMu.
+	drawn bool
+
+	floatMu sync.Mutex
+	vis     Visibility
+	// seen are the keys of the queue's items on its last read, nil before
+	// the first, under floatMu.
+	seen map[string]bool
+	// started says the saved visibility loaded, running that Run runs, and
+	// stopped that it ended; all under floatMu.
+	started, running, stopped bool
+	// wake stops the timer of the snooze, under floatMu.
+	wake chan struct{}
+	// loadAt is when the float's page was last asked to show, and quit ends
+	// the grace's timer as Run ends; both under floatMu.
+	loadAt time.Time
+	quit   chan struct{}
+	// bg are the goroutines Run starts and the float's, which Run waits on.
+	bg sync.WaitGroup
 }
 
 // words is the client strings the menu and the notes read.
@@ -192,10 +234,13 @@ func (c *Controller) Run(ctx context.Context) error {
 	c.mu.Lock()
 	c.ctx = ctx
 	c.mu.Unlock()
+	defer c.stopFloat()
 	c.cfg.Notifier.WithdrawAll()
 	c.forgetSent()
+	c.StartFloat()
+	c.runFloat()
 	if c.cfg.DigestAt != "" {
-		go c.digests(ctx)
+		c.bg.Go(func() { c.digests(ctx) })
 	}
 	go func() {
 		if _, err := c.cfg.Notifier.Authorize(ctx); err != nil && ctx.Err() == nil {
@@ -337,6 +382,7 @@ func (c *Controller) refresh(ctx context.Context, health, rows bool) {
 	if err == nil {
 		err = c.loadSpecs(ctx, shown)
 	}
+	c.drawn = err == nil
 	if err != nil {
 		if h, herr := c.cfg.Daemon.Health(ctx); herr == nil && h.Store != nil && h.Store.State != api.StoreOK {
 			c.cfg.Tray.SetTitle(c.words().T("{name} !", map[string]any{"name": brand.Name}))
@@ -352,6 +398,7 @@ func (c *Controller) refresh(ctx context.Context, health, rows bool) {
 		})
 		return
 	}
+	c.floatRefreshed(rows && c.queueRead)
 	c.cfg.Tray.SetTitle(c.title())
 	c.cfg.Tray.SetMenu(c.menu(c.health))
 	c.notify()
@@ -472,10 +519,8 @@ func (c *Controller) menu(h api.Health) []MenuItem {
 		open = w.T("Open in {manager}", map[string]any{"manager": h.WorkspaceManagers[0]})
 	}
 	items = append(items, c.loadingItems()...)
-	for _, v := range c.taskViews {
-		items = append(items, c.taskSection(v.Label, v.ID)...)
-		items = append(items, MenuItem{Separator: true})
-	}
+	items = append(items, c.needsSection()...)
+	items = append(items, MenuItem{Separator: true})
 	for _, sec := range c.sections {
 		items = append(items, c.section(sec.Label, sec.View, c.set.View(sec.View), open)...)
 		items = append(items, MenuItem{Separator: true})
@@ -484,6 +529,7 @@ func (c *Controller) menu(h api.Health) []MenuItem {
 		MenuItem{Title: w.T("Open cockpit", nil), Enabled: true, Action: c.later(func(ctx context.Context) error { return c.open(window.HomeRoute) })},
 		MenuItem{Title: w.T("Sweep now", nil), Enabled: true, Action: c.later(func(ctx context.Context) error { return c.cfg.Daemon.Trigger(ctx, "sweep") })},
 	)
+	items = append(items, c.floatItem()...)
 	pause := MenuItem{Title: w.T("Pause automatic rounds", nil), Enabled: true, Action: c.later(func(ctx context.Context) error { return c.cfg.Daemon.SetPause(ctx, api.PauseRequest{Paused: true}) })}
 	if h.Paused {
 		pause = MenuItem{Title: w.T("Resume automatic rounds", nil), Enabled: true, Action: c.later(func(ctx context.Context) error { return c.cfg.Daemon.SetPause(ctx, api.PauseRequest{Paused: false}) })}

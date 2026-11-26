@@ -18,6 +18,9 @@ const (
 
 var statusItemAutosaveName = brand.LaunchAgent() + ".status"
 
+// trayStartTitle is what the menu bar shows until the first count arrives.
+var trayStartTitle = brand.Name
+
 type tray struct {
 	item objc.ID
 }
@@ -29,7 +32,7 @@ func newTray() *tray {
 	item.Send(sel("setBehavior:"), statusItemBehaviorRemovable)
 	// NSStatusBar does not retain the item.
 	item.Send(sel("retain"))
-	item.Send(sel("button")).Send(sel("setTitle:"), nsString("PR"))
+	item.Send(sel("button")).Send(sel("setTitle:"), nsString(trayStartTitle))
 	return &tray{item: item}
 }
 

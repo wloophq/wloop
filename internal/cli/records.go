@@ -44,8 +44,8 @@ type namedGates struct {
 
 func (n namedGates) OpenNamed(ctx context.Context, name string, g gate.Gate) (gate.Gate, error) {
 	g.Name, g.Kind, g.Intents = name, "", nil
-	if n.e.messages != nil && n.e.messages.Gates != nil {
-		return n.e.messages.OpenMissing(ctx, g)
+	if svc := n.e.inbox(); svc != nil && svc.Gates != nil {
+		return svc.OpenMissing(ctx, g)
 	}
 	return n.e.newGates(n.db, nil).Open(ctx, g, nil)
 }

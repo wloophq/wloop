@@ -181,6 +181,17 @@ type startPlan struct {
 
 func (p startPlan) observed() bool { return p.round && p.planned.Observed }
 
+// head is the head the round runs on: its plan's for a round of the plan, else the unit's as stored, "" unknown.
+func (p startPlan) head() string {
+	if p.round {
+		return p.planned.Head
+	}
+	if p.args.dueByWhen {
+		return factString(p.facts, "pr.head")
+	}
+	return ""
+}
+
 // address is why the plan's address round runs now; nil for other rounds.
 func (p startPlan) address(now time.Time) *turn.RoundReason {
 	if p.args.def.RoundKind != builtin.RoundKindAddress {
@@ -367,8 +378,8 @@ func (s *stepSet) activity(ctx context.Context, p startPlan, byHand bool) string
 
 // asks refuses a round whose intent's newest turn asks the user something:
 // the round would replace the turn the agent finishes with the answer. A
-// step that replaces a moved question lets a round planned on another head
-// replace one no answer is on its way to.
+// step that replaces a moved question lets a round on another head replace
+// one no answer is on its way to.
 func (s *stepSet) asks(ctx context.Context, c stepCall, p *startPlan) (string, error) {
 	if s.e.Turns == nil {
 		return "", nil
@@ -387,10 +398,10 @@ func (s *stepSet) asks(ctx context.Context, c stepCall, p *startPlan) (string, e
 	switch {
 	case b.QuestionAnswered(intent):
 		why = turns.AnswerOnItsWay(intent)
-	case p.round && c.arg("open_question") == builtin.QuestionReplaceIfMoved && b.QuestionMoved(intent, p.planned.Head):
+	case c.arg("open_question") == builtin.QuestionReplaceIfMoved && b.QuestionMoved(intent, p.head()):
 		return "", nil
 	}
-	s.holdByQuestion(c.u, questionHold{refusal: why, head: p.planned.Head})
+	s.holdByQuestion(c.u, questionHold{refusal: why, head: p.head()})
 	return why, nil
 }
 

@@ -34,6 +34,14 @@ func (p *pins) Pinning(ctx context.Context, d gate.Gate) (gate.Gate, string, int
 	return q, "Approve (option a)", 3, err == nil && q.Status == gate.Open, err
 }
 
+func (p *pins) PinnedDrafts(ctx context.Context) (map[int64]int64, error) {
+	q, err := p.store.Get(ctx, p.question)
+	if err != nil || q.Status != gate.Open {
+		return nil, err
+	}
+	return map[int64]int64{42: 1}, nil
+}
+
 func pickFixture(t *testing.T) (fixture, gate.Gate, gate.Gate) {
 	t.Helper()
 	return pickFixtureAsked(t, "s-worker")

@@ -83,7 +83,7 @@ func (d taskEnding) Ended(ctx context.Context, t task.Task, v task.Verb, by task
 			ob.Log("drafts of ended task %s: %v", t.ID, err)
 		}
 	}
-	if g := d.e.gates; g != nil {
+	if g, _ := d.e.builtGates(); g != nil {
 		at := t.Updated
 		if at.IsZero() {
 			at = d.e.Now()

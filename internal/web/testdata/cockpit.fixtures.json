@@ -3915,6 +3915,16 @@
  "views": {
   "views": [
    {
+    "id": "needs-you",
+    "label": "Needs you",
+    "summary": "What waits on you, one decision at a time: questions first, then drafts to send, plans, steps and the rest.",
+    "empty": "Nothing needs you.",
+    "sort": "task.decision_since",
+    "over": "tasks",
+    "rail": false,
+    "layout": "queue"
+   },
+   {
     "id": "inbox",
     "label": "Inbox",
     "summary": "What nobody has clarified yet; once clarified, a task leaves for good.",

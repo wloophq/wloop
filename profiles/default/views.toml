@@ -1,9 +1,10 @@
 # The lists of tasks and gates, in the order clients list them: each
 # view's when says what it lists, over the facts of a task (or of a gate,
 # with over = "gates"), and its key jumps to it. The review walks the
-# views its steps name, in order; the badge adds up the counts of the
-# views it names. A user profile's views.toml replaces the keys it sets
-# and adds its own views and steps after these.
+# views its steps name, in order; the badge names the views whose tasks
+# notify, the daily digest counts and status lists. A user profile's
+# views.toml replaces the keys it sets and adds its own views and steps
+# after these.
 
 empty = "Nothing in {{.label}} right now."
 
@@ -369,6 +370,18 @@ fact  = "draft.created_at"
 label = "Written"
 sort  = "time"
 
+# Needs you is drawn as the queue of every decision kind. With no when of
+# its own it lists the tasks of the views decisions.toml's kinds name, so
+# it lists what the queue walks.
+[views.needs-you]
+label         = "Needs you"
+summary       = "What waits on you, one decision at a time: questions first, then drafts to send, plans, steps and the rest."
+empty         = "Nothing needs you."
+key           = "g q"
+sort          = "task.decision_since"
+layout        = "queue"
+hide_disabled = true
+
 [views.inbox]
 label         = "Inbox"
 summary       = "What nobody has clarified yet; once clarified, a task leaves for good."
@@ -501,6 +514,7 @@ over          = "gates"
 when          = "gate.kind == 'draft' && (gate.status == 'open' || gate.delivery in ['sending', 'failed'])"
 hide_disabled = true
 layout        = "outbox"
+opens         = { view = "needs-you", kind = "send-draft" }
 group         = "draft.proposer"
 sort          = "draft.created_at"
 
@@ -517,8 +531,9 @@ label         = "Review"
 summary       = "The weekly review: walk each step until the lists are clean."
 key           = "g r"
 
-# The home's sections and the decision queues. The rail leaves
-# them out; decisions.toml names each kind's view.
+# The home's sections and each decision kind's view, which Needs you
+# walks one kind after another. The rail leaves them out;
+# decisions.toml names each kind's view.
 [views.home-blocked]
 label         = "Blocked by you"
 summary       = "Tasks that wait on you: a gate to decide or someone's ask, the longest owed first."

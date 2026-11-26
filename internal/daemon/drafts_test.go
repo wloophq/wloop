@@ -623,7 +623,7 @@ func TestOutboxViewListsOpenDrafts(t *testing.T) {
 		!slices.Equal(e.UnitLabels, []string{"acme/api#7"}) {
 		t.Fatalf("task %+v", e)
 	}
-	if p.Counters.Views["outbox"] != 2 || p.Counters.Badge != p.Counters.Views["inbox"]+p.Counters.Views["needs-me"] {
+	if p.Counters.Views["outbox"] != 2 {
 		t.Fatalf("counters %+v", p.Counters)
 	}
 	var c api.Counters

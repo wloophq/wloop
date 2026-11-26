@@ -63,6 +63,9 @@ func testAgents() map[string]turns.Agent { return map[string]turns.Agent{"echo":
 // failedDraftFacts are the facts of a unit's failed drafts, over drafts.
 func failedDraftFacts(drafts draftLister) unitFacter { return factdrafts.Provider{Drafts: drafts} }
 
+// draftFactStates are the states of the drafts failedDraftFacts lists.
+var draftFactStates = factdrafts.States
+
 func defaultAgents() map[string]agentEntry {
 	return map[string]agentEntry{"claude": {
 		Kind:     claude.Agent{Sh: claude.Shell, AskSh: claude.Exec, UserHome: config.Home()},
@@ -379,6 +382,7 @@ func (e *Env) taskFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (b
 		Wakes:      db.Wakes(),
 		Links:      e.linkState,
 		Decisions:  func() decision.Map { return e.loadedIntents().Decisions.Map },
+		Pinned:     e.pinnedDrafts,
 		Extraction: psource.NewSnapshots(db.Snapshots()).Unextracted,
 		RoleProp: func(r task.Role) string {
 			name, _ := e.loadedIntents().Tasks.PropOf(r)
@@ -395,6 +399,16 @@ func (e *Env) taskFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (b
 			Unrelates: verbsHandledBy(e.loadedIntents, coretasks.HandlerUnrelate), Events: db.EventsOfKinds},
 		Clarity: facttask.ClarityDeps{Shaping: shapingVerbs(e.loadedIntents), ByHand: db.TasksRunByHand},
 	})
+}
+
+// pinnedDrafts are the drafts an open message pins, as the daemon's gates service says; none before the
+// service is built.
+func (e *Env) pinnedDrafts(ctx context.Context) (map[int64]int64, error) {
+	svc, _ := e.builtGates()
+	if svc == nil {
+		return nil, nil
+	}
+	return svc.Pinned(ctx)
 }
 
 // linkState is what the daemon's read model holds of u for the task facts; nothing before the daemon is built.

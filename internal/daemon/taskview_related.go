@@ -29,7 +29,11 @@ func (ev *taskViewer) taskOf(ctx context.Context, id task.ID) (task.Task, bool, 
 	if r, seen := ev.refs[id]; seen {
 		return r.t, r.ok, nil
 	}
-	o, err := ev.g.Task(ctx, id)
+	o, held := coretasks.PageTask(ctx, id)
+	var err error
+	if !held {
+		o, err = ev.g.Task(ctx, id)
+	}
 	if err != nil && !errors.Is(err, coretasks.ErrNoTask) {
 		return task.Task{}, false, err
 	}

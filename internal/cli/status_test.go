@@ -15,7 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
-// statusDaemon serves the views catalog, whose badge counts inbox and needs-me, the tasks of each view, and rows.
+// statusDaemon serves the views catalog, whose badge names inbox and needs-me, the tasks of each view, and rows.
 func statusDaemon(t *testing.T, tasks map[string][]api.TaskView, rows []api.Row) string {
 	t.Helper()
 	mux := http.NewServeMux()

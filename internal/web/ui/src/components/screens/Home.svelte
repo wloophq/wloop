@@ -6,7 +6,8 @@
   import { capture } from "./screen";
 
   // The home: the briefing the daemon words, its counters as links to their queues or views, the first rows of its
-  // sections and the capture field. The daemon decides every word and count; this only draws them.
+  // sections, or the first items of the queue a section of the queue's view lists, and the capture field. The
+  // daemon decides every word, count and order; this only draws them.
   let { hidden = false }: { hidden?: boolean } = $props();
 
   const home = $derived(homeState.home);
@@ -63,18 +64,22 @@
             onkeydown={onCapture} />{#if c.key}<kbd class="capture-key">{c.key}</kbd>{/if}
         </form>
         {#each home.sections || [] as s (s.id)}
-          {@const rows = s.rows || []}
+          {@const rows = s.items ? s.items.map((it: J) => it.task) : s.rows || []}
           <section class="home-section" data-section={s.id} aria-label={s.label}>
             <header class="home-head">
               <h2>{s.label}</h2>
               {#if s.total > rows.length}<a class="see-all" href={"#view=" + encodeURIComponent(s.view)} data-focus={"home:all:" + s.id}>{tn("See all {n}", s.total)}</a>{/if}
             </header>
-            {#if rows.length}
+            {#if s.items && rows.length}
+              <div class="rows">
+                {#each s.items as it, i (i)}<div class="home-item"><span class="item-kind">{it.word}</span><ScreenRow task={it.task} view={s.view} /></div>{/each}
+              </div>
+            {:else if rows.length}
               <div class="rows">
                 {#each rows as e (e.id)}<ScreenRow task={e} view={s.view} />{/each}
               </div>
             {:else}
-              <p class="empty">{t("Nothing here right now.")}</p>
+              <p class="empty">{s.empty || t("Nothing here right now.")}</p>
             {/if}
           </section>
         {/each}

@@ -55,6 +55,8 @@ export const PLAN = "plan";
 export const RECENT = "recent";
 export const EXPLORE = "explore";
 export const DASH = "dash";
+// KIND is the parameter that narrows a view drawn as the queue to one decision kind.
+export const KIND = "kind";
 // QUEUE_LIST is the queue of the tasks a route's ids name, in their order; QUEUE_IDS_MAX the most it takes.
 export const QUEUE_LIST = "list";
 export const QUEUE_IDS_MAX = 200;
@@ -85,6 +87,7 @@ export function routeParams(hash: string): URLSearchParams {
 export interface Route {
   view: string;
   queue: string;
+  kind: string;
   ids: string[];
   unit: string;
   task: string;
@@ -104,6 +107,7 @@ export function readRoute(hash: string): Route {
   return {
     view: routeView(p),
     queue: (p.get("queue") || "").slice(0, 100),
+    kind: (p.get(KIND) || "").slice(0, 100),
     ids: (p.get("ids") || "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, QUEUE_IDS_MAX),
     unit: routeUnitKey(p.get("unit")),
     task: (p.get("task") || "").slice(0, 200),
@@ -119,3 +123,13 @@ export function readRoute(hash: string): Route {
 // routeItem is the item a route's detail shows, the task before the unit, as the window controller reads it;
 // "" when it names none.
 export const routeItem = (r: Route): string => (r.task ? "task:" + r.task : r.unit ? "unit:" + r.unit : "");
+
+// FLOAT_ROUTES are the floating widget's two pages, each in a native panel of its own beside the cockpit: the tab,
+// and the panel the host places beside it.
+export const FLOAT_ROUTES = { tab: "/float/tab", panel: "/float/panel" } as const;
+
+// floatRole is which of the floating widget's pages hash opens, "" for none.
+export function floatRole(hash: string): "tab" | "panel" | "" {
+  const route = String(hash || "").replace(/^#/, "").split(/[?&]/)[0];
+  return route === FLOAT_ROUTES.tab ? "tab" : route === FLOAT_ROUTES.panel ? "panel" : "";
+}

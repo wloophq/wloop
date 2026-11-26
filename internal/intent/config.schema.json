@@ -902,6 +902,30 @@
           "description": "Show the cockpit in the app's own window on macOS; false opens it in the browser.",
           "type": "boolean"
         },
+        "float": {
+          "default": "off",
+          "description": "on shows the floating widget, which carries what waits on you: no Needs you banner posts while it is hidden for a while, or shown with a page that has loaded; they post while it is off, and while a shown widget's page has not loaded once a few seconds have passed since it was asked to. Needs the app's own window.",
+          "enum": [
+            "on",
+            "off"
+          ],
+          "type": "string"
+        },
+        "float_hotkey": {
+          "default": "cmd+option+.",
+          "description": "The global shortcut that hides the floating widget until something new arrives, and shows it again, such as cmd+shift+j; empty for none. Bound only while window.float is on. The default leaves out ctrl+option, VoiceOver's modifier.",
+          "type": "string"
+        },
+        "float_morning": {
+          "default": "09:00",
+          "description": "The local HH:MM at which Hide until tomorrow shows the floating widget again.",
+          "type": "string"
+        },
+        "float_over_full_screen": {
+          "default": false,
+          "description": "The floating widget shows over a full-screen app or a presentation too; off, it stays off a full-screen space.",
+          "type": "boolean"
+        },
         "hotkey": {
           "default": "ctrl+option+space",
           "description": "The global shortcut that opens the omnibox panel, such as cmd+shift+space; empty for none.",

@@ -165,8 +165,8 @@ func TestCountsKeepBadgeAndReviewViewsOffTheRail(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.Badge != 2 || c.Views["badged-ready"] != 2 || c.Views["reviewed-ready"] != 2 {
-		t.Fatalf("badge %d views %v: a view the badge or a review step names counts, on the rail or off it", c.Badge, c.Views)
+	if c.Views["badged-ready"] != 2 || c.Views["reviewed-ready"] != 2 {
+		t.Fatalf("views %v: a view the badge or a review step names counts, on the rail or off it", c.Views)
 	}
 }
 

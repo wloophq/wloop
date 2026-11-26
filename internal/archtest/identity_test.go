@@ -22,7 +22,7 @@ var pluginIdentityAllowlist = []providerSite{
 	{"internal/cli/launcher.go", "githubRef", "pr.Codec{}.Provider", 1, "debt: the launcher reads a pull request's workspace outside the plugin"},
 	{"internal/cli/launcher.go", "cliLauncher.Launch", "pr.RefOf", 1, "debt: the launcher reads a pull request's workspace outside the plugin"},
 	{"internal/cli/launcher.go", "isPR", "pr.RefOf", 1, "debt: the launcher reads a pull request's workspace outside the plugin"},
-	{"internal/cli/serve_ended.go", "openPRBooks.Books", "pr.RefOf", 1, "debt: the ended turns' books are pull requests"},
+	{"internal/cli/serve_ended.go", "openPRBooks.read", "pr.RefOf", 1, "debt: the ended turns' books are pull requests"},
 }
 
 // pluginIdentity flags, outside the providers' homes and the GitHub

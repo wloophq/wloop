@@ -145,6 +145,13 @@ export function viewSpec(id: string, cat: J = tasksState.catalog): J {
   return coreViews(cat).find((v) => v.id === id) || null;
 }
 
+// QUEUE_LAYOUT is the served layout of a view drawn as the queue of every decision kind, whatever the view's id.
+export const QUEUE_LAYOUT = "queue";
+
+export function isQueueView(id: string, cat: J = tasksState.catalog): boolean {
+  return (viewSpec(id, cat) || {}).layout === QUEUE_LAYOUT;
+}
+
 // viewLabel is the profile's word for a core view.
 export function viewLabel(view: string): string {
   return (coreViews().find((v) => v.id === view) || {}).label || view;

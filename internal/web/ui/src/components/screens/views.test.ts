@@ -298,16 +298,11 @@ describe("a task row", () => {
 });
 
 describe("a view's layout", () => {
-  it("picks the Outbox, the board or the list", () => {
+  it("picks the board or the list", () => {
     const cat = fixture("views.json");
     cat.views = cat.views.map((v: J) => (v.id === "needs-me" ? { ...v, layout: "board" } : v));
-    cat.views.push({ id: "send-later", label: "Send later", over: "gates", layout: "outbox" });
-    mixed("#view=send-later", fixture("mixed-tasks.json"), cat);
-    outboxState.page = fixture("outbox-page.json");
+    mixed("#view=needs-me", fixture("mixed-tasks.json"), cat);
     const classes = (c: Element) => Array.from(body(c).children).map((n) => n.className);
-    expect(classes(page())).toEqual(["outbox"]);
-    cleanup();
-    nav.hash = "#view=needs-me";
     tasksState.key = viewQueryKey("needs-me", "", []);
     const board = classes(page());
     expect(board.length).toBe(1);

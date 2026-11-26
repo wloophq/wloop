@@ -50,7 +50,7 @@ Geist for interface and prose (`sans`), Geist Mono for figures and identifiers (
 
 - Hairlines in `rule`, 1px; dashed for soft separators inside a list (timeline, activity) and for disabled or stale controls.
 - Radii: `radius-md` for controls and cards, `radius-lg` for inset cards, tiles and panels, `radius-pill` for chips, `radius-sm` for flags, key hints, code spans and the late age.
-- No shadows. Elevation is `panel` over `bg` plus a `rule` border.
+- No shadows. Elevation is `panel` over `bg` plus a `rule` border. The one exception is the floating widget, which floats over other apps' windows rather than over `bg`: its tab and its peek's card cast `0 6px 24px #0000002e` over a `backdrop-filter: blur(18px) saturate(1.4)`, and its panel, `panel` at 94% with radius 14px, casts `0 18px 50px #00000040` over `blur(22px) saturate(1.4)`.
 - The waits-on strip is the one colored edge: `strip-row` on rows and the situation block, `strip-card` on cards, tasks and the current rail view.
 
 ### States
@@ -64,7 +64,7 @@ Geist for interface and prose (`sans`), Geist Mono for figures and identifiers (
 
 ### Motion
 
-Only in answer to an action, short: the detail panel and the palette fade in as they open (`@starting-style`), a decision card dims while its gate is being resolved and comes back if that fails, and controls ease their hover and press. Every transition reads `motion-fast` (120ms) with `motion-ease`, and there are no keyframe animations. Under `prefers-reduced-motion: reduce` the generated tokens set `motion-fast` to 0ms, so nothing moves. Live updates never animate: they replace content in place, and the sync line reports freshness.
+Only in answer to an action, short: the detail panel and the palette fade in as they open (`@starting-style`), a decision card dims while its gate is being resolved and comes back if that fails, and controls ease their hover and press. Every transition reads `motion-fast` (120ms) with `motion-ease`, and there are no keyframe animations. The one motion that answers no action is the float's peek, once per burst of arrivals: its card slides 12px in from the tab's side, whichever side of the tab the panel's window sits on, and fades in over `motion-peek-in` (180ms) with `motion-ease`, then fades out moving 6px back toward the tab over `motion-peek-out` (140ms) with `motion-exit-ease`, and its window hides only once it is gone. Under `prefers-reduced-motion: reduce` the generated tokens set every duration to 0ms, so nothing moves and the peek appears and leaves at once. Live updates never animate: they replace content in place, and the sync line reports freshness.
 
 ## Iconography
 
@@ -86,7 +86,17 @@ The menu bar notifications use four 128px PNG badges (assets group **Notificatio
 | Cockpit | all tokens, both themes from `prefers-color-scheme` |
 | Terminal client | the same views, keys and words; bold for the current view, dim for disabled actions; no hues of its own |
 | Menu bar | `wloop <n>` title, menu sections in cockpit order, the four notification badges |
+| Floating widget | the cockpit's tokens on two transparent pages (`#/float/tab`, `#/float/panel`), each fitted by a native panel window of its own; the elevation exception above |
 | Docs | Starlight with `me` as its accent and the loop mark |
+
+## Floating widget
+
+Two cockpit pages, each hosted in a borderless panel window above other windows: `#/float/tab` draws the tab, and `#/float/panel` the panel or a peek's card, in a window the app places beside the tab. Each page is transparent and draws only:
+
+- **The tab**, a 36px circle, `mono` at `meta`, a flat `panel` fill with no outline, shadow or blur: how many decisions wait on the user in `me`. While turns run it becomes a capsule of two such circles, the second a static `loop` ring around the count of running turns; side by side when free, stacked when docked on a side edge. Its size depends only on where it sits and on its counts. Nothing waiting and nothing running shrinks it to an 8px `muted` dot; offline its circle holds a `muted` dot, and an unreadable queue an `err` dot, with no count.
+- **The peek**, a card beside the tab, at most `min(340px, room - 16px)` wide: the arrival's kind word in its tone, its unit and its text, two lines at most.
+- **The panel**, `min(460px, room - 16px)` wide and at most `room - 16px` tall, where room is the part of the tab's screen's visible frame beside the tab that the host gives the panel's window (`window.screen`'s available size until it names one); the panel's window is sized to what the page draws, so no float style reads the viewport (`vw`, `vh`), and the body scrolls past that height: a header with the count, the position in the queue and Pin; the agents (each running turn's static arc and a 3px `loop` bar of elapsed over its intent's usual duration, the turns done today); the queue in the daemon's order. The current item is drawn whole in place as a `raise` card with the `me` card strip; every other item is one line of dot, kind word, unit and title, and age. The dot, the kind word and the card strip take the item's `tone`, a token the profile names (`me`, `loop`, `late`, `err`, `muted`), through a `tone-<token>` class; the review verdict chip takes its value's tone the same way. A question whose options pin drafts is one card with a tab per option, the recommended one selected, its draft's verdict chip and its comments tallied by Conventional Comments label, blocking in `err` first.
+- **Motion**: none of its own. The running ring is a static arc that grows with the turn; it never spins.
 
 ## Further sections
 
