@@ -59,7 +59,9 @@ func (v gatesView) Tasks(ctx context.Context, q task.Query) ([]task.Task, error)
 // the task the gate is on; false for a gate on no task.
 func (s *Server) gateTask(ctx context.Context, g gateIn) (task.Task, bool, error) {
 	var on task.Task
-	if g.gate.Task != "" {
+	if e, held := coretasks.PageTask(ctx, g.gate.Task); held {
+		on = e
+	} else if g.gate.Task != "" {
 		var err error
 		on, err = s.deps.Tasks.Task(ctx, g.gate.Task)
 		if err != nil && !errors.Is(err, coretasks.ErrNoTask) {

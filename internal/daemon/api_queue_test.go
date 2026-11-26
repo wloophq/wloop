@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -13,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -31,6 +33,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/meter/metertest"
 )
 
 // pin is a draft an open message pins: the message, and its question gate, 0 while the gate is not opened yet.
@@ -638,5 +641,79 @@ func TestTheQueueComputesEachTasksFactsOnce(t *testing.T) {
 	}
 	if got := q.factReads.Load(); got != n {
 		t.Fatalf("%d facts reads for a queue of %d tasks, want %d", got, n, n)
+	}
+}
+
+// countedMessages are openMessages that count the reads of one message.
+type countedMessages struct {
+	openMessages
+	reads *atomic.Int64
+}
+
+func (c countedMessages) Message(ctx context.Context, id int64) (dmessage.Message, bool, error) {
+	c.reads.Add(1)
+	return c.openMessages.Message(ctx, id)
+}
+
+func TestTheQueueReadsEachQuestionsMessageOnce(t *testing.T) {
+	t.Parallel()
+	q := newQueueRig(t, nil)
+	q.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "answer the vendor"})
+	q.pinnedQuestion(t, "t-0000000000000001")
+	var reads atomic.Int64
+	m := q.s.deps.Messages.Store.(openMessages)
+	q.s.deps.Messages = &messages.Service{Store: countedMessages{m, &reads}, Books: noBooks{}}
+	if got := q.all(t); len(got.Items) != 1 {
+		t.Fatalf("%d items, want the question", len(got.Items))
+	}
+	if got := reads.Load(); got != 1 {
+		t.Errorf("%d reads of the question's message for one queue page, want 1", got)
+	}
+}
+
+// TestAQueuePageReadsRelatedTasksFromItsPass reads the tasks a page's items relate to, and those their gates
+// serve, from the page's pass, not one by one from the store.
+func TestAQueuePageReadsRelatedTasksFromItsPass(t *testing.T) {
+	t.Parallel()
+	q := newQueueRig(t, nil)
+	var ids []task.ID
+	for i := range 4 {
+		id := task.ID(fmt.Sprintf("t-%016x", i+1))
+		q.put(t, task.Task{ID: id, State: "next", Category: task.CategoryReady, Title: fmt.Sprintf("send note %d", i+1)})
+		q.open(t, id, gate.KindDraft, strconv.Itoa(100+i), time.Duration(i+1)*time.Minute)
+		ids = append(ids, id)
+	}
+	for i, id := range ids {
+		other := task.ID(fmt.Sprintf("t-%016x", 100+i))
+		q.put(t, task.Task{ID: other, State: "inbox", Category: task.CategoryInbox, Title: fmt.Sprintf("read note %d", i+1)})
+		if rec := post(t, q.s, api.TaskPath(string(id), "relate"), relateBody(string(other))); rec.Code != 200 {
+			t.Fatalf("relate: %d %s", rec.Code, rec.Body)
+		}
+	}
+	ctx, sc := metertest.Start(t, context.Background())
+	rec := httptest.NewRecorder()
+	q.s.Handler().ServeHTTP(rec, apiRequest("GET", api.QueueAllPath, nil).WithContext(ctx))
+	if rec.Code != 200 {
+		t.Fatalf("queue: %d %s", rec.Code, rec.Body)
+	}
+	var got api.Queue
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	related := 0
+	for _, it := range got.Items {
+		related += len(it.Task.Related)
+	}
+	if len(got.Items) != len(ids) || related != len(ids) {
+		t.Fatalf("%d items relating %d tasks, want %d each relating one", len(got.Items), related, len(ids))
+	}
+	reads := 0
+	for _, x := range sc.Samples() {
+		if strings.Contains(x.Detail, "FROM tasks WHERE id = ?") {
+			reads++
+		}
+	}
+	if reads != 0 {
+		t.Errorf("%d reads of single tasks for a queue page whose pass holds them, want 0", reads)
 	}
 }

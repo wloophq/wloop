@@ -2,6 +2,8 @@ package daemon
 
 import (
 	"context"
+	"encoding/json"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -32,6 +34,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/meter/metertest"
 )
 
 // notifyRig is the catalog rig with the tasks, the items ledger and the Inbox messages over its store, so a
@@ -494,11 +497,22 @@ func TestLiveTasksNotifyAsTheRows(t *testing.T) {
 	}
 	start := time.Now()
 	got := map[unit.Unit][]*api.Attention{}
-	tasks := 0
+	tasks, unitReads := 0, 0
 	for _, v := range storedViews() {
 		var p api.TasksPage
-		if code := get(t, s, api.TasksPath+"?view="+v, &p); code != 200 {
-			t.Fatalf("%s: %d", v, code)
+		tctx, sc := metertest.Start(t, context.Background())
+		rec := httptest.NewRecorder()
+		s.Handler().ServeHTTP(rec, apiRequest("GET", api.TasksPath+"?view="+v, nil).WithContext(tctx))
+		if rec.Code != 200 {
+			t.Fatalf("%s: %d", v, rec.Code)
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &p); err != nil {
+			t.Fatal(err)
+		}
+		for _, x := range sc.Samples() {
+			if strings.Contains(x.Detail, "FROM task_units WHERE provider = ? AND unit_key = ?") {
+				unitReads++
+			}
 		}
 		tasks += len(p.Tasks)
 		for _, e := range p.Tasks {
@@ -513,6 +527,9 @@ func TestLiveTasksNotifyAsTheRows(t *testing.T) {
 		}
 	}
 	t.Logf("%d rows, %d tasks over every view served in %s", len(rows), tasks, time.Since(start))
+	if unitReads != 0 {
+		t.Errorf("%d reads of a unit's tasks for pages whose pass holds them, want 0", unitReads)
+	}
 	notified, answered := 0, 0
 	for u, old := range byUnit {
 		news := got[u]

@@ -89,3 +89,46 @@ func TestUnextractedFollowsARewrittenSnapshot(t *testing.T) {
 		}
 	}
 }
+
+// TestAPassDecodesEachSnapshotOnce shares one decoding of a unit's snapshot among every reader of the pass,
+// and decodes anew outside it.
+func TestAPassDecodesEachSnapshotOnce(t *testing.T) {
+	a := unit.Unit{Provider: "acme", Key: "1"}
+	raw, _ := json.Marshal(src.Snapshot{Facts: []src.Fact{{Name: "acme.size"}}})
+	store := &countingSnapshots{stored: map[unit.Unit]snapshot.Stored{a: {Unit: a, Rev: 1, JSON: raw}}}
+	snaps := psource.NewSnapshots(store)
+	ctx := coretasks.WithPass(context.Background(), &coretasks.Pass{Tasks: []task.Task{{ID: "t-1", Units: []unit.Unit{a}}}})
+	decoded := func(ctx context.Context) *src.Fact {
+		got, err := snaps.Reported(ctx, []unit.Unit{a})
+		if err != nil || len(got[a].Facts) != 1 {
+			t.Fatalf("reported %+v, %v", got, err)
+		}
+		return &got[a].Facts[0]
+	}
+	if first, second := decoded(ctx), decoded(ctx); first != second {
+		t.Error("two readers of a pass decoded the snapshot twice")
+	}
+	if first, second := decoded(context.Background()), decoded(context.Background()); first == second {
+		t.Error("readers outside a pass shared a decoding")
+	}
+}
+
+// TestASnapshotRewrittenAtItsRevDecodesAnew decodes again, in a pass, the snapshot of a unit outside it that its
+// plugin wrote again at the same rev.
+func TestASnapshotRewrittenAtItsRevDecodesAnew(t *testing.T) {
+	a := unit.Unit{Provider: "acme", Key: "1"}
+	put := func(name string, at time.Time) snapshot.Stored {
+		raw, _ := json.Marshal(src.Snapshot{Facts: []src.Fact{{Name: name}}})
+		return snapshot.Stored{Unit: a, Rev: 1, At: at, JSON: raw}
+	}
+	store := &countingSnapshots{stored: map[unit.Unit]snapshot.Stored{a: put("acme.size", time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC))}}
+	snaps := psource.NewSnapshots(store)
+	ctx := coretasks.WithPass(context.Background(), &coretasks.Pass{})
+	if got, _ := snaps.Reported(ctx, []unit.Unit{a}); got[a].Facts[0].Name != "acme.size" {
+		t.Fatalf("reported %+v", got)
+	}
+	store.stored[a] = put("acme.color", time.Date(2026, 3, 1, 0, 1, 0, 0, time.UTC))
+	if got, _ := snaps.Reported(ctx, []unit.Unit{a}); got[a].Facts[0].Name != "acme.color" {
+		t.Errorf("after a rewrite at the same rev: %+v, want the new snapshot", got[a].Facts)
+	}
+}

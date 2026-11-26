@@ -133,7 +133,11 @@ func (ev *taskViewer) unitNotice(ctx context.Context, e task.Task) (string, api.
 // unitsOwn says whether e is its first unit's own task (task.UnitTask), the one task its row's notice stands
 // for.
 func (ev *taskViewer) unitsOwn(ctx context.Context, e task.Task) bool {
-	ts, err := ev.g.TasksOf(ctx, e.Units[0])
+	ts, held := coretasks.PageTasksOf(ctx, e.Units[0])
+	var err error
+	if !held {
+		ts, err = ev.g.TasksOf(ctx, e.Units[0])
+	}
 	if err != nil {
 		ev.s.logf("notifications: the tasks of %s: %v", e.Units[0].Label(), err)
 		return false

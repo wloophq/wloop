@@ -194,6 +194,69 @@ func Once[T any](ctx context.Context, key string, load func() (T, error)) (T, er
 	return v.(T), nil
 }
 
+type pageKey struct{}
+
+// WithPage is ctx serving one page of a read route, which writes nothing: PageOnce under it reads each key once
+// for the page.
+func WithPage(ctx context.Context) context.Context { return context.WithValue(ctx, pageKey{}, &Pass{}) }
+
+// InPage says whether ctx serves a page of a read route.
+func InPage(ctx context.Context) bool {
+	_, ok := ctx.Value(pageKey{}).(*Pass)
+	return ok
+}
+
+// PageOnce is the value of key, loaded once for the page ctx serves; outside a page, load reads it each time.
+func PageOnce[T any](ctx context.Context, key string, load func() (T, error)) (T, error) {
+	p, ok := ctx.Value(pageKey{}).(*Pass)
+	if !ok {
+		return load()
+	}
+	return Once(WithPass(ctx, p), key, load)
+}
+
+// PageTask is task id as the pass of the page ctx serves holds it; false outside a page or a pass, or when the
+// pass does not hold it, as for an alias of a merged task.
+func PageTask(ctx context.Context, id task.ID) (task.Task, bool) {
+	if !InPage(ctx) {
+		return task.Task{}, false
+	}
+	pass, ok := PassOf(ctx)
+	if !ok {
+		return task.Task{}, false
+	}
+	return pass.Task(id)
+}
+
+// PageTasksOf are the tasks of the pass of the page ctx serves that hold u or one of its items, held or resolved;
+// false outside a page or a pass.
+func PageTasksOf(ctx context.Context, u unit.Unit) ([]task.Task, bool) {
+	if !InPage(ctx) {
+		return nil, false
+	}
+	pass, ok := PassOf(ctx)
+	if !ok {
+		return nil, false
+	}
+	byUnit, _ := PageOnce(ctx, "tasks.of", func() (map[unit.Unit][]task.Task, error) {
+		out := map[unit.Unit][]task.Task{}
+		for _, e := range pass.Tasks {
+			seen := map[unit.Unit]bool{}
+			for _, h := range e.Units {
+				seen[h] = true
+			}
+			for _, r := range slices.Concat(e.Items, e.Resolved) {
+				seen[r.Unit] = true
+			}
+			for h := range seen {
+				out[h] = append(out[h], e)
+			}
+		}
+		return out, nil
+	})
+	return byUnit[u], true
+}
+
 // ItemsKey is the Once key of the items of every unit of a pass, a map[unit.Unit][]items.Item, which the facts
 // and the draft step share.
 const ItemsKey = "items"

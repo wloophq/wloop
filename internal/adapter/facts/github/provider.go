@@ -16,6 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/sweep"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/views"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -137,7 +138,7 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 	if err != nil {
 		return nil, err
 	}
-	v, err := p.fresh(ctx, false)
+	v, err := p.passView(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -149,6 +150,41 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 	}
 	return v.facts(ref, p.now()), nil
 }
+
+// passView is the view every unit's facts read in the page ctx serves, with the events and reports of each pull
+// request its pass's open tasks link read at once; outside a page, such as in the sweep's pass, whose List renews
+// the view between reads, the view each call finds current.
+func (p *Provider) passView(ctx context.Context) (*view, error) {
+	pass, ok := coretasks.PassOf(ctx)
+	if !ok || !coretasks.InPage(ctx) {
+		return p.fresh(ctx, false)
+	}
+	return coretasks.PageOnce(ctx, sharedViewKey, func() (*view, error) {
+		v, err := p.fresh(ctx, false)
+		if err != nil {
+			return nil, err
+		}
+		var prs []unit.Unit
+		seen := map[unit.Unit]bool{}
+		for _, e := range pass.Tasks {
+			if !e.Open() {
+				continue
+			}
+			for _, u := range e.LinkedUnits() {
+				if u.Provider == unit.GitHub && !seen[u] {
+					seen[u] = true
+					prs = append(prs, u)
+				}
+			}
+		}
+		if err := v.loadEvents(ctx, prs); err != nil {
+			return nil, err
+		}
+		return v, v.loadReports(ctx, prs)
+	})
+}
+
+const sharedViewKey = "facts.github.view"
 
 // Due is the earliest instant after now a decision of the last evaluation
 // changes with no input changing.

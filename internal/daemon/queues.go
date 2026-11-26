@@ -87,7 +87,7 @@ func (s *Server) queuePass(ctx context.Context, w http.ResponseWriter, g *coreta
 		writeTasksError(w, err)
 		return nil, false
 	}
-	return n.Within(ctx), true
+	return coretasks.WithPage(n.Within(ctx)), true
 }
 
 // queueKeep is the lens r's query parameter q narrows a queue by; nil when it names none.
@@ -153,7 +153,7 @@ func (s *Server) questionOptions(ctx context.Context, q gate.Gate, pinned map[in
 	if s.deps.Messages == nil || s.deps.GateReader == nil {
 		return nil, fmt.Errorf("question gate %d pins drafts, and the daemon reads no messages or gates", q.ID)
 	}
-	m, ok, err := s.deps.Messages.Store.Message(ctx, id)
+	m, ok, err := s.message(ctx, id)
 	switch {
 	case err != nil:
 		return nil, fmt.Errorf("the message of question gate %d, which pins drafts: %w", q.ID, err)

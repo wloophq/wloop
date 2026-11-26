@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/domain/merge"
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
@@ -14,28 +15,31 @@ func (ev *taskViewer) mergedFromOf(ctx context.Context, e task.Task, v *api.Task
 	if name == "" {
 		return nil
 	}
-	refs, err := ev.mergedInto(ctx, e.ID, e.Prop(name).List)
-	v.MergedFrom = refs
-	return err
+	ids := e.Prop(name).List
+	records := make(map[string]merge.Record, len(ids))
+	for _, id := range ids {
+		r, ok, err := ev.g.MergeOf(ctx, task.ID(id))
+		if err != nil {
+			return err
+		}
+		if ok {
+			records[id] = r
+		}
+	}
+	v.MergedFrom = mergedInto(e.ID, ids, records)
+	return nil
 }
 
 // mergedInto are the tasks of ids whose merge record names into, in ids' order, each with those merged into
 // it in Within.
-func (ev *taskViewer) mergedInto(ctx context.Context, into task.ID, ids []string) ([]api.TaskRef, error) {
+func mergedInto(into task.ID, ids []string, records map[string]merge.Record) []api.TaskRef {
 	var out []api.TaskRef
 	for _, id := range ids {
-		r, ok, err := ev.g.MergeOf(ctx, task.ID(id))
-		if err != nil {
-			return nil, err
-		}
+		r, ok := records[id]
 		if !ok || r.Into != into {
 			continue
 		}
-		ref := api.TaskRef{ID: id, Title: r.Task.Title, State: string(r.Task.State)}
-		if ref.Within, err = ev.mergedInto(ctx, r.From, ids); err != nil {
-			return nil, err
-		}
-		out = append(out, ref)
+		out = append(out, api.TaskRef{ID: id, Title: r.Task.Title, State: string(r.Task.State), Within: mergedInto(r.From, ids, records)})
 	}
-	return out, nil
+	return out
 }
