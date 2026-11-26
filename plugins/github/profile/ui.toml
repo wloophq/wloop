@@ -294,6 +294,7 @@ empty = "No pull request waits for a reviewer."
 [drafts.review.fields.event]
 label = "Verdict"
 values = { APPROVE = "Approve", REQUEST_CHANGES = "Request changes", COMMENT = "Comment" }
+tones = { APPROVE = "loop", REQUEST_CHANGES = "err", COMMENT = "muted" }
 
 [drafts.review.fields.comments]
 label = "Inline comments"
@@ -343,6 +344,7 @@ label = "Edit"
 
 [drafts.review]
 label = "Review"
+comments = "/comments"
 
 [drafts.thread_reply]
 label = "Reply in a thread"

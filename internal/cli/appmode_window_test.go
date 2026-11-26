@@ -26,14 +26,23 @@ type recHost struct {
 	shown    []string
 	listened *window.Handlers
 	reworded int
+	floats   int
 }
 
-func (h *recHost) ShowMain(url string)         { h.mu.Lock(); h.shown = append(h.shown, url); h.mu.Unlock() }
-func (h *recHost) ShowPanel(string)            {}
-func (h *recHost) HidePanel()                  {}
-func (h *recHost) Reword(*texts.Catalog)       { h.mu.Lock(); h.reworded++; h.mu.Unlock() }
-func (h *recHost) ShowDetached(string, string) {}
-func (h *recHost) OpenExternal(string)         {}
+func (h *recHost) ShowMain(url string)                { h.mu.Lock(); h.shown = append(h.shown, url); h.mu.Unlock() }
+func (h *recHost) ShowPanel(string)                   {}
+func (h *recHost) HidePanel()                         {}
+func (h *recHost) Reword(*texts.Catalog)              { h.mu.Lock(); h.reworded++; h.mu.Unlock() }
+func (h *recHost) ShowDetached(string, string)        {}
+func (h *recHost) OpenExternal(string)                {}
+func (h *recHost) ShowFloat(string, bool)             { h.mu.Lock(); h.floats++; h.mu.Unlock() }
+func (h *recHost) HideFloat()                         {}
+func (h *recHost) SetFloatFrame(window.Rect)          {}
+func (h *recHost) PlaceFloat(window.FloatPlace)       {}
+func (h *recHost) LoadFloatPanel(string)              {}
+func (h *recHost) TellFloatPanel(window.PanelPlace)   {}
+func (h *recHost) ShowFloatPanel(window.Rect, string) {}
+func (h *recHost) HideFloatPanel()                    {}
 func (h *recHost) Listen(hs window.Handlers) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -145,8 +154,11 @@ func TestWindowDisabledRunsNoHost(t *testing.T) {
 func TestAppModeWithoutAHostKeepsTheBrowser(t *testing.T) {
 	t.Parallel()
 	var wg sync.WaitGroup
-	if show := windowShow(context.Background(), &wg, nil, nil, nil, config.Window{}, nil); show != nil {
+	if ctl := windowShow(context.Background(), &wg, nil, nil, nil, config.Window{}, nil); ctl != nil {
 		t.Fatal("no host, yet the menu bar opens a window")
+	}
+	if cfg := withWindow(menubar.Config{}, nil, nil, config.Window{Float: config.FloatOn}); cfg.Window != nil || cfg.ShowFloat != nil || cfg.HideFloat != nil || cfg.Float {
+		t.Fatal("no host, yet the menu bar has a window or a float")
 	}
 	wg.Wait()
 }
@@ -202,5 +214,69 @@ func TestAppWordsAreTheServedStringsElseEnglish(t *testing.T) {
 	}
 	if got := appWords(context.Background(), servedStrings{err: errors.New("dial unix: no such file")}).T("Edit", nil); got != "Edit" {
 		t.Fatalf("%q", got)
+	}
+}
+
+// window.float turns the float on and binds its hotkey, whose press reaches
+// the menu bar; off, the float stays off and its hotkey unbound.
+func TestTheFloatKeyTurnsTheFloatOn(t *testing.T) {
+	t.Parallel()
+	for _, float := range []string{config.FloatOff, config.FloatOn} {
+		synctest.Test(t, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			var wg sync.WaitGroup
+			events := heldEvents{release: make(chan struct{})}
+			defer func() { cancel(); close(events.release); wg.Wait() }()
+			host := &recHost{}
+			cockpit := func(string) (string, error) { return "http://127.0.0.1:1/", nil }
+			win := config.Window{Enabled: true, Float: float, FloatHotkey: "cmd+option+.", FloatMorning: "07:30"}
+			ctl := windowShow(ctx, &wg, host, events, cockpit, win, func(string, ...any) {})
+			synctest.Wait()
+			cfg := withWindow(menubar.Config{Tray: &recTray{}, Notifier: silentNotifier{}}, ctl, host, win)
+			on := float == config.FloatOn
+			if cfg.Float != on || cfg.FloatMorning != "07:30" || cfg.Window == nil || cfg.ShowFloat == nil || cfg.HideFloat == nil {
+				t.Fatalf("float %q: menu bar float %v, window %v, show %v, hide %v", float, cfg.Float, cfg.Window != nil, cfg.ShowFloat != nil, cfg.HideFloat != nil)
+			}
+			_, hs := host.state()
+			if want := map[bool]string{true: "cmd+option+."}[on]; hs.FloatHotkey != want {
+				t.Fatalf("float %q: bound float hotkey %q, want %q", float, hs.FloatHotkey, want)
+			}
+			if !on {
+				return
+			}
+			c := menubar.New(cfg)
+			hookFloat(ctl, c)
+			c.StartFloat()
+			hs.OnFloatHotkey()
+			hs.OnFloatHotkey()
+			synctest.Wait()
+			host.mu.Lock()
+			defer host.mu.Unlock()
+			if host.floats != 2 {
+				t.Fatalf("shown %d times, want at start and after the hotkey hid and showed it", host.floats)
+			}
+		})
+	}
+}
+
+// window.float_over_full_screen reaches the host's listen, which sets the
+// float's collection behavior.
+func TestTheFullScreenKeyReachesTheHost(t *testing.T) {
+	t.Parallel()
+	for _, over := range []bool{false, true} {
+		synctest.Test(t, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			var wg sync.WaitGroup
+			events := heldEvents{release: make(chan struct{})}
+			defer func() { cancel(); close(events.release); wg.Wait() }()
+			host := &recHost{}
+			cockpit := func(string) (string, error) { return "http://127.0.0.1:1/", nil }
+			win := config.Window{Enabled: true, Float: config.FloatOn, FloatOverFullScreen: over}
+			windowShow(ctx, &wg, host, events, cockpit, win, func(string, ...any) {})
+			synctest.Wait()
+			if _, hs := host.state(); hs.FloatOverFullScreen != over {
+				t.Fatalf("listened with FloatOverFullScreen %v, want %v", hs.FloatOverFullScreen, over)
+			}
+		})
 	}
 }

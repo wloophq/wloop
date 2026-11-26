@@ -169,6 +169,7 @@ var Operations = []Operation{
 	{"GET", StringsPath},
 	{"GET", HomePath},
 	{"GET", QueuePath},
+	{"GET", QueueAllPath},
 	{"GET", SearchPath},
 	{"POST", OmniboxResolvePath},
 	{"POST", OmniboxAskPath},
@@ -179,6 +180,7 @@ var Operations = []Operation{
 	{"DELETE", UnitSkip},
 	{"POST", DraftCloseSilently},
 	{"GET", OutboxPath},
+	{"GET", TurnsLivePath},
 
 	{"POST", AgentTurnsStart},
 	{"POST", AgentTurnsByHand},

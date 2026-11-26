@@ -1080,6 +1080,37 @@ func (s *Service) HoldersOf(ctx context.Context, u unit.Unit) ([]task.Task, erro
 	if err != nil {
 		return nil, err
 	}
+	return s.holders(es), nil
+}
+
+// HoldersOfUnits is HoldersOf of each of units, in one read when the store has one; a unit no task holds is absent.
+func (s *Service) HoldersOfUnits(ctx context.Context, units []unit.Unit) (map[unit.Unit][]task.Task, error) {
+	out := make(map[unit.Unit][]task.Task, len(units))
+	if b, ok := s.d.Store.(UnitTasks); ok {
+		got, err := b.TasksOfUnits(ctx, units)
+		if err != nil {
+			return nil, err
+		}
+		for u, es := range got {
+			if es = s.holders(es); len(es) > 0 {
+				out[u] = es
+			}
+		}
+		return out, nil
+	}
+	for _, u := range units {
+		es, err := s.HoldersOf(ctx, u)
+		if err != nil {
+			return nil, err
+		}
+		if len(es) > 0 {
+			out[u] = es
+		}
+	}
+	return out, nil
+}
+
+func (s *Service) holders(es []task.Task) []task.Task {
 	if hidden := s.hider(); hidden != nil {
 		es = slices.DeleteFunc(es, hidden)
 	}
@@ -1092,7 +1123,7 @@ func (s *Service) HoldersOf(ctx context.Context, u unit.Unit) ([]task.Task, erro
 		}
 		return 1
 	})
-	return es, nil
+	return es
 }
 
 // ReopenOwn is u's own task when u's items key on u (task.UnitTask), moved back into the ready category,

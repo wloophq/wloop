@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { isCoreView } from "./lib/catalog";
+  import { isCoreView, isQueueView } from "./lib/catalog";
   import { I18N, t } from "./lib/i18n.svelte";
   import { readLens } from "./lib/view";
   import type { Lens, Pipeline } from "./lib/lens";
@@ -73,7 +73,7 @@
     <PlanPage shown={view === PLAN} />
     <Dash lens={readLens()} shown={view === DASH} />
     <Home hidden={view !== HOME} />
-    <Queue hidden={view !== QUEUE} />
+    <Queue hidden={view !== QUEUE && !isQueueView(view)} />
     <TaskViewPage tools={taskTools} />
     <UnitList tools={unitTools} />
   </section>

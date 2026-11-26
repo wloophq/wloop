@@ -65,6 +65,8 @@ type tasksRig struct {
 	// facts are the tasks' facts the views read, factReads how many times they were computed.
 	facts     func(context.Context, task.Task) (workflow.Facts, error)
 	factReads atomic.Int32
+	// factGates count the facts' reads of the gates.
+	factGates *countedGates
 	// linked reads the read model's link state of a unit for the facts when set.
 	linked bool
 }
@@ -97,13 +99,19 @@ func newTasksRig(t testing.TB, edit func(*Deps)) *tasksRig {
 				return bundledLoaded()
 			}
 		}
+		r.factGates = &countedGates{Reader: db.Gates(func() time.Time { return tasksNow })}
 		r.facts = countedLensFacts(db, loaded, tasksNow, &r.factReads, func(ctx context.Context, u unit.Unit) (facttask.Link, error) {
 			if !r.linked {
 				return facttask.Link{}, nil
 			}
 			signals, situation, moved, _, err := r.s.LinkState(ctx, u)
 			return facttask.Link{Signals: signals, Situation: situation, Moved: moved}, err
-		})
+		}, func(ctx context.Context) (map[int64]int64, error) {
+			if r.s.deps.Gates == nil {
+				return nil, nil
+			}
+			return r.s.deps.Gates.Pinned(ctx)
+		}, r.factGates)
 		r.g = coretasks.New(withLens(coretasks.Deps{States: loadedHandlers{taskstest.BundledStates, loaded}, Authority: taskstest.BundledStates.Authority, Store: db.Tasks(), Items: r.ledger,
 			Facts: coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled, Me: func() task.Me { return meID }},
 			Me:    meID, Clock: fixedClock(tasksNow), Disabled: disabledOf(enabled), Wakes: db.Wakes(),
@@ -359,7 +367,7 @@ func TestCaptureLandsInInbox(t *testing.T) {
 	if v.State != "inbox" || v.Title != "call the bank" {
 		t.Fatalf("%+v", v)
 	}
-	if p := r.page(t, "view=inbox"); !slices.Equal(taskIDs(p.Tasks), []string{v.ID}) || p.Counters.Badge != 1 {
+	if p := r.page(t, "view=inbox"); !slices.Equal(taskIDs(p.Tasks), []string{v.ID}) || p.Counters.Views["inbox"] != 1 {
 		t.Fatalf("%+v", p)
 	}
 	var detail api.TaskView
@@ -1421,10 +1429,10 @@ func TestARowsChangeAndATasksChangeMergeForASubscriber(t *testing.T) {
 	sub := h.subscribe("test")
 	other := unit.Unit{Provider: unit.GitHub, Key: "acme/api#13"}
 	h.publish(api.Change{Type: "changed", Epoch: "e", Rev: 2, Units: []unit.Unit{other}})
-	h.publish(api.Change{Type: "changed", Epoch: "e", Rev: 2, Units: []unit.Unit{apiPR}, Counters: &api.Counters{Badge: 1}})
+	h.publish(api.Change{Type: "changed", Epoch: "e", Rev: 2, Units: []unit.Unit{apiPR}, Counters: &api.Counters{Views: map[string]int{"inbox": 1}}})
 	h.publish(api.Change{Type: "changed", Epoch: "e", Rev: 3, Units: []unit.Unit{apiPR}})
 	c, ok := sub.take()
-	if !ok || !slices.Equal(c.Units, []unit.Unit{apiPR, other}) || c.Counters == nil || c.Counters.Badge != 1 || c.Rev != 3 {
+	if !ok || !slices.Equal(c.Units, []unit.Unit{apiPR, other}) || c.Counters == nil || c.Counters.Views["inbox"] != 1 || c.Rev != 3 {
 		t.Fatalf("merged %+v (%v), want both units, the counters and rev 3", c, ok)
 	}
 }

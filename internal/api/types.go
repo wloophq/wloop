@@ -66,7 +66,10 @@ type Change struct {
 	// Plan says what GET /api/plan serves moved.
 	Plan bool `json:"plan,omitempty"`
 	// Gates says what GET /api/gates serves moved: a gate, or the draft, item, message or plan item one shows.
-	Gates   bool     `json:"gates,omitempty"`
+	Gates bool `json:"gates,omitempty"`
+	// Turns says what GET /api/turns/live serves moved: any write to a turn's book (a turn's state, a record or an
+	// answer), which can be a change the route does not show.
+	Turns   bool     `json:"turns,omitempty"`
 	Notices []Notice `json:"notices,omitempty"`
 	// Counters are the Area "" counters, on every "changed" change after a note of what a view reads: the tasks,
 	// their gates, wakes, drafts, records, links, placements or the profile.
@@ -204,6 +207,8 @@ type Attention struct {
 	Body     string            `json:"body"`
 	Image    string            `json:"image,omitempty"`
 	Actions  []AttentionAction `json:"actions"`
+	// Daily is posted once a day: its id's token is the local day.
+	Daily bool `json:"daily,omitempty"`
 }
 
 // TurnView is the pull request's newest turn with its records and answers.

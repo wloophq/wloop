@@ -273,3 +273,32 @@ func TestStaleIsADetailOlderThanFresh(t *testing.T) {
 		t.Fatalf("a detail read: %+v", v)
 	}
 }
+
+func TestCommitsAreThePushesAndTheFullReadsCommits(t *testing.T) {
+	in := input(fixtures()[0])
+	push := func(oid string) pr.Event {
+		return pr.Event{PR: in.PR.Ref, Kind: pr.KindPush, Key: oid, Actor: "ana", At: ago(time.Hour)}
+	}
+	commits := func() src.Value {
+		for _, f := range Derive(in).Facts() {
+			if f.Name == "pr.commits" {
+				return f.Value
+			}
+		}
+		t.Fatal("no pr.commits")
+		return src.Value{}
+	}
+	if v := commits(); v.Kind != src.List().Kind || len(v.List) != 0 {
+		t.Fatalf("no push and no full read: %+v", v)
+	}
+	in.Events = append(in.Events, push("c1"), pr.Event{PR: in.PR.Ref, Kind: pr.KindComment, Key: "k9", Actor: "bob", At: ago(time.Hour)}, push("c2"))
+	in.Detail = &store.Detail{ReadAt: ago(time.Minute), Commits: []pr.Commit{{Oid: "c2", Parents: 1}, {Oid: "m3", Parents: 2}}}
+	if v := commits(); !reflect.DeepEqual(v, src.List("c1", "c2", "m3")) {
+		t.Fatalf("the pushes c1 c2 and the merge m3 of the full read: %+v", v)
+	}
+	in.PR.HeadOid = "c2"
+	in.Events = append(in.Events, push("c4"))
+	if v := commits(); !reflect.DeepEqual(v, src.List("c1", "c2")) {
+		t.Fatalf("a push stored before the head moved to it, and the commits after the stored head c2: %+v", v)
+	}
+}

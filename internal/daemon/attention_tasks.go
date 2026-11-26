@@ -80,12 +80,12 @@ func (ev *taskViewer) notice(ctx context.Context, e task.Task) *api.Attention {
 	if !ev.s.unitsEnabled(e.Units) {
 		return nil
 	}
-	cat, token, a, ok := ev.unitNotice(ctx, e)
+	token, a, ok := ev.unitNotice(ctx, e)
 	if !ok {
 		if _, gated := ev.message(ctx, e); e.Category != task.CategoryInbox && !gated {
 			return nil
 		}
-		cat, token, a, ok = ev.inboxNotice(ctx, e)
+		token, a, ok = ev.inboxNotice(ctx, e)
 	}
 	if !ok {
 		return nil
@@ -93,8 +93,8 @@ func (ev *taskViewer) notice(ctx context.Context, e task.Task) *api.Attention {
 	if d, ok := ev.proposedFor(ctx, e.ID); ok {
 		token = hashToken(token, draftPrefix+strconv.FormatInt(int64(d.ID), 10), d.UpdatedAt.UTC().Format(stampToken))
 	}
-	a.Category = string(cat)
-	a.ID = api.NotificationID(cat, string(e.ID), token)
+	a.Category = string(api.CategoryNeeds)
+	a.ID = api.NotificationID(api.CategoryNeeds, string(e.ID), token)
 	return &a
 }
 
@@ -109,33 +109,35 @@ func verbAction(v task.Verb) string { return api.TaskActionPrefix + string(v) }
 // which a mute holds: the unit's row notice, keyed on the task and on the gate the notice stands for (the
 // round's plan gate, the block's trust gate, the question's record), so the task notifies what the row did
 // and only once. ok is false when the task's first unit is not served, or its row notifies nothing.
-func (ev *taskViewer) unitNotice(ctx context.Context, e task.Task) (api.Category, string, api.Attention, bool) {
+func (ev *taskViewer) unitNotice(ctx context.Context, e task.Task) (string, api.Attention, bool) {
 	n, row, served, ok := ev.rowNotice(ctx, e)
 	if !served || !ok || !e.Open() || e.Category == task.CategoryDeferred || !ev.unitsOwn(ctx, e) {
-		return "", "", api.Attention{}, false
+		return "", api.Attention{}, false
 	}
 	if n.Question {
 		if m, isMsg := ev.message(ctx, e); !isMsg || m.Kind != dmessage.Question || ev.recordOf(ctx, m) != n.Record {
-			return "", "", api.Attention{}, false
+			return "", api.Attention{}, false
 		}
-		return api.QuestionCategory(n.Record), n.Token, n.Attention, true
+		return n.Token, n.Attention, true
 	}
 	a := n.Attention
 	a.Actions = ev.asVerbs(e, row, a.Actions)
+	a.Daily = n.Held
 	token := n.Token
 	if g, ok := ev.openGate(ctx, e, n.Gate); ok {
 		token = "g" + strconv.FormatInt(int64(g.ID), 10)
 	}
-	if n.Held {
-		return api.CategoryHeld, token, a, true
-	}
-	return api.CategoryInbox, token, a, true
+	return token, a, true
 }
 
 // unitsOwn says whether e is its first unit's own task (task.UnitTask), the one task its row's notice stands
 // for.
 func (ev *taskViewer) unitsOwn(ctx context.Context, e task.Task) bool {
-	ts, err := ev.g.TasksOf(ctx, e.Units[0])
+	ts, held := coretasks.PageTasksOf(ctx, e.Units[0])
+	var err error
+	if !held {
+		ts, err = ev.g.TasksOf(ctx, e.Units[0])
+	}
 	if err != nil {
 		ev.s.logf("notifications: the tasks of %s: %v", e.Units[0].Label(), err)
 		return false
@@ -163,7 +165,7 @@ func (ev *taskViewer) openGate(ctx context.Context, e task.Task, k gate.Kind) (g
 
 // inboxNotice is what an Inbox task no row notice stands for notifies; ok is false when it notifies nothing. A
 // question's message, and a task derived from a unit the read model serves, notify only through the row.
-func (ev *taskViewer) inboxNotice(ctx context.Context, e task.Task) (api.Category, string, api.Attention, bool) {
+func (ev *taskViewer) inboxNotice(ctx context.Context, e task.Task) (string, api.Attention, bool) {
 	m, isMsg := ev.message(ctx, e)
 	question := isMsg && m.Kind == dmessage.Question
 	record := int64(-1)
@@ -171,14 +173,14 @@ func (ev *taskViewer) inboxNotice(ctx context.Context, e task.Task) (api.Categor
 		record = ev.recordOf(ctx, m)
 	}
 	if _, _, served, _ := ev.rowNotice(ctx, e); served && (question || e.Origin == task.OriginDerived) {
-		return "", "", api.Attention{}, false
+		return "", api.Attention{}, false
 	}
 	if isMsg {
-		cat, token, a := ev.s.messageNotice(e, m, record)
-		return cat, token, a, true
+		token, a := ev.s.messageNotice(e, m, record)
+		return token, a, true
 	}
 	a := api.Attention{Title: ev.s.notice(builtin.NoticeNotifyInbox, nil), Subtitle: unitsLabel(e.Units), Body: e.Title, Actions: ev.inboxActions(ctx, e)}
-	return api.CategoryInbox, hashToken(e.Title), a, true
+	return hashToken(e.Title), a, true
 }
 
 // inboxActions are Draft for me when the task's delegate runs an action that drafts headless, and Reply and
@@ -316,7 +318,7 @@ func (ev *taskViewer) recordOf(ctx context.Context, m dmessage.Message) int64 {
 
 // messageNotice is a message task's notification from the message alone; its dismiss and approve buttons run the
 // verbs whose handlers drop and approve, worded as the profile words them.
-func (s *Server) messageNotice(e task.Task, m dmessage.Message, record int64) (api.Category, string, api.Attention) {
+func (s *Server) messageNotice(e task.Task, m dmessage.Message, record int64) (string, api.Attention) {
 	a := api.Attention{Subtitle: unitsLabel(e.Units), Body: m.Text, Image: "ask"}
 	if a.Subtitle == "" {
 		a.Subtitle = m.Unit.Label()
@@ -333,7 +335,7 @@ func (s *Server) messageNotice(e task.Task, m dmessage.Message, record int64) (a
 		if pins(m) {
 			a.Body = strings.TrimSpace(a.Body + "\n\n" + s.notice(builtin.NoticeNotifyPinned, nil))
 		}
-		return api.QuestionCategory(max(record, 0)), strconv.FormatInt(max(record, 0), 10), a
+		return strconv.FormatInt(max(record, 0), 10), a
 	case dmessage.Proposal:
 		a.Title = s.notice(builtin.NoticeNotifyProposal, nil)
 		v, label := s.handlerVerb(handlerApprove)
@@ -342,7 +344,7 @@ func (s *Server) messageNotice(e task.Task, m dmessage.Message, record int64) (a
 		a.Title = s.notice(builtin.NoticeNotifyPost, nil)
 		a.Actions = slices.Concat([]api.AttentionAction{{ID: "answer:text", Title: s.notice(builtin.NoticeNotifyReply, nil), TextInput: true}}, dismiss)
 	}
-	return api.CategoryInbox, hashToken(strconv.FormatInt(m.ID, 10), m.Text), a
+	return hashToken(strconv.FormatInt(m.ID, 10), m.Text), a
 }
 
 // The handlers of the verbs the daemon runs or bridges itself.
@@ -352,6 +354,7 @@ const (
 	handlerDelegate   = "delegate"
 	handlerFinish     = "finish"
 	handlerProject    = "project"
+	handlerRetry      = "retry"
 	handlerReviewed   = "reviewed"
 	handlerSequential = "sequential"
 )
@@ -484,14 +487,14 @@ func (ev *taskViewer) draftAttention(ctx context.Context, e task.Task) *api.Atte
 	if !ev.s.pluginEnabled(d.Unit.Provider) || d.State == draft.Held && ev.servesInbox(ctx, d) {
 		return nil
 	}
-	a := api.Attention{Category: string(api.CategoryOutbox), Subtitle: d.Unit.Label(), Body: draftBody(d)}
+	a := api.Attention{Category: string(api.CategoryNeeds), Subtitle: d.Unit.Label(), Body: draftBody(d)}
 	a.Title = ev.s.notice(builtin.NoticeNotifyDraft, nil)
 	if d.State == draft.Failed {
 		a.Title = ev.s.notice(builtin.NoticeNotifyDraftFailed, nil)
 	}
 	drop, _ := ev.s.handlerVerb(handlerDrop)
 	a.Actions = []api.AttentionAction{{ID: "open", Title: ev.s.notice(builtin.NoticeNotifyOpen, nil)}, {ID: verbAction(drop), Title: ev.s.notice(builtin.NoticeNotifyDiscard, nil)}}
-	a.ID = api.NotificationID(api.CategoryOutbox, string(e.ID), d.UpdatedAt.UTC().Format(stampToken))
+	a.ID = api.NotificationID(api.CategoryNeeds, string(e.ID), d.UpdatedAt.UTC().Format(stampToken))
 	return &a
 }
 

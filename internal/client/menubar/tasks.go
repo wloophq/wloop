@@ -9,13 +9,15 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
+	"github.com/wloophq/wloop/internal/client/window"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// pullTasks reads the catalog, then each view the profile's badge counts, whole: the menu lists those views
-// first, in the profile's order. A task's attention also moves with its row's notice and its proposed draft,
-// which no task write marks, so a delta would miss it. The counters come with the first view's page, or on
-// their own when the menu lists no view.
+// pullTasks reads the catalog, each view the profile's badge names, whole, whose tasks notify, and the queue
+// of every decision kind, which the menu lists first. A task's attention also moves with its row's notice and
+// its proposed draft, which no task write marks, so a delta would miss it. The counters come with the first
+// view's page, or on their own when no view is badged. A queue that fails to read keeps the last one read, so
+// the menu and the banners do not hang on it.
 func (c *Controller) pullTasks(ctx context.Context) error {
 	cat, err := c.cfg.Daemon.Views(ctx)
 	if err != nil {
@@ -49,6 +51,15 @@ func (c *Controller) pullTasks(ctx context.Context) error {
 			return err
 		}
 		c.counters = &counters
+	}
+	needs, err := c.cfg.Daemon.QueueAll(ctx, "")
+	c.queueRead = err == nil
+	switch {
+	case err == nil:
+		c.needs, c.queueErr = needs, ""
+	case err.Error() != c.queueErr:
+		c.queueErr = err.Error()
+		c.cfg.Log("reading the queue: %v", err)
 	}
 	c.taskViews, c.tasks, c.tasksLoading = views, tasks, loading
 	c.mu.Lock()
@@ -95,31 +106,40 @@ func (c *Controller) loadingItems() []MenuItem {
 
 func (c *Controller) viewTasks(v string) []api.TaskView { return c.tasks[v] }
 
+// title says how many items Needs you holds, and each view's count for a profile that words it.
 func (c *Controller) title() string {
 	params := map[string]any{}
-	badge := 0
 	if c.counters != nil {
-		badge = c.counters.Badge
 		for view, n := range c.counters.Views {
 			params[view] = n
 		}
 	}
-	params["name"], params["n"] = brand.Name, badge
+	params["name"], params["n"] = brand.Name, c.needs.Total
 	if c.health.Paused {
 		return c.words().T("{name} {n} paused", params)
 	}
 	return c.words().T("{name} {n}", params)
 }
 
-func (c *Controller) taskSection(label string, view string) []MenuItem {
-	tasks := c.viewTasks(view)
-	items := []MenuItem{{Title: fmt.Sprintf("%s (%d)", label, len(tasks))}}
-	for i, e := range tasks {
+// needsSection is what waits on the user, as many as the queue holds, and its first items, each worded by its
+// kind and opening its task; more opens the queue's view, else the home.
+func (c *Controller) needsSection() []MenuItem {
+	items := []MenuItem{{Title: fmt.Sprintf("%s (%d)", c.needs.Title, c.needs.Total)}}
+	more := window.HomeRoute
+	if c.needs.View != "" {
+		more = viewRoute(c.needs.View)
+	}
+	for i, it := range c.needs.Items {
 		if i == perSection {
-			items = append(items, MenuItem{Title: c.words().T("more…", nil), Enabled: true, Action: c.later(func(context.Context) error { return c.open(viewRoute(view)) })})
+			items = append(items, MenuItem{Title: c.words().T("more…", nil), Enabled: true, Action: c.later(func(context.Context) error { return c.open(more) })})
 			break
 		}
-		items = append(items, MenuItem{Title: taskLabel(e), Enabled: true, Action: c.later(func(context.Context) error { return c.open(taskRoute(e.ID)) })})
+		e := it.Task
+		title := taskLabel(e)
+		if it.Word != "" {
+			title = it.Word + " · " + title
+		}
+		items = append(items, MenuItem{Title: title, Enabled: true, Action: c.later(func(context.Context) error { return c.open(taskRoute(e.ID)) })})
 	}
 	return items
 }

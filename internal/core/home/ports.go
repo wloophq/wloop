@@ -21,6 +21,11 @@ type Decisions interface {
 	Of(ctx context.Context, e task.Task) ([]decision.Found, error)
 }
 
+// Serves keeps the queue items that can be served, so every count of a queue counts what it serves.
+type Serves interface {
+	Servable(ctx context.Context, items []Item) ([]Item, error)
+}
+
 // Words are the profile's and the plugins' words in the served locale.
 type Words interface {
 	Profile() Profile
@@ -51,36 +56,45 @@ func (f Forms) For(form string) string {
 	return f["other"]
 }
 
-// Profile is home.toml: the briefing's words and counters, the sections and the capture hint.
+// Profile is home.toml: the briefing's words and counters, the sections and the capture hint; Order is the
+// order of the decision kinds a queue section lists and Sort how it lists them.
 type Profile struct {
 	Template, Join, LastJoin, End, Count, Empty string
 	PerSentence                                 int
 	Counters                                    []Counter
 	Sections                                    []Section
 	CaptureHint                                 string
+	Order                                       []decision.Kind
+	Sort                                        decision.Sort
 }
 
-// Counter counts a decision kind's decisions (Kind), one per item of its queue, or a view's tasks (View, with its own Noun and Clause).
+// Counter counts a decision kind's decisions (Kind), one per item of its queue, or a view's tasks (View, with its
+// own Noun and Clause); with Queue, its view draws the queue of every decision kind, whose items it counts.
 type Counter struct {
 	ID           string
 	Kind         decision.Kind
 	View         task.View
 	Noun, Clause Forms
+	Queue        bool
 }
 
-// Section is the first Limit rows of View, titled Label, each showing Time.
+// Section is the first Limit rows of View, titled Label, each showing Time; with Queue, the first Limit items of
+// the queue of every decision kind, which View draws.
 type Section struct {
 	ID          string
 	View        task.View
 	Label, Time string
 	Limit       int
+	Queue       bool
 }
 
-// KindWords are a decision kind's view and words; Primary is the gate intent a queue offers first.
+// KindWords are a decision kind's view and words; Primary is the gate intent a queue offers first, Tone the
+// design token its items are drawn in.
 type KindWords struct {
 	View                  task.View
 	Noun, Clause          Forms
 	Queue, Empty, Primary string
+	Tone                  string
 }
 
 // PluginWords are a plugin's noun, its words of each decision kind and what its queue offers first on each.

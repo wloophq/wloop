@@ -336,11 +336,24 @@ func (s *Server) messageOf(ctx context.Context, g gate.Gate) (dmessage.Message, 
 	if err != nil {
 		return dmessage.Message{}, false
 	}
-	m, ok, err := s.deps.Messages.Store.Message(ctx, id)
+	m, ok, err := s.message(ctx, id)
 	if err != nil {
 		s.logf("the message of gate %d: %v", g.ID, err)
 	}
 	return m, ok && err == nil && m.Kind.Gate() == g.Kind
+}
+
+// message is the stored message id; in a page, read once.
+func (s *Server) message(ctx context.Context, id int64) (dmessage.Message, bool, error) {
+	type read struct {
+		m  dmessage.Message
+		ok bool
+	}
+	r, err := coretasks.PageOnce(ctx, "message."+strconv.FormatInt(id, 10), func() (read, error) {
+		m, ok, err := s.deps.Messages.Store.Message(ctx, id)
+		return read{m, ok}, err
+	})
+	return r.m, r.ok, err
 }
 
 // gateMessage is the id of the message of question or post gate raw names; false for any other.

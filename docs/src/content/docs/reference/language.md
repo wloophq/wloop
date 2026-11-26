@@ -356,11 +356,14 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `views.<name>.sort` (string): The facts the view sorts by, comma-separated; a leading - sorts one descending. A view's tasks start oldest first, a parent's children in their sibling order.
 - `views.<name>.key` (string): The key that jumps to the view: `g`, a space and a key that no core key uses, such as `g i`. Its help is the view's label, and its help line the view's summary.
 - `views.<name>.hide_disabled` (bool, default `false`): The view hides the tasks whose units are all of a disabled plugin, and the gates on a disabled plugin's units.
+- `views.<name>.opens` (table): What a page of the view opens instead of its own, such as the Outbox's, which opens what waits on you narrowed to the drafts to send; none opens its own.
+- `views.<name>.opens.view` (string): The view it opens, such as needs-you.
+- `views.<name>.opens.kind` (string): The decision kind of decisions.toml that narrows the view it opens, such as send-draft; none shows it whole.
 - `views.<name>.rail` (bool, default `true`): The rail lists the view; false keeps it for the home, a queue or search.
 - `views.<name>.remove_clean` (bool, default `false`): The view offers to remove at once the workspaces its tasks' links hold whose checkouts hold nothing that is not published, as each link's remove action does; the rest are kept, with why.
-- `views.<name>.layout` (one of `list`, `board`, `outbox`, default `list`): How the cockpit draws the view: list, its rows; board, a lane per group, which a person may switch back to the list; outbox, the Outbox's drafts, which the lens filters, groups and sorts over the `draft_facets` and the view's own `group` and `sort` (draft facts), read from the Outbox's own route whatever the view lists.
-- `badge` (table): The menu bar's badge.
-- `badge.views` (list of strings): The views whose counts the badge adds up, each a view of views.
+- `views.<name>.layout` (one of `list`, `board`, `outbox`, `queue`, default `list`): How the cockpit draws the view: list, its rows; board, a lane per group, which a person may switch back to the list; outbox, the Outbox's drafts, which the lens filters, groups and sorts over the `draft_facets` and the view's own `group` and `sort` (draft facts), read from the Outbox's own route whatever the view lists; queue, what waits on you one decision at a time, the queue of every decision kind in decisions.toml's order, read from its own route whatever the view lists, which the home's section and counter of the view and the menu bar open; with no `when` of its own, such a view lists the tasks of the views decisions.toml's kinds name.
+- `badge` (table): The views whose tasks the menu bar notifies, the daily digest counts and `status` prints; the menu bar's title counts Needs you, the queue of every decision kind, instead.
+- `badge.views` (list of strings): Those views, each a view of views: the tasks of the ones on the rail post the menu bar's banners, the digest counts what moved in them and `status` prints their tasks.
 - `review` (table): The review's steps, in the order the review walks them.
 - `review.<name>` (table): A step of the review, by the view it walks, which views declares. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones, and comes after the steps below it.
 - `review.<name>.label` (string, localized): What the step asks of you, as the review lists it. Required.
@@ -631,7 +634,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `stage` (one of `first`, `follow-up`): The pass over the unit: its first, or one after; empty is the one the unit's plan holds due, one after before its first.
   - `due` (one of `plan`, `when`, default `plan`): When the round is due: plan, when the unit's plan holds it due; when, whenever the workflow's when matches, as a round to retry what a failed round left, whatever the plan holds.
   - `runner` (one of `session`, `headless`): How the turn runs, one of the intent's runners; by default its first.
-  - `open_question` (one of `hold`, `replace_if_moved`, default `hold`): What an open question of the intent's newest turn does to a round of the unit's plan: hold waits for its answer; replace_if_moved runs a round planned on a head other than the one the question was asked on, which replaces the asked turn, supersedes its gate and carries the question in the new turn's history. An answer on its way holds the round either way.
+  - `open_question` (one of `hold`, `replace_if_moved`, default `hold`): What an open question of the intent's newest turn does to a round of the unit's plan: hold waits for its answer; replace_if_moved runs a round on a head other than the one the question was asked on (the head its plan holds, or the unit's stored pr.head when due is when), which replaces the asked turn, supersedes its gate and carries the question in the new turn's history. An answer on its way holds the round either way.
 - `draft.propose`:
   - `purpose` (string): What the draft is for, such as nudge or close. Required.
   - `delivery` (one of `comment`, `reaction`, `edit`, `review`, `reply`, `resolve`, `request_review`, `message`, `delete`, `unreaction`): How the draft posts, a delivery the plugin that posts it declares; empty is that plugin's default delivery.
@@ -876,8 +879,8 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `answer_placeholder`: The placeholder of a notification's input that answers an agent.
   - `answer_button`: The button of a notification's input that answers an agent.
   - `digest_title`: The title of the daily digest notification.
-  - `digest_new`: The digest's first line: Count, the tasks of the badge's views that moved since the last digest.
-  - `digest_view`: The digest's line for one view the badge counts: View, its label, and Count, its tasks.
+  - `digest_new`: The digest's first line: Count, the tasks of the views the badge names that moved since the last digest.
+  - `digest_view`: The digest's line for one view the badge names: View, its label, and Count, its tasks.
   - `notify_inbox`: The title of the notification of a task in the Inbox that says what it is itself.
   - `notify_draft_for_me`: The button of an Inbox task's notification that delegates it to an agent headless.
   - `notify_reply`: The button of a notification whose text input saves a reply for approval, or answers an agent.
@@ -1035,12 +1038,20 @@ The fields each notice reads besides `Name` and `Command`:
 - `drafts` (table by name): The words of a draft's payload on its card, by the draft kind the manifest declares; a field with no word shows as its key, a value with none as itself.
 - `drafts.<name>` (table): One draft kind's words.
 - `drafts.<name>.label` (string, localized): What the draft kind is called to a person, such as "Review": the Outbox's name for the kind, and the head of its group when drafts group by kind. A kind with no label shows its name.
+- `drafts.<name>.comments` (string): The JSON pointer of the payload's list whose records are the draft's comments, such as a review's inline comments, "/comments": the floating widget lists and counts them on the draft's card. None when unset.
 - `drafts.<name>.fields` (table by name): The payload's fields, by the key they have in the payload, at any depth.
 - `drafts.<name>.fields.<name>` (table): One field's words.
 - `drafts.<name>.fields.<name>.label` (string, localized): The field's name on the card.
 - `drafts.<name>.fields.<name>.markdown` (bool, default `false`): The field's value is Markdown, such as an inline comment's body: the card renders it as it renders the draft's text.
 - `drafts.<name>.fields.<name>.values` (table by name): The words of the field's values, by value, such as an enum's; the card keeps the value itself in its tooltip.
 - `drafts.<name>.fields.<name>.values.<name>` (string, localized): The value's word.
+- `drafts.<name>.fields.<name>.tones` (table by name): The design token each of the field's values is drawn in, by value, such as a review verdict's chip.
+- `drafts.<name>.fields.<name>.tones.<name>` (one of `me`, `loop`, `late`, `err`, `muted`): The value's tone.
+  - `me`: What waits on the user; the accent.
+  - `loop`: The loop's doing, or a good outcome.
+  - `late`: Time and medium risk: amber.
+  - `err`: A failure, a block or high risk.
+  - `muted`: Secondary, nothing to signal.
 - `detail` (table): How a field of the plugin's unit detail shows, by field.
 - `detail.<name>` (table): One field's words.
 - `detail.<name>.label` (string, localized): The field's name. Required.
@@ -1232,6 +1243,19 @@ The fields each notice reads besides `Name` and `Command`:
 ## Decision kinds (`decisions.toml`)
 
 - `open` (string, localized): What a queue's button that opens a unit at its source says; only the default layer's file sets it.
+- `order` (list of `answer`, `approve-plan`, `send-draft`, `review-step`, `last-step`, `pick-someone`, `act`): The order of the decision kinds in the queue of every kind, each once; a kind it leaves out comes after the listed ones. Under sort "kind", items of one kind follow, oldest decision first. Only the default layer's file sets it.
+  - `answer`: An agent's question or a post waits for the user's answer.
+  - `approve-plan`: An agent's plan waits for the user's approval.
+  - `send-draft`: A draft waits for the user to send, edit or drop it.
+  - `review-step`: A step of a review waits for the user's look.
+  - `last-step`: A unit waits only for its last step at its source, such as a merge or a closure, which the user takes there.
+  - `pick-someone`: A unit waits for the user to pick who takes it next, such as a reviewer.
+  - `act`: A proposal or a trust request waits for the user to act on it.
+- `sort` (one of `kind`, `newest`, default `kind`): How the queue of every kind lists its items. Only the default layer's file sets it.
+  - `kind`: By kind, in order; within a kind, oldest decision first.
+  - `newest`: Every item, newest decision first, whatever its kind.
+- `queue_all` (string, localized): The title of the queue of every kind; only the default layer's file sets it.
+- `empty_all` (string, localized): What the queue of every kind says when it holds nothing; only the default layer's file sets it.
 - `gates` (table): The decision kind of an open gate, by gate kind; only the default layer's file maps gates.
 - `gates.<name>` (one of `answer`, `approve-plan`, `send-draft`, `review-step`, `last-step`, `pick-someone`, `act`): One gate kind's decision kind.
   - `answer`: An agent's question or a post waits for the user's answer.
@@ -1267,6 +1291,12 @@ The fields each notice reads besides `Name` and `Command`:
 - `kinds.<name>.primary` (string): The gate intent a queue offers first on a gate of the kind; empty offers the gate's first.
 - `kinds.<name>.queue` (string, localized): The title of the kind's queue. Required.
 - `kinds.<name>.empty` (string, localized): What the kind's queue says when it holds nothing. Required.
+- `kinds.<name>.tone` (one of `me`, `loop`, `late`, `err`, `muted`, default `me`): The design token the floating widget draws the kind's items in, such as "late" for plans.
+  - `me`: What waits on the user; the accent.
+  - `loop`: The loop's doing, or a good outcome.
+  - `late`: Time and medium risk: amber.
+  - `err`: A failure, a block or high risk.
+  - `muted`: Secondary, nothing to signal.
 - `kinds.<name>.noun` (string or table, localized): What one of the kind's tasks is, which the briefing counts, such as "question". A string, or a table of its CLDR plural forms, `other` required.
 - `kinds.<name>.noun.zero` (string, localized): Its zero form.
 - `kinds.<name>.noun.one` (string, localized): Its one form.
@@ -1539,6 +1569,10 @@ The fields each notice reads besides `Name` and `Command`:
 - `window` (table): The app's own window on macOS, which the app reads when it starts.
 - `window.enabled` (bool, default `true`): Show the cockpit in the app's own window on macOS; false opens it in the browser.
 - `window.hotkey` (string, default `ctrl+option+space`): The global shortcut that opens the omnibox panel, such as cmd+shift+space; empty for none.
+- `window.float` (one of `on`, `off`, default `off`): on shows the floating widget, which carries what waits on you: no Needs you banner posts while it is hidden for a while, or shown with a page that has loaded; they post while it is off, and while a shown widget's page has not loaded once a few seconds have passed since it was asked to. Needs the app's own window.
+- `window.float_hotkey` (string, default `cmd+option+.`): The global shortcut that hides the floating widget until something new arrives, and shows it again, such as cmd+shift+j; empty for none. Bound only while window.float is on. The default leaves out ctrl+option, VoiceOver's modifier.
+- `window.float_morning` (string, default `09:00`): The local HH:MM at which Hide until tomorrow shows the floating widget again.
+- `window.float_over_full_screen` (bool, default `false`): The floating widget shows over a full-screen app or a presentation too; off, it stays off a full-screen space.
 
 ### Units and tasks
 

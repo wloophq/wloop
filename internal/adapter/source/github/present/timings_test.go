@@ -19,13 +19,13 @@ func TestTimingsReportQuantiles(t *testing.T) {
 	for _, v := range []int64{14300, 6200, 18400, 11300, 13200} {
 		ds = append(ds, time.Duration(v)*time.Millisecond)
 	}
-	if q := quantiles(ds); q != (api.Quantiles{Count: 5, P50MS: 13200, P90MS: 18400}) {
+	if q := api.QuantilesOf(ds); q != (api.Quantiles{Count: 5, P50MS: 13200, P90MS: 18400}) {
 		t.Fatalf("%+v", q)
 	}
-	if q := quantiles(nil); q != (api.Quantiles{}) {
+	if q := api.QuantilesOf(nil); q != (api.Quantiles{}) {
 		t.Fatalf("empty: %+v", q)
 	}
-	if q := quantiles(ds[:1]); q != (api.Quantiles{Count: 1, P50MS: 14300, P90MS: 14300}) {
+	if q := api.QuantilesOf(ds[:1]); q != (api.Quantiles{Count: 1, P50MS: 14300, P90MS: 14300}) {
 		t.Fatalf("one: %+v", q)
 	}
 	ms := func(v int64) *int64 { return &v }

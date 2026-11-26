@@ -20,7 +20,7 @@ var schema string
 
 // SchemaVersion is the PRAGMA user_version of a store this release creates
 // and migrates to.
-const SchemaVersion = 15
+const SchemaVersion = 16
 
 const TimeLayout = time.RFC3339Nano
 

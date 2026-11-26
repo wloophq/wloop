@@ -19,19 +19,21 @@ func (e *Env) serveMessages(ctx context.Context, d daemon.Deps, db *sqlite.DB, c
 	ledger := e.itemsLedger(db, cfg, logf)
 	tasks := e.newTasks(db, cfg, ledger)
 	e.serveMemory(db, cfg, logf)
-	if e.messages == nil {
-		e.messages = &messages.Service{Store: inventory.NewMessages(db), Books: openPRBooks{sqlite.New(db), e.reportedPRs()}, Turns: e.Turns,
+	svc := e.inbox()
+	if svc == nil {
+		svc = &messages.Service{Store: inventory.NewMessages(db), Books: openPRBooks{sqlite.New(db), e.reportedPRs()}, Turns: e.Turns,
 			Ledger: ledger, Tasks: tasks, Gates: draftGates{e, db, logf}, Drafts: optionDrafts{draftGates{e, db, logf}}, Intents: registryPort{e}, Clock: clockFunc(e.Now), Log: logf,
 			ProposalText: proposalText(e.loadedIntents, logf), Ready: e.outboxBuilt,
 			ChatDeps: messages.ChatDeps{Sessions: e.Turns, Log: chatLog{db}, Units: db.Tasks(), Merged: db, Intent: e.chatIntent, Memory: e.memory}}
+		e.setInbox(svc)
 	}
-	e.Turns.Chats = e.messages.Chats()
-	d.Tasks, d.Messages = tasks, e.messages
+	e.Turns.Chats = svc.Chats()
+	d.Tasks, d.Messages = tasks, svc
 	d.Gates = e.newGates(db, logf)
 	d.GateReader = e.gateReader
 	if e.changes != nil {
-		e.background.Go(func() { e.messages.Run(ctx, e.changes) })
-		e.background.Go(func() { reconcileEnded(ctx, e.messages, e.changes, logf) })
+		e.background.Go(func() { svc.Run(ctx, e.changes) })
+		e.background.Go(func() { reconcileEnded(ctx, svc, e.changes, logf) })
 	}
 	return d
 }

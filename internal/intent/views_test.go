@@ -298,7 +298,7 @@ func TestViewsKeepTheirDeclaredOrderAcrossLayers(t *testing.T) {
 	if want := append(bundled.IDs(), "zeta", "alpha"); !slices.Equal(texts.IDs(), want) {
 		t.Errorf("views %v, want %v", texts.IDs(), want)
 	}
-	if want := []string{"inbox", "needs-me", "waiting", "chase", "fits-now", "blocked-by-me", "stalled", "in-loop", "approved", "snoozed", "focus", "projects", "someday", "logbook", "done", "outbox", "review-projects", "review",
+	if want := []string{"needs-you", "inbox", "needs-me", "waiting", "chase", "fits-now", "blocked-by-me", "stalled", "in-loop", "approved", "snoozed", "focus", "projects", "someday", "logbook", "done", "outbox", "review-projects", "review",
 		"home-blocked", "home-stalled", "decide-answer", "decide-approve-plan", "decide-send-draft", "decide-review-step", "decide-last-step", "decide-pick-someone", "decide-act"}; !slices.Equal(bundled.IDs(), want) {
 		t.Errorf("bundled views %v, want %v", bundled.IDs(), want)
 	}
@@ -787,5 +787,26 @@ func TestPluginDraftKindLabel(t *testing.T) {
 	texts, problems = loadUI(append(layers, profile.Layer{Name: "user:acme", Dir: user}), readerOf(nil))
 	if d := texts["acme"].Drafts["note"]; len(problems) > 0 || d.Label != "Memo" || d.Fields["body"].Label != "Text" {
 		t.Errorf("note over a user layer: %+v, %s", d, problems.Error())
+	}
+}
+
+// A view's opens names the view, and the decision kind narrowing it, that a
+// page of its own opens instead; it must name a view and a decision kind.
+func TestAViewOpensTheViewItNames(t *testing.T) {
+	texts, problems := loadListsWith(t, string(defaultLists()), "[views.outbox]\nopens = { view = \"inbox\" }\n")
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	if v, _ := texts.View("outbox"); v.Opens != (ViewOpens{View: "inbox"}) {
+		t.Fatalf("outbox opens %+v, want the user's inbox", v.Opens)
+	}
+	if v, _ := texts.View("inbox"); v.Opens != (ViewOpens{}) {
+		t.Fatalf("inbox opens %+v, want none", v.Opens)
+	}
+	_, problems = loadListsWith(t, string(defaultLists()), "[views.outbox]\nopens = { view = \"nowhere\", kind = \"sideways\" }\n")
+	for _, want := range []string{"views.outbox.opens.view: nowhere names no view", "views.outbox.opens.kind: sideways names no decision kind"} {
+		if !strings.Contains(problems, want) {
+			t.Errorf("no %q in:\n%s", want, problems)
+		}
 	}
 }

@@ -68,13 +68,43 @@ func rewordOf(host window.Host) func(*texts.Catalog) {
 	return nil
 }
 
-// windowShow starts the window controller on host until ctx ends, in wg, and
-// returns how the menu bar shows a route in the window; nil without a host.
-func windowShow(ctx context.Context, wg *sync.WaitGroup, host window.Host, daemon window.Events, cockpit func(string) (string, error), win config.Window, logf func(string, ...any)) func(string) error {
+// windowShow starts the window controller on host until ctx ends, in wg; nil
+// without a host. A host that keeps user defaults keeps the widget's
+// placement in them; the widget's hotkey is bound only while win turns it on.
+func windowShow(ctx context.Context, wg *sync.WaitGroup, host window.Host, daemon window.Events, cockpit func(string) (string, error), win config.Window, logf func(string, ...any)) *window.Controller {
 	if host == nil {
 		return nil
 	}
-	ctl := window.New(window.Config{Host: host, Daemon: daemon, CockpitURL: cockpit, Hotkey: win.Hotkey, Log: logf})
+	defaults, _ := host.(window.Defaults)
+	cfg := window.Config{Host: host, Daemon: daemon, CockpitURL: cockpit, Hotkey: win.Hotkey, Log: logf, Defaults: defaults}
+	if win.Float == config.FloatOn {
+		cfg.FloatHotkey, cfg.FloatOverFullScreen = win.FloatHotkey, win.FloatOverFullScreen
+	}
+	ctl := window.New(cfg)
 	wg.Go(func() { _ = ctl.Run(ctx) })
-	return ctl.Show
+	return ctl
+}
+
+// withWindow is cfg showing routes in ctl's window and, when win turns it
+// on, the floating widget, whose visibility host's user defaults keep; cfg
+// as it is without a controller.
+func withWindow(cfg menubar.Config, ctl *window.Controller, host window.Host, win config.Window) menubar.Config {
+	if ctl == nil {
+		return cfg
+	}
+	cfg.Window, cfg.ShowFloat, cfg.HideFloat, cfg.FloatReady = ctl.Show, ctl.ShowFloat, ctl.HideFloat, ctl.FloatReady
+	cfg.Float, cfg.FloatMorning = win.Float == config.FloatOn, win.FloatMorning
+	cfg.Defaults, _ = host.(window.Defaults)
+	return cfg
+}
+
+// hookFloat hands the hides the float's page asks for and its hotkey to the
+// menu bar, which decides what the float shows.
+func hookFloat(ctl *window.Controller, c *menubar.Controller) {
+	if ctl == nil {
+		return
+	}
+	ctl.OnFloatHide(c.FloatHide)
+	ctl.OnFloatHotkey(c.ToggleFloat)
+	ctl.OnFloatReady(c.FloatPageReady)
 }

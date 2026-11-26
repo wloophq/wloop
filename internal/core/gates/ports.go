@@ -74,6 +74,9 @@ type Options interface {
 	// gate drafted's draft, in an option or its confirm, the answer that picks that pin and the rev it pinned;
 	// false when no open message pins it. question is zero while the message's question gate is not opened yet.
 	Pinning(ctx context.Context, drafted gate.Gate) (question gate.Gate, answer string, rev int64, ok bool, err error)
+	// PinnedDrafts are the drafts the open messages pin, each with the id of the message that pins it: every
+	// draft gate Pinning names a pin for, read at once.
+	PinnedDrafts(ctx context.Context) (map[int64]int64, error)
 }
 
 // Query narrows Where: a zero field matches every gate, but Statuses, which

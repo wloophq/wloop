@@ -58,6 +58,8 @@ type UIDraft struct {
 	// Label is what the kind is called to a person.
 	Label  string                  `toml:"label"`
 	Fields map[string]UIDraftField `toml:"fields"`
+	// Comments is the JSON pointer of the payload's list whose records are the draft's comments.
+	Comments string `toml:"comments"`
 }
 
 // UIDraftField is a payload field's name and its values' words, by value.
@@ -66,6 +68,8 @@ type UIDraftField struct {
 	Values map[string]string `toml:"values"`
 	// Markdown says the field's value is Markdown, which the card renders as the draft's text is.
 	Markdown *bool `toml:"markdown"`
+	// Tones are the design token each value is drawn in, by value.
+	Tones map[string]string `toml:"tones"`
 }
 
 // UISearch is a custom view's search: the queries it runs at a press, the
@@ -298,11 +302,15 @@ func mergeUI(into, over UITexts) UITexts {
 		if b.Label != "" {
 			a.Label = b.Label
 		}
+		if b.Comments != "" {
+			a.Comments = b.Comments
+		}
 		a.Fields = mergeMap(a.Fields, b.Fields, func(x, y UIDraftField) UIDraftField {
 			if y.Label != "" {
 				x.Label = y.Label
 			}
 			x.Values = mergeMap(x.Values, y.Values, func(_, v string) string { return v })
+			x.Tones = mergeMap(x.Tones, y.Tones, func(_, v string) string { return v })
 			if y.Markdown != nil {
 				x.Markdown = y.Markdown
 			}

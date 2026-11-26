@@ -128,7 +128,8 @@ func TestEveryPluginUnitSlotReadsDraftFailedAndStale(t *testing.T) {
 	}
 	for _, slot := range slots {
 		env := WorkflowEnv(slot)
-		for name, want := range map[string]expr.Type{"draft.failed": expr.Bool, "draft.stale": expr.Bool, "draft.failed_kind": expr.String, "draft.failed_ref": expr.String} {
+		for name, want := range map[string]expr.Type{"draft.failed": expr.Bool, "draft.stale": expr.Bool, "draft.failed_kind": expr.String, "draft.failed_ref": expr.String,
+			"draft.held_ref": expr.String, "draft.held_kind": expr.String, "draft.held_basis": expr.String, "draft.held_stale": expr.Bool} {
 			if typ, ok := env[name]; !ok || typ != want || IsUntrusted(name) {
 				t.Errorf("slot %s reads %s as %v, %v; untrusted %v", slot, name, typ, ok, IsUntrusted(name))
 			}

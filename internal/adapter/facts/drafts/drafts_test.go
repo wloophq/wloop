@@ -61,7 +61,9 @@ func TestFailedSendIsUnitFact(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if want := (workflow.Facts{FactFailed: c.failed, FactStale: c.stale, FactFailedKind: got[FactFailedKind], FactFailedRef: got[FactFailedRef]}); !equal(got, want) {
+		want := workflow.Facts{FactFailed: c.failed, FactStale: c.stale, FactFailedKind: got[FactFailedKind], FactFailedRef: got[FactFailedRef],
+			FactHeldStale: false, FactHeldKind: "", FactHeldRef: "", FactHeldBasis: ""}
+		if !equal(got, want) {
 			t.Errorf("%s: %v, want %v", c.name, got, want)
 		}
 	}
@@ -110,4 +112,51 @@ func equal(a, b workflow.Facts) bool {
 		}
 	}
 	return true
+}
+
+func held(id draft.ID, origin draft.OriginKind, basis string) draft.Draft {
+	return draft.Draft{ID: id, Unit: pr7, Kind: "review", Rev: 1, State: draft.Held, Basis: basis, Origin: draft.Origin{Kind: origin, TurnSeq: 3}}
+}
+
+func TestHeldDraftFactsNameTheDraftAPushCanMakeStale(t *testing.T) {
+	at := func(m int) time.Time { return time.Date(2026, 10, 18, 12, m, 0, 0, time.UTC) }
+	fresh := held(4, draft.OriginTurn, "c2")
+	refused := held(5, draft.OriginTurn, "c1")
+	refused.Cause, refused.UpdatedAt = draft.CauseStale, at(1)
+	newer := held(6, draft.OriginTurn, "c2")
+	newer.Rev, newer.UpdatedAt = 2, at(5)
+	noBasis := held(7, draft.OriginTurn, "")
+	noBasis.Kind, noBasis.UpdatedAt = "thread_reply", at(9)
+	for _, c := range []struct {
+		name             string
+		drafts           stored
+		ref, kind, basis string
+		stale            bool
+	}{
+		{"none", nil, "", "", "", false},
+		{"a turn's fresh held review", stored{fresh}, "4:1", "review", "c2", false},
+		{"a held review refused as stale", stored{refused}, "5:1", "review", "c1", true},
+		{"the refused one before a newer fresh one", stored{newer, refused}, "5:1", "review", "c1", true},
+		{"the newest of two fresh ones", stored{fresh, newer}, "6:2", "review", "c2", false},
+		{"a held draft of no basis", stored{noBasis}, "", "", "", false},
+		{"a person's held review", stored{held(8, draft.OriginUser, "c1")}, "", "", "", false},
+		{"a held review your own session wrote", stored{func() draft.Draft {
+			d := held(10, draft.OriginSession, "c1")
+			d.Cause = draft.CauseStale
+			return d
+		}()}, "", "", "", false},
+		{"a workflow's held draft", stored{held(9, draft.OriginAuto, "c1")}, "", "", "", false},
+	} {
+		got, err := Provider{Drafts: c.drafts}.Facts(context.Background(), pr7)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got[FactHeldRef] != c.ref || got[FactHeldKind] != c.kind || got[FactHeldBasis] != c.basis || got[FactHeldStale] != c.stale {
+			t.Errorf("%s: ref %v kind %v basis %v stale %v, want %q %q %q %v", c.name,
+				got[FactHeldRef], got[FactHeldKind], got[FactHeldBasis], got[FactHeldStale], c.ref, c.kind, c.basis, c.stale)
+		}
+		if got[FactFailed] != false || got[FactStale] != false || got[FactFailedRef] != "" {
+			t.Errorf("%s: a held draft set the failed facts: %v", c.name, got)
+		}
+	}
 }

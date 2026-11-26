@@ -19,6 +19,8 @@ type Service struct {
 	Lists     Lists
 	Decisions Decisions
 	Words     Words
+	// Serves, when set, keeps the items every queue and count serves.
+	Serves Serves
 }
 
 // Home is the briefing, the sections and the capture hint.
@@ -54,32 +56,53 @@ type PluginNoun struct {
 	Noun   string
 }
 
-// Rows are a section's first rows and how many it holds.
+// Rows are a section's first rows, or a queue section's first items, and how many it holds.
 type Rows struct {
 	Section
 	Tasks []task.Task
+	Items []Item
 	Total int
 }
 
-// Home reads every counter's and section's view in one pass and words the briefing.
+// Home reads every counter's and section's view in one pass, and the queue of every kind once when a counter or a
+// section counts it, and words the briefing.
 func (s Service) Home(ctx context.Context) (Home, error) {
 	p := s.Words.Profile()
 	var views []task.View
+	queued := false
 	for _, c := range p.Counters {
+		if c.Queue {
+			queued = true
+			continue
+		}
 		views = append(views, s.viewOf(c))
 	}
 	for _, sec := range p.Sections {
+		if sec.Queue {
+			queued = true
+			continue
+		}
 		views = append(views, sec.View)
 	}
 	slices.Sort(views)
-	sets, err := s.Lists.Sets(ctx, slices.Compact(views), nil)
-	if err != nil {
-		return Home{}, err
+	sets := map[task.View][]task.Task{}
+	if len(views) > 0 {
+		var err error
+		if sets, err = s.Lists.Sets(ctx, slices.Compact(views), nil); err != nil {
+			return Home{}, err
+		}
+	}
+	var items []Item
+	if queued {
+		var err error
+		if items, err = s.QueueAll(ctx, p.Order, p.Sort, nil); err != nil {
+			return Home{}, err
+		}
 	}
 	h := Home{Template: p.Template, CaptureHint: p.CaptureHint}
 	var clauses [][]Part
 	for i, c := range p.Counters {
-		count, clause, err := s.count(ctx, p, c, sets[s.viewOf(c)])
+		count, clause, err := s.count(ctx, p, c, sets[s.viewOf(c)], items)
 		if err != nil {
 			return Home{}, err
 		}
@@ -95,6 +118,10 @@ func (s Service) Home(ctx context.Context) (Home, error) {
 		h.Empty = p.Empty
 	}
 	for _, sec := range p.Sections {
+		if sec.Queue {
+			h.Sections = append(h.Sections, Rows{Section: sec, Items: items[:min(len(items), sec.Limit)], Total: len(items)})
+			continue
+		}
 		ts := sets[sec.View]
 		h.Sections = append(h.Sections, Rows{Section: sec, Tasks: ts[:min(len(ts), sec.Limit)], Total: len(ts)})
 	}
@@ -109,16 +136,19 @@ func (s Service) viewOf(c Counter) task.View {
 }
 
 // count is counter c over its tasks ts, and its clause in the served plural form: a kind's counter counts the
-// decisions its queue lists, a view's the tasks.
-func (s Service) count(ctx context.Context, p Profile, c Counter, ts []task.Task) (Count, string, error) {
+// decisions its queue lists, a queue counter the items of the queue of every kind, and a view's the tasks.
+func (s Service) count(ctx context.Context, p Profile, c Counter, ts []task.Task, items []Item) (Count, string, error) {
 	n := len(ts)
+	if c.Queue {
+		n = len(items)
+	}
 	var shares []share
 	if c.Kind != "" {
-		ds, err := s.decisions(ctx, c.Kind, ts)
+		its, err := s.items(ctx, c.Kind, ts)
 		if err != nil {
 			return Count{}, "", err
 		}
-		n, shares = len(ds), sharesOf(ds)
+		n, shares = len(its), sharesOf(its)
 	}
 	out := Count{ID: c.ID, Kind: c.Kind, View: s.viewOf(c), N: n}
 	form := s.Words.Form(n)
@@ -127,11 +157,7 @@ func (s Service) count(ctx context.Context, p Profile, c Counter, ts []task.Task
 		kw := s.Words.Kind(c.Kind)
 		noun, clause = noun.Or(kw.Noun), clause.Or(kw.Clause)
 		for _, sh := range shares {
-			pn := noun
-			if sh.Plugin != "" {
-				pn = s.Words.Plugin(sh.Plugin).Noun.Or(noun)
-			}
-			out.Nouns = append(out.Nouns, PluginNoun{Plugin: sh.Plugin, N: sh.N, Noun: pn.For(s.Words.Form(sh.N))})
+			out.Nouns = append(out.Nouns, PluginNoun{Plugin: sh.Plugin, N: sh.N, Noun: s.noun(sh.Plugin, noun).For(s.Words.Form(sh.N))})
 		}
 		switch {
 		case len(shares) == 1 && shares[0].Plugin != "":
@@ -151,17 +177,25 @@ func (s Service) count(ctx context.Context, p Profile, c Counter, ts []task.Task
 	return out, clause.For(form), nil
 }
 
+// noun is plugin's noun for its units, else noun; noun for decisions of no unit.
+func (s Service) noun(plugin unit.ProviderID, noun Forms) Forms {
+	if plugin == "" {
+		return noun
+	}
+	return s.Words.Plugin(plugin).Noun.Or(noun)
+}
+
 // share is a plugin's decisions among a kind's; "" holds those of no unit.
 type share struct {
 	Plugin unit.ProviderID
 	N      int
 }
 
-// sharesOf counts ds by the plugin of each decision's unit, the most first.
-func sharesOf(ds []taskDecision) []share {
+// sharesOf counts its by the plugin of each item's unit, the most first.
+func sharesOf(its []Item) []share {
 	by := map[unit.ProviderID]int{}
-	for _, d := range ds {
-		by[d.found.Unit.Provider]++
+	for _, it := range its {
+		by[it.Found.Unit.Provider]++
 	}
 	out := make([]share, 0, len(by))
 	for p, n := range by {

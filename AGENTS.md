@@ -33,7 +33,7 @@ A move that touches only the user's own tasks (close, done, dismiss, unwatch, re
 | Every reserved key of a manifest, `actions.toml`, `tasks.toml`, `views.toml`, `gates.toml`, `records.toml`, `keys.toml` and the configuration | `builtin.Grammar` in `internal/intent/builtin/grammar*.go`; `make docs-ref` regenerates the schemas and the reference |
 | The words of the built-in actions | `profiles/default/actions.toml` |
 | Task states and their categories, properties (type, writers, role), verbs (words, moves, handler, who may run them), who owes a task, the chat's intent | `profiles/default/tasks.toml` |
-| Views (what each lists, label, key, group, sort), the Review's steps, the views the badge counts | `profiles/default/views.toml` |
+| Views (what each lists, label, key, group, sort), the Review's steps, the views the badge names | `profiles/default/views.toml` |
 | Gates: names, kinds, words, the intents each is resolved with, the default approval | `profiles/default/gates.toml`; the gates service, the only code that resolves a gate, in `internal/core/gates` |
 | The core keys' help | `profiles/default/keys.toml` |
 | What a trigger handled (marks) | `[marks]` and `handled()` in a workflow; encoding and comparison in `internal/domain/mark`; a plugin's own mark names beside its planner (`internal/domain/round` for GitHub rounds) |

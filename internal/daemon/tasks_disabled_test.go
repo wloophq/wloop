@@ -27,7 +27,7 @@ func TestADisabledPluginsTasksAndDraftsLeaveTheCountsAndStayDismissable(t *testi
 	if got := taskIDs(inbox.Tasks); len(got) != 1 || got[0] != "t-mine" {
 		t.Fatalf("inbox %v", got)
 	}
-	if c := inbox.Counters; c.Badge != 1 || c.Views["inbox"] != 1 || c.Views["outbox"] != 0 {
+	if c := inbox.Counters; c.Views["inbox"] != 1 || c.Views["outbox"] != 0 {
 		t.Fatalf("counters %+v", c)
 	}
 	if p := r.page(t, "view=outbox"); len(p.Tasks) != 0 {

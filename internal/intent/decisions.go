@@ -2,6 +2,7 @@ package intent
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"maps"
 	"slices"
@@ -28,6 +29,13 @@ type Decisions struct {
 	Primary map[dunit.ProviderID]map[decision.Kind]string
 	// Open is what a queue's button that opens a unit at its source says.
 	Open string
+	// Order is the order of the kinds in the queue of every kind; a kind it leaves out comes after, in
+	// decision.Kinds order.
+	Order []decision.Kind
+	// QueueAll and EmptyAll are the title of the queue of every kind and what it says when it holds nothing.
+	QueueAll, EmptyAll string
+	// Sort is how the queue of every kind lists its items.
+	Sort decision.Sort
 }
 
 // KindTexts are a decision kind's view and words; Primary is the gate intent a queue offers first, "" the
@@ -37,11 +45,17 @@ type KindTexts struct {
 	Noun, Clause i18n.Forms
 	Queue, Empty string
 	Primary      string
+	// Tone is the design token the kind's items are drawn in.
+	Tone         string
 	viewAt, prAt *sheet
 }
 
 type mDecisions struct {
 	Open       *string           `toml:"open"`
+	Order      []string          `toml:"order"`
+	Sort       *string           `toml:"sort"`
+	QueueAll   *string           `toml:"queue_all"`
+	EmptyAll   *string           `toml:"empty_all"`
 	Gates      map[string]string `toml:"gates"`
 	Situations map[string]string `toml:"situations"`
 	Signals    map[string]string `toml:"signals"`
@@ -56,6 +70,7 @@ type mKind struct {
 	Empty   *string `toml:"empty"`
 	Noun    any     `toml:"noun"`
 	Clause  any     `toml:"clause"`
+	Tone    *string `toml:"tone"`
 }
 
 type decisionsLoad struct {
@@ -73,6 +88,7 @@ func loadDecisions(layers []profile.Layer, r layerReader) (*decisionsLoad, Probl
 				Signals: map[dunit.ProviderID]map[string]decision.Kind{}},
 			Kinds:   map[decision.Kind]KindTexts{},
 			Primary: map[dunit.ProviderID]map[decision.Kind]string{},
+			Sort:    decision.SortKind,
 		},
 		primaryAt: map[dunit.ProviderID]map[decision.Kind]*sheet{},
 	}
@@ -125,6 +141,28 @@ func (l *decisionsLoad) merge(plugin dunit.ProviderID, file string, src []byte, 
 	}
 	if plugin == "" {
 		text(s, "open", m.Open, &l.def.Open)
+		text(s, "queue_all", m.QueueAll, &l.def.QueueAll)
+		text(s, "empty_all", m.EmptyAll, &l.def.EmptyAll)
+		if m.Sort != nil {
+			n := len(s.problems)
+			s.oneOf("sort", *m.Sort, builtin.DecisionSorts())
+			if len(s.problems) == n {
+				l.def.Sort = decision.Sort(*m.Sort)
+			}
+		}
+		if m.Order != nil {
+			l.def.Order = nil
+			for i, v := range m.Order {
+				path := fmt.Sprintf("order[%d]", i)
+				switch k, ok := kindOf(path, v); {
+				case !ok:
+				case slices.Contains(l.def.Order, k):
+					s.add(path, "%s is in the order already", v)
+				default:
+					l.def.Order = append(l.def.Order, k)
+				}
+			}
+		}
 		for _, section := range []struct {
 			name string
 			set  bool
@@ -156,7 +194,8 @@ func (l *decisionsLoad) merge(plugin dunit.ProviderID, file string, src []byte, 
 		for _, section := range []struct {
 			name string
 			set  bool
-		}{{"gates", m.Gates != nil}, {"kinds", m.Kinds != nil}, {"open", m.Open != nil}} {
+		}{{"gates", m.Gates != nil}, {"kinds", m.Kinds != nil}, {"open", m.Open != nil}, {"order", m.Order != nil}, {"sort", m.Sort != nil},
+			{"queue_all", m.QueueAll != nil}, {"empty_all", m.EmptyAll != nil}} {
 			if section.set {
 				s.add(section.name, "%s belong to the profile's own %s, not a plugin's layer", section.name, DecisionsFile)
 			}
@@ -220,6 +259,12 @@ func (l *decisionsLoad) mergeKind(s *sheet, k decision.Kind, m mKind) {
 	if m.Primary != nil {
 		t.Primary, t.prAt = strings.TrimSpace(*m.Primary), s
 	}
+	if m.Tone != nil && slices.ContainsFunc(builtin.TokenTones, func(v builtin.Value) bool { return v.Name == *m.Tone }) {
+		t.Tone = *m.Tone
+	}
+	if t.Tone == "" {
+		t.Tone = builtin.DefaultTone
+	}
 	for _, f := range []struct {
 		key string
 		v   any
@@ -233,6 +278,37 @@ func (l *decisionsLoad) mergeKind(s *sheet, k decision.Kind, m mKind) {
 		}
 	}
 	l.def.Kinds[k] = t
+}
+
+// queueViews gives each view of views drawn as the queue of every kind that sets no when of its own the union of
+// the whens of the views the kinds name, so it lists the tasks the queue walks and a profile that edits a kind's
+// view moves it too.
+func (l *decisionsLoad) queueViews(views *ViewsDef, tasks TasksDef) Problems {
+	var out Problems
+	for i := range views.Views {
+		v := &views.Views[i]
+		if v.Layout != builtin.ViewLayoutQueue || v.WhenText != "" {
+			continue
+		}
+		var parts []string
+		for _, k := range decision.Kinds {
+			kv, ok := views.View(l.def.Kinds[k].View)
+			if ok && kv.WhenText != "" && kv.Over == v.Over && !slices.Contains(parts, "("+kv.WhenText+")") {
+				parts = append(parts, "("+kv.WhenText+")")
+			}
+		}
+		if len(parts) == 0 {
+			continue
+		}
+		text := strings.Join(parts, " || ")
+		pred, err := expr.CompileWorkflow(text, ViewEnv(v.Over, tasks))
+		if err != nil {
+			out = append(out, Problem{File: ViewsFile, Field: "views." + v.ID + ".when", Msg: "the union of the kinds' views does not compile: " + err.Error()})
+			continue
+		}
+		v.When, v.WhenText = pred, text
+	}
+	return out
 }
 
 // check says what of the decisions names what the profile lacks: a kind's view, a kind's primary gate intent,

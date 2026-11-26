@@ -28,8 +28,8 @@ func TestCountsWhereCountsOnlyTheKeptTasksOfEachView(t *testing.T) {
 			t.Errorf("%s %d, want %d (%+v)", v, c.Views[v], n, c.Views)
 		}
 	}
-	if c.Areas["OSS"] != 1 || c.Areas["Hiring"] != 0 || c.Contexts["@reply"] != 1 || c.Badge != 2 {
-		t.Errorf("areas %v contexts %v badge %d", c.Areas, c.Contexts, c.Badge)
+	if c.Areas["OSS"] != 1 || c.Areas["Hiring"] != 0 || c.Contexts["@reply"] != 1 {
+		t.Errorf("areas %v contexts %v", c.Areas, c.Contexts)
 	}
 	all, err := r.svc.CountsWhere(ctx, "Hiring", func(context.Context, task.Task) (bool, error) { return true, nil })
 	if err != nil {

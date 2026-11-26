@@ -5,23 +5,25 @@ import (
 	"strings"
 )
 
-// Category is the first part of a notification id: Q<record-id>, INBOX, OUTBOX, HELD, DIGEST or NOTE.
+// Category is the first part of a notification id: NEEDS, DIGEST or NOTE.
 type Category string
 
 const (
-	CategoryInbox  Category = "INBOX"
-	CategoryOutbox Category = "OUTBOX"
-	// CategoryHeld's token is the local day, so it is posted once a day.
-	CategoryHeld Category = "HELD"
+	// CategoryNeeds is what waits on the user: a task, a question or a draft. A daily one's token is the local
+	// day, so it is posted once a day.
+	CategoryNeeds Category = "NEEDS"
 	// CategoryDigest's task is "-" and its token the day.
 	CategoryDigest Category = "DIGEST"
 	CategoryNote   Category = "NOTE"
 )
 
-// QuestionCategory is the category of the question of turn record record.
-func QuestionCategory(record int64) Category {
-	return Category("Q" + strconv.FormatInt(record, 10))
-}
+// The categories NEEDS took over, which a notification posted before it still carries: an Inbox task, a
+// draft, a held task and Q<record-id>, a question.
+const (
+	CategoryInbox  Category = "INBOX"
+	CategoryOutbox Category = "OUTBOX"
+	CategoryHeld   Category = "HELD"
+)
 
 // Record is the turn record a question category names; ok is false for any other category.
 func (c Category) Record() (int64, bool) {
@@ -38,7 +40,7 @@ func (c Category) Record() (int64, bool) {
 
 func (c Category) known() bool {
 	switch c {
-	case CategoryInbox, CategoryOutbox, CategoryHeld, CategoryDigest, CategoryNote:
+	case CategoryNeeds, CategoryDigest, CategoryNote, CategoryInbox, CategoryOutbox, CategoryHeld:
 		return true
 	}
 	_, ok := c.Record()
