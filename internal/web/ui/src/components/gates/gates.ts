@@ -106,7 +106,9 @@ export async function resolveGate(e: J, g: J, id: string, option?: string): Prom
   const args: Record<string, string> = {};
   if (intent.answer) {
     const chosen = option === undefined ? gateOption(g) : option;
-    const pick = chosen && pinGone(g, chosen) ? "" : chosen;
+    const gone = !!chosen && pinGone(g, chosen);
+    if (gone) gateState.picked.delete(key);
+    const pick = gone ? "" : chosen;
     const text = (gateState.answers.get(key) || "").trim();
     if (!text && !pick) {
       setNotice(t("{action}: write the answer first", { action: intent.label }), true);

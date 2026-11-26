@@ -60,9 +60,6 @@ func (b openPRBooks) Books(ctx context.Context, units ...unit.Unit) (map[unit.Un
 // reconcileEnded reconciles the messages of the pull requests each
 // TopicPRs note names that hold an open message, until ctx ends.
 func reconcileEnded(ctx context.Context, s *messages.Service, changes port.Changes, logf func(string, ...any)) {
-	if !s.WaitReady(ctx) {
-		return
-	}
 	var mu sync.Mutex
 	var noted []unit.Unit
 	kick := make(chan struct{}, 1)
@@ -79,6 +76,9 @@ func reconcileEnded(ctx context.Context, s *messages.Service, changes port.Chang
 		}
 	})
 	defer cancel()
+	if !s.WaitReady(ctx) {
+		return
+	}
 	for {
 		select {
 		case <-ctx.Done():

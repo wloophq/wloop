@@ -142,7 +142,6 @@ func (s *Service) Reconcile(ctx context.Context, units ...unit.Unit) error {
 			errs = append(errs, err)
 		}
 	}
-	errs = append(errs, s.closeLeftQuestions(ctx))
 	return errors.Join(errs...)
 }
 

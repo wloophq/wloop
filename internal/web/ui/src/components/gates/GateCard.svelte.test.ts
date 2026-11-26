@@ -322,6 +322,7 @@ describe("rf1_reattack5_test.go, a pinned recommendation", () => {
     await fireEvent.click(byFocus(c, "gate:3:answer"));
     await settle();
     expect(posts).toEqual([]);
+    expect(gateState.picked.get("3") || "").toBe("");
   });
 
   test("TestAPickCarriesThePersonsEditOfThePinnedDraft: the pinned draft is edited on the card and the pick sends the edit", async () => {

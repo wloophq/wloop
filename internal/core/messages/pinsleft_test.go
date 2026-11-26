@@ -20,6 +20,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 // postQuestion asks which of two held drafts to post: every option posts one.
@@ -40,7 +41,7 @@ func pinsRig(t *testing.T, q *record.Question) (*rig, *optionDrafts, message.Mes
 	r.started(r7)
 	r.record(t, r7, 1, askedRecord(q))
 	r.live()
-	r.reconcile(t, r7)
+	r.pass(t, r7)
 	return r, od, r.only(t)
 }
 
@@ -105,12 +106,12 @@ func TestAQuestionClosesWhenItsLastPinnedDraftLeaves(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			r, od, m := pinsRig(t, postQuestion())
 			od.leave(42, draft.Dropped, "user", gate.Rejected)
-			r.reconcile(t, r7)
+			r.pass(t, r7)
 			if g := r.gateOf(t, m); g.Status != gate.Open {
 				t.Fatalf("question gate %s after one of two drafts left, want open", g.Status)
 			}
 			od.leave(43, c.state, c.reason, c.status)
-			r.reconcile(t, r7)
+			r.pass(t, r7)
 			requireMoot(t, r, m)
 		})
 	}
@@ -120,7 +121,7 @@ func TestAConfirmClosesWhenItsDraftLeaves(t *testing.T) {
 	q := &record.Question{Kind: "confirm", Text: "Post the approval?", Draft: &record.DraftRef{ID: 42, Rev: 1}}
 	r, od, m := pinsRig(t, q)
 	od.leave(42, draft.Dropped, "user", gate.Rejected)
-	r.reconcile(t, r7)
+	r.pass(t, r7)
 	requireMoot(t, r, m)
 }
 
@@ -129,7 +130,7 @@ func TestAConfirmClosesWhenItsDraftLeaves(t *testing.T) {
 func TestAQuestionWithAPinStillWaitingStaysOpen(t *testing.T) {
 	r, od, m := pinsRig(t, postQuestion())
 	od.leave(42, draft.Dropped, "user", gate.Rejected)
-	r.reconcile(t)
+	r.pass(t)
 	q := r.gateOf(t, m)
 	if q.Status != gate.Open || r.book(t, r7).Turns[0].State != turn.Asked {
 		t.Fatalf("question gate %s, turn %s: want open and asked", q.Status, r.book(t, r7).Turns[0].State)
@@ -158,7 +159,7 @@ func TestAQuestionWithAnOptionPostingNothingStaysOpen(t *testing.T) {
 	r, od, m := pinsRig(t, q)
 	od.leave(42, draft.Dropped, "user", gate.Rejected)
 	od.leave(43, draft.Dropped, draft.WithdrawMoot, gate.Superseded)
-	r.reconcile(t, r7)
+	r.pass(t, r7)
 	if g := r.gateOf(t, m); g.Status != gate.Open || r.book(t, r7).Turns[0].State != turn.Asked {
 		t.Fatalf("question gate %s, turn %s: want open and asked", g.Status, r.book(t, r7).Turns[0].State)
 	}
@@ -170,9 +171,9 @@ func TestAQuestionStuckBeforeThisCloseHealsOnTheFirstPass(t *testing.T) {
 	r, od, m := pinsRig(t, postQuestion())
 	od.leave(42, draft.Dropped, "user", gate.Rejected)
 	od.leave(43, draft.Dropped, "user", gate.Rejected)
-	r.reconcile(t)
+	r.pass(t)
 	requireMoot(t, r, m)
-	r.reconcile(t)
+	r.pass(t)
 	if open := r.open(t); len(open) != 0 {
 		t.Fatalf("open messages %+v after a second pass, want none", open)
 	}
@@ -181,14 +182,11 @@ func TestAQuestionStuckBeforeThisCloseHealsOnTheFirstPass(t *testing.T) {
 // TestAPickInFlightIsNotMooted: the pick of a confirm queues its draft before it answers the question; a pass that
 // runs in between finds the question being decided and leaves it to the pick.
 func TestAPickInFlightIsNotMooted(t *testing.T) {
-	ctx := context.Background()
 	q := &record.Question{Kind: "confirm", Text: "Post the approval?", Draft: &record.DraftRef{ID: 42, Rev: 1}}
 	r, od, m := pinsRig(t, q)
 	hook := &interleaved{optionDrafts: od}
 	hook.then = func() {
-		if err := r.svc.Reconcile(ctx, r7); err != nil {
-			t.Logf("the pass during the pick: %v", err)
-		}
+		r.pass(t, r7)
 	}
 	r.gates = gates.New(gates.Deps{Store: r.gateStore, Reader: r.gateStore, Profile: profileGates, Tasks: gateTasks{r.taskStore, r.tasks}, Clock: r.clock,
 		Deliverer: r.svc, Decider: r.svc, Publisher: hook, Options: r.svc, Log: t.Logf, Sessions: drivenSessions(nil)})
@@ -240,7 +238,7 @@ func TestAnAnsweredQuestionIsNotMooted(t *testing.T) {
 	}
 	od.leave(42, draft.Queued, "", gate.Approved)
 	od.leave(43, draft.Dropped, messages.ReasonOtherOption, gate.Superseded)
-	r.reconcile(t, r7)
+	r.pass(t, r7)
 	if r.book(t, r7).Turns[0].State == turn.Dismissed {
 		t.Fatal("the turn of an answered question was dismissed as if its drafts left")
 	}
@@ -261,43 +259,46 @@ func TestADraftOfAnotherUnitClosesItsQuestion(t *testing.T) {
 	r.started(r7)
 	r.record(t, r7, 1, askedRecord(postQuestion()))
 	r.live()
-	r.reconcile(t, r7)
+	r.pass(t, r7)
 	m := r.only(t)
 	od.leave(42, draft.Dropped, "user", gate.Rejected)
-	r.reconcile(t, r7)
+	r.pass(t, r7)
 	od.leave(43, draft.Dropped, draft.WithdrawMoot, gate.Superseded)
-	r.reconcile(t, r8)
+	r.pass(t, r8)
 	requireMoot(t, r, m)
 }
 
-// reconcilingGates run one pass over r7 right after the first question gate the close supersedes, as the worker
-// may.
+// reconcilingGates start one pass over r7 right after the first question gate the close supersedes, as the worker
+// may, while the close still runs.
 type reconcilingGates struct {
 	serviceGates
 	r    *rig
 	once *atomic.Bool
+	wg   *sync.WaitGroup
 }
 
 func (g reconcilingGates) SupersedeQuestion(ctx context.Context, id int64, settle func(context.Context) (bool, error)) (bool, error) {
 	closed, err := g.serviceGates.SupersedeQuestion(ctx, id, settle)
-	var rerr error
 	if g.once.CompareAndSwap(false, true) {
-		rerr = g.r.svc.Reconcile(ctx, r7)
-	}
-	if rerr != nil {
-		return closed, rerr
+		g.wg.Go(func() {
+			if err := g.r.svc.Reconcile(ctx, r7); err != nil {
+				panic(err)
+			}
+		})
 	}
 	return closed, err
 }
 
-// TestAPassDuringTheCloseOpensNoGate: a pass that runs once the question's gate is superseded finds its turn
-// dismissed already, so it closes the message instead of opening it a new gate.
+// TestAPassDuringTheCloseOpensNoGate: a pass that runs once the question's gate is superseded, while the close still
+// runs, opens the message no new gate.
 func TestAPassDuringTheCloseOpensNoGate(t *testing.T) {
 	r, od, m := pinsRig(t, postQuestion())
-	r.svc.Gates = reconcilingGates{serviceGates{r.gates, r.gateStore}, r, &atomic.Bool{}}
+	var wg sync.WaitGroup
+	r.svc.Gates = reconcilingGates{serviceGates{r.gates, r.gateStore}, r, &atomic.Bool{}, &wg}
 	od.leave(42, draft.Dropped, "user", gate.Rejected)
 	od.leave(43, draft.Dropped, "user", gate.Rejected)
-	r.reconcile(t, r7)
+	r.pass(t, r7)
+	wg.Wait()
 	requireMoot(t, r, m)
 	all, err := r.gateStore.Where(context.Background(), gates.Query{Kind: gate.KindQuestion, Statuses: []gate.Status{gate.Open, gate.Answered,
 		gate.Dismissed, gate.Superseded}})
@@ -333,4 +334,14 @@ func TestTheWorkerHealsOnceItsDraftsAreReadable(t *testing.T) {
 		synctest.Wait()
 		requireMoot(t, r, m)
 	})
+}
+
+// pass is a pass of the messages worker over units: their reconcile, then the close of the questions whose drafts
+// left.
+func (r *rig) pass(t *testing.T, units ...unit.Unit) {
+	t.Helper()
+	r.reconcile(t, units...)
+	if err := r.svc.CloseLeftQuestions(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 }
