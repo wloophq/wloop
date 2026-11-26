@@ -90,7 +90,7 @@ The comment each nudge drafts still waits for you, unless a rule that names its 
 
 ## Tune the Slack proposals
 
-`slack-stalled-nudge`, `slack-stalled-nudge-dm` and `slack-ask-owner` propose drafts, which wait for you in Needs you. A thread you started is closed without a message by `slack-closure-quiet`, with no approval, once the extraction read its newest message; to propose a closing message instead, turn `slack-closure` on and the quiet one off:
+`slack-stalled-nudge`, `slack-stalled-nudge-dm` and `slack-ask-owner` propose drafts, which wait for you in Needs you. A thread you started is closed without a message by `slack-closure-quiet`, with no approval, once the extraction read its newest message, and a conversation no item came from by `slack-ended-empty` once it ended; to propose a closing message instead, turn `slack-closure` on and the quiet one off:
 
 ```toml
 [workflows.slack-closure]

@@ -70,7 +70,7 @@ Follow a whole thread, so every message of it comes in:
 
 ## 4. Work with it
 
-Slack threads and DM topics now give tasks in your Inbox. Their rows offer the intents that serve Slack: the bundled `act`, and any intent of yours with `provider = "slack"` or `"any"`.
+Slack threads and DM topics now give tasks in your Inbox. Their rows offer the intents that serve Slack: the bundled `act`, and any intent of yours with `provider = "slack"` or `"any"`. They also offer **Close**.
 
 **Delegate.** `d` on a Slack task (a thread's task, whether it waits on you or on someone else, or a capture on a thread) runs `act`, or your own Slack intent of the same verb, which outranks it. It asks for optional guidance first. By default `act` runs headless: one read-only agent call that resolves what it can and writes the replies as drafts for that task. In the cockpit, Delegate on the task's page asks for the guidance and lets the action pick its mode; the page's composer writes to the task's agent instead, which starts a turn when no session of the task is live. A thread or a DM with no [placement](/reference/configuration/) runs its session in a neutral directory under the state directory, an empty repository with no project checked out; add a placement for a channel to work its threads in that repository instead. When no session can run at all, such as with no workspace manager enabled, the terminal's guidance prompt says why. Tab in the guidance prompt switches to a session. The Inbox notification of a Slack task has a **Draft for me** button. A session started this way knows the task and its items, so what it drafts with `slack_post` lands in the task's detail like a headless draft.
 
@@ -92,6 +92,8 @@ Write one, approve one with `a`, or from a terminal:
 {{command}} needs --kind send-draft
 {{command}} needs approve <ref>
 ```
+
+**Close.** **Close** on a conversation's row in the Slack view, or on the page of a task that holds it, is offered while none of its items is open. It closes the conversation without a message and without asking: the tasks that hold it end and it leaves the Slack view until a message someone else writes there comes in, or an item opens. A conversation no item came from closes on its own once it has been quiet for `plugins.slack.ended_after` (7 days), unless an open task of yours holds it, through the `slack-ended-empty` workflow; turn it off with `[workflows.slack-ended-empty] enabled = false`. When it stops being watched is in [Closing a conversation](/concepts/slack/#closing-a-conversation).
 
 `slack send` posts as you after a confirmation, through the running daemon. To a message ref or permalink it replies in the thread through the Outbox, as a draft of yours approved once you say yes (or at once with `--yes`), so the reply counts for the thread's items and shows in the Logbook; `--broadcast` asks that draft to also post to the conversation. To a channel, a person, or with `--thread=false`, it posts directly:
 

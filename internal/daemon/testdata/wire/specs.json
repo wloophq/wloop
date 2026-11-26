@@ -1,5 +1,5 @@
 {
-  "version": "e67ef4df4627",
+  "version": "3fbb7a86e93a",
   "specs": [
     {
       "id": "answer",
@@ -371,6 +371,21 @@
       "source": "builtin",
       "scope": "unit",
       "plugin": "github"
+    },
+    {
+      "id": "unit.close",
+      "label": "Close",
+      "summary": "Close it without a message: its source records the closure, which ends the tasks that hold it and takes it out of its view.",
+      "group": "control",
+      "surfaces": [
+        "row",
+        "detail",
+        "task",
+        "tui",
+        "menubar"
+      ],
+      "source": "builtin",
+      "scope": "unit"
     },
     {
       "id": "open",

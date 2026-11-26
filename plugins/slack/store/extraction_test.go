@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/pkg/plugin/store"
+
 	"github.com/wloophq/wloop/plugins/slack/unit"
 )
 
@@ -18,7 +20,7 @@ func init() {
 				Hints: map[unit.Unit]map[string]ExtractionHint{u: {"e1": {Mode: "none"}}}})
 		}, touches: true, units: []unit.Unit{u}},
 		writeCase{method: "ExtractionStore.MarkClosed", call: func(ctx context.Context, e *noteEnv) error {
-			return e.db.Extraction().MarkClosed(ctx, u, noteAt)
+			return e.db.Extraction().MarkClosed(ctx, u, noteAt, "1.1")
 		}, touches: true, units: []unit.Unit{u}},
 		writeCase{method: "ExtractionStore.SetWatched", call: func(ctx context.Context, e *noteEnv) error {
 			return e.db.Extraction().SetWatched(ctx, u, true, noteAt)
@@ -154,5 +156,76 @@ func TestTheExtractionKeepsTheBriefItLastWrote(t *testing.T) {
 		if err != nil || got[u].Brief != c.want {
 			t.Fatalf("after save %d the brief is %q, want %q (%v)", i, got[u].Brief, c.want, err)
 		}
+	}
+}
+
+func TestMarkClosedKeepsTheNewestMessageItSaw(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db := openExtraction(t)
+	u := unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/1.1"}
+	if err := db.Extraction().MarkClosed(ctx, u, noteAt, "1700000003.000100"); err != nil {
+		t.Fatal(err)
+	}
+	st, err := db.Extraction().States(ctx, []unit.Unit{u})
+	if err != nil || !st[u].ClosureMarked || st[u].ClosedTS != "1700000003.000100" {
+		t.Fatalf("state %+v %v", st[u], err)
+	}
+}
+
+// TestAClosureMarkedBeforeClosedTSHoldsUntilANewerMessage: migrating a store marked before closed_ts gives a
+// thread's closure the newest message the extraction read, else the newest message of the thread or of the DM
+// segment's range, and one with no message stored a ts any message is after.
+func TestAClosureMarkedBeforeClosedTSHoldsUntilANewerMessage(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	dir := t.TempDir()
+	old, err := store.Open(ctx, dir, store.Options{Migrations: migrations[:4]})
+	if err != nil {
+		t.Fatal(err)
+	}
+	thread, segment, empty, open := unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/1.1"}, unit.Unit{Provider: "slack", Key: "T000AAA/D000AAA/seg/s1"},
+		unit.Unit{Provider: "slack", Key: "T000AAA/D000AAA/seg/s3"}, unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/2.1"}
+	unread := unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/1700000040.000100"}
+	for _, q := range []string{
+		`INSERT INTO extraction_cursors (provider, unit_key, last_ts, closure_marked, at) VALUES
+			('slack', '` + thread.Key + `', '1700000003.000100', 1, ''), ('slack', '` + segment.Key + `', '', 1, ''),
+			('slack', '` + empty.Key + `', '', 1, ''), ('slack', '` + open.Key + `', '1700000004.000100', 0, ''),
+			('slack', '` + unread.Key + `', '', 1, '')`,
+		`INSERT INTO segment_map (provider, conversation, segment_id, team, from_ts, to_ts, created_at, updated_at) VALUES
+			('slack', 'D000AAA', 's1', 'T000AAA', '1700000010.000100', '1700000020.000100', '', ''),
+			('slack', 'D000AAA', 's2', 'T000AAA', '1700000030.000100', '', '', ''),
+			('slack', 'D000AAA', 's3', 'T000AAA', '1700000050.000100', '', '', '')`,
+		`INSERT INTO slack_messages (conversation, ts, user, text) VALUES ('D000AAA', '1700000011.000100', 'U1', 'a'),
+			('D000AAA', '1700000019.000100', 'U2', 'b'), ('D000AAA', '1700000031.000100', 'U1', 'c')`,
+		`INSERT INTO slack_messages (conversation, ts, thread_ts, user, text) VALUES ('C000AAA', '1700000040.000100', '', 'U1', 'p'),
+			('C000AAA', '1700000042.000100', '1700000040.000100', 'U2', 'r'), ('C000AAA', '1700000050.000100', '', 'U2', 'other')`,
+	} {
+		if _, err := old.ExecContext(ctx, q); err != nil {
+			t.Fatalf("%s: %v", q, err)
+		}
+	}
+	old.Close()
+	db, err := Open(ctx, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	st, err := db.Extraction().States(ctx, []unit.Unit{thread, segment, empty, open, unread})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for u, want := range map[unit.Unit]string{thread: "1700000003.000100", segment: "1700000019.000100", empty: "0.000000", open: "", unread: "1700000042.000100"} {
+		if st[u].ClosedTS != want {
+			t.Errorf("%s closed at %q, want %q", u.Key, st[u].ClosedTS, want)
+		}
+	}
+}
+
+func TestMarkClosedRefusesAClosureWithNoTS(t *testing.T) {
+	t.Parallel()
+	db := openExtraction(t)
+	if err := db.Extraction().MarkClosed(context.Background(), unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/1.1"}, noteAt, ""); err == nil {
+		t.Fatal("marked a closure with no ts")
 	}
 }

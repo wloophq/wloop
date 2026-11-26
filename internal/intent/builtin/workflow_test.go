@@ -29,7 +29,7 @@ var workflowTable = map[string]string{
 		"sequential_next:B review_due:B children_ready:B children_mine:B ask_age:D askers:L asker_names:L promised:T extraction_lag:D link_owes:L link_signals:L " +
 		"clarified:B refused_pairs:L undone:L candidates:L linked_candidates:L link_target_tasks:L link_target_units:L title:S notes:S",
 	"gate": "kind:S name:S status:S delivery:S",
-	"slack": "channel:S conversation:S started_by_me:B closure_posted:B live_task:B items_open:I items_resolved:I items_unowned:I items_unowned_age_days:I " +
+	"slack": "channel:S conversation:S started_by_me:B closure_posted:B live_task:B open_task:B items_open:I items_resolved:I items_unowned:I items_unowned_age_days:I " +
 		"ended:B settled_at:T fingerprint:S language:S members:L extracted:B last_by_me:B last_to_me:B reacted_to_last:B items_resolved_unanswered:I " +
 		"waited_posted:L waited_reactions:L unmentionable:L",
 	"brief":   "goal:S risk:S kind:S size:S tags:L missing:L",

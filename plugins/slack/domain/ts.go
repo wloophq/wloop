@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+// TS is the ts that names t, to the microsecond.
+func TS(t time.Time) string {
+	return strconv.FormatInt(t.Unix(), 10) + "." + strconv.FormatInt(int64(t.Nanosecond()/1000)+1_000_000, 10)[1:]
+}
+
 // TSTime is the instant a Slack ts names, to the microsecond; zero for a ts
 // that names none.
 func TSTime(ts string) time.Time {

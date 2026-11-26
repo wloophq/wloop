@@ -695,6 +695,11 @@ func (j *Job) apply(ctx context.Context, k unit.Unit, p *pend, team string, in I
 	if _, err := j.watch(ctx, cfg, k, obj, units, state, now, true); err != nil {
 		j.logf("slack extraction %s: watch: %v", k, err)
 	}
+	if state.ClosurePosted && len(units) > 0 {
+		if err := j.Closed(ctx, units[0]); err != nil {
+			j.logf("slack extraction %s: unwatch a closed conversation: %v", k, err)
+		}
+	}
 	return len(ops), nil
 }
 
@@ -950,6 +955,42 @@ func (j *Job) watch(ctx context.Context, cfg config.Config, k unit.Unit, obj sla
 		return true, j.Store.DB.SetWatched(ctx, k, false, now)
 	}
 	return false, nil
+}
+
+// Closed unwatches the object of u, a unit unit.closed just closed, when a closure ended each of the object's
+// units and none of them holds an item: no item's warm period waits for a follow-up there.
+func (j *Job) Closed(ctx context.Context, u unit.Unit) error {
+	if j.Ledger == nil {
+		return nil
+	}
+	k, ok := targetFor(u)
+	if !ok {
+		return fmt.Errorf("not a unit of a conversation: %s", u)
+	}
+	obj, units, err := j.objectOf(ctx, k)
+	if err != nil {
+		return err
+	}
+	states, err := j.Store.DB.States(ctx, units)
+	if err != nil {
+		return err
+	}
+	for _, x := range units {
+		if st := states[x]; !st.ClosurePosted && !st.ClosureMarked {
+			return nil
+		}
+		its, err := j.Ledger.Items(ctx, x)
+		if err != nil {
+			return err
+		}
+		if len(its) > 0 {
+			return nil
+		}
+	}
+	if err := j.Watcher.Unwatch(ctx, obj); err != nil {
+		return err
+	}
+	return j.Store.DB.SetWatched(ctx, k, false, j.Clock.Now())
 }
 
 func settled(its []items.Item, now time.Time, warm time.Duration) bool {

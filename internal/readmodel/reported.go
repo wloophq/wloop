@@ -283,7 +283,7 @@ func (p *Reported) Derive(base Base, in any, at time.Time) (api.Row, error) {
 	}
 	s := x.snap
 	sit := x.situation(base, at)
-	r := api.Row{Label: x.unit.Label(), Kind: api.Kind(sit.Kind), Views: slices.Clone(s.Views), Facets: map[string][]string{},
+	r := api.Row{Unit: x.unit, Label: x.unit.Label(), Kind: api.Kind(sit.Kind), Views: slices.Clone(s.Views), Facets: map[string][]string{},
 		Payload: s.Data}
 	if c := s.Card; c != nil {
 		r.Link, r.Title = c.Link, c.Title
@@ -344,7 +344,8 @@ func offered(base Base, r api.Row, offers []src.Offer) []api.ActionState {
 	for _, o := range offers {
 		ids = append(ids, o.Action)
 	}
-	return catalog.WithOffers(catalog.UnitStates(catalog.Facts{Row: r, Tracked: true, Open: !r.Summary.Closed, Asked: base.Asked,
+	closes := base.Closes != nil && base.Closes(r.Unit.Provider)
+	return catalog.WithOffers(catalog.UnitStates(catalog.Facts{Row: r, Tracked: true, Open: !r.Summary.Closed, Closes: closes, Asked: base.Asked,
 		Intents: base.Intents}), ids)
 }
 

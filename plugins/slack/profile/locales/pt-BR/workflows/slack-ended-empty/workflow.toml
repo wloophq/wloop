@@ -1,0 +1,1 @@
+summary = "Fechar uma conversa do Slack da qual nenhum item saiu quando ela terminou, seja quem for que a começou, a menos que uma tarefa aberta sua a contenha, sem mensagem: registra o fechamento, que deixa de acompanhá-la e a tira da visão do Slack"

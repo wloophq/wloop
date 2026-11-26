@@ -36,8 +36,10 @@ type Facts struct {
 	HeldByCap bool
 	Tracked   bool
 	Open      bool
-	Mine      bool
-	Muted     bool
+	// Closes says the row's unit closes with no message: its plugin applies unit.closed without a post.
+	Closes bool
+	Mine   bool
+	Muted  bool
 	// MutedStored is a mute kept in the override, active or not.
 	MutedStored       bool
 	Draft             bool

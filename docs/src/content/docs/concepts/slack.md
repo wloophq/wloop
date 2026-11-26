@@ -29,6 +29,20 @@ The model extracts every item of a conversation, for the brief, but only an item
 
 Spend is capped: $0.10 per call, $3.00 and 500 calls per local day; a day's cap frees at local midnight, and the job's skip line says when. After 3 failed calls in a row the job pauses for 15 minutes before a trial call. `plugins.slack.extraction.enabled: false` turns it off. The [configuration reference](/reference/configuration/) lists every knob, and the [extraction eval](/reference/slack-eval/) measures the extraction against your own conversations.
 
+## Closing a conversation
+
+A conversation is closed when a closure was posted there, as the extraction reads it, or marked by `unit.closed`, the effect a sent closing draft, the `effects.apply` step of a workflow and the **Close** action apply. A closure ends the tasks that hold the conversation and makes it ended (`slack.closure_posted`, `slack.ended`). A marked closure keeps the newest message the conversation had when it applied, or the time it applied when it had none, and holds until a message someone other than you posted after that one comes in: your own message keeps it closed, theirs reopens it, and its facts read it open again. A conversation that is no longer watched only takes the messages [What comes in](#what-comes-in) admits: a message in a DM or a group DM, one that mentions you or contains one of your terms, or a reply in a thread you started reopens it, and any other reply in the thread never comes in. While none of its items is open, a closed conversation leaves the Slack view, its row, card and facts kept for its tasks and the Logbook; a message that reopens it, or an item that opens there, brings it back, and an open item watches it again. A reopened conversation can be closed again: by **Close** or `slack-closure-quiet`, which end the tasks that hold it as the first closure did, or by `slack-ended-empty`, which waits while an open task holds it. A row offers **Close**, as does the page of a task that holds it, while it is in the Slack view and none of its items is open: to close a conversation that still asks something, resolve or dismiss that item first.
+
+The plugin stops watching a closed conversation once its items resolved and stayed so for `items.heat.warm_for`, so a late follow-up still comes in; one no item ever came from is unwatched at once, when it is marked closed or the extraction reads a closure posted there. A conversation of a DM is its open segments: it is unwatched only when every one of them is closed and none holds an item. A thread you follow (`{{command}} slack follow`) or a session watches stays watched.
+
+Three paths close a conversation without a message, none of them waiting for your approval, since none posts:
+
+- **Close** on a conversation's row applies `unit.closed` at once;
+- `slack-closure-quiet` closes a thread you started once its items resolved, nobody's newest message there is to you and the extraction read its newest message;
+- `slack-ended-empty` closes a conversation no item came from once it ended, quiet for `plugins.slack.ended_after` (7 days), whoever started it, once the extraction read its newest message, unless an open task holds it, a snoozed one included, so a task you attached to it to follow up is never ended for you (`!slack.closure_posted && slack.ended && slack.items_open == 0 && slack.items_resolved == 0 && !slack.open_task && slack.extracted`).
+
+`slack-closure`, off by default, closes with a message instead; sending it applies the same effect.
+
 ## The agent tools
 
 While Slack is configured and the plugin is on, the daemon's MCP server serves these tools to agent sessions:

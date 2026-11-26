@@ -263,3 +263,53 @@ func TestATurnEndingRefreshesTheRowWithoutThePlugin(t *testing.T) {
 		t.Errorf("the plugin reported again: rev %d", s.Rev)
 	}
 }
+
+func TestARowOffersCloseWhenItsPluginClosesWithNoMessage(t *testing.T) {
+	u := acmeUnit("one")
+	resolved := report("one")
+	resolved.Items[0].State = "resolved"
+	r := &reports{snaps: map[unit.Unit]src.Snapshot{u: resolved}}
+	p := reportedProvider(t, r, &books{by: map[unit.Unit]turn.Book{}}, nil, nil, nil)
+	load := func() map[unit.Unit]any {
+		t.Helper()
+		ins, err := p.Load(context.Background(), []unit.Unit{u})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ins
+	}
+	ins := load()
+	offers := func(base readmodel.Base) (api.ActionState, bool) {
+		t.Helper()
+		base.Intents = acmeRole(t)
+		row, err := p.Derive(base, ins[u], reportedAt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		i := slices.IndexFunc(row.Actions, func(st api.ActionState) bool { return st.ID == catalog.UnitClose })
+		if i < 0 {
+			return api.ActionState{}, false
+		}
+		return row.Actions[i], true
+	}
+	if st, ok := offers(readmodel.Base{Closes: func(p unit.ProviderID) bool { return p == "acme" }}); !ok || !st.Enabled {
+		t.Errorf("close %+v %v, want enabled on a unit whose plugin closes it", st, ok)
+	}
+	if st, ok := offers(readmodel.Base{}); ok {
+		t.Errorf("close %+v offered on a unit nothing closes", st)
+	}
+	r.snaps[u] = report("one")
+	ins = load()
+	if st, ok := offers(readmodel.Base{Closes: func(unit.ProviderID) bool { return true }}); ok {
+		t.Errorf("close %+v offered on a unit with an open item, which its closure would leave in the view", st)
+	}
+}
+
+func TestARowWithNoActionsOffersCloseWhenItsPluginClosesWithNoMessage(t *testing.T) {
+	u := acmeUnit("one")
+	base := readmodel.Base{Intents: acmeRole(t), Closes: func(p unit.ProviderID) bool { return p == "acme" }}
+	row := readmodel.WithIntents(base, u, api.Row{Views: []string{"asks"}})
+	if !slices.ContainsFunc(row.Actions, func(st api.ActionState) bool { return st.ID == catalog.UnitClose && st.Enabled }) {
+		t.Errorf("actions %+v, want close", row.Actions)
+	}
+}

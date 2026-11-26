@@ -337,6 +337,20 @@
     "source": "builtin"
   },
   {
+    "id": "unit.close",
+    "label": "Close",
+    "summary": "Close it without a message: its source records the closure, which ends the tasks that hold it and takes it out of its view.",
+    "group": "control",
+    "surfaces": [
+      "row",
+      "detail",
+      "task",
+      "tui",
+      "menubar"
+    ],
+    "source": "builtin"
+  },
+  {
     "id": "open",
     "label": "Open",
     "summary": "Open the pull request's workspace in its workspace manager, or the pull request itself when it has none.",

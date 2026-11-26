@@ -94,7 +94,7 @@
      "status": ""
     }
    },
-   "specs_version": "e67ef4df4627",
+   "specs_version": "3fbb7a86e93a",
    "summary": {
     "closed": false,
     "line": "",
@@ -206,7 +206,7 @@
      "status": ""
     }
    },
-   "specs_version": "e67ef4df4627",
+   "specs_version": "3fbb7a86e93a",
    "summary": {
     "closed": false,
     "line": "",
@@ -3088,6 +3088,21 @@
     "toggle": "track"
    },
    {
+    "group": "control",
+    "id": "unit.close",
+    "label": "Close",
+    "scope": "unit",
+    "source": "builtin",
+    "summary": "Close it without a message: its source records the closure, which ends the tasks that hold it and takes it out of its view.",
+    "surfaces": [
+     "row",
+     "detail",
+     "task",
+     "tui",
+     "menubar"
+    ]
+   },
+   {
     "group": "workspace",
     "id": "open",
     "key": "O",
@@ -3294,7 +3309,7 @@
     ]
    }
   ],
-  "version": "e67ef4df4627"
+  "version": "3fbb7a86e93a"
  },
  "stringsEn": {
   "\"state\" to wait until the situation changes": "\"state\" to wait until the situation changes",

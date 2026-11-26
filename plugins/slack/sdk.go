@@ -15,6 +15,7 @@ import (
 	sdk "github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	"github.com/wloophq/wloop/plugins/slack/config"
+	dslack "github.com/wloophq/wloop/plugins/slack/domain"
 	"github.com/wloophq/wloop/plugins/slack/draft"
 	"github.com/wloophq/wloop/plugins/slack/host"
 	"github.com/wloophq/wloop/plugins/slack/store"
@@ -386,7 +387,8 @@ func (s *Plugin) Payload(ctx context.Context, req src.PayloadRequest) (src.Paylo
 }
 
 // EffectUnitClosed is the draft effect that marks a unit's closure, which
-// no extraction pass clears.
+// no extraction pass clears, and stops watching a conversation no item came
+// from.
 const EffectUnitClosed = "unit.closed"
 
 func (s *Plugin) ApplyEffect(ctx context.Context, req src.EffectRequest) error {
@@ -401,7 +403,18 @@ func (s *Plugin) ApplyEffect(ctx context.Context, req src.EffectRequest) error {
 	if at.IsZero() {
 		at = p.now()
 	}
-	return p.db.Extraction().MarkClosed(ctx, unit.Of(req.Unit), at)
+	u := unit.Of(req.Unit)
+	newest, err := p.closedTS(ctx, u, at)
+	if err != nil {
+		return err
+	}
+	if err := p.db.Extraction().MarkClosed(ctx, u, at, newest); err != nil {
+		return err
+	}
+	if p.job == nil {
+		return nil
+	}
+	return p.job.Closed(ctx, u)
 }
 
 // Proposals are none: the plugin's drafts come from the profile's workflows.
@@ -455,4 +468,14 @@ func (s *Plugin) Within(ctx context.Context, u sdk.Unit, target string) (bool, e
 	}
 	got, ok, err := p.resolve(ctx, target)
 	return ok && got == unit.Of(u), err
+}
+
+// closedTS is the ts of u's newest stored message, the newest a closure of u at at saw; the ts of at when u
+// has none stored.
+func (p *plugin) closedTS(ctx context.Context, u unit.Unit, at time.Time) (string, error) {
+	newest, err := p.rowsSource().Newest(ctx, u)
+	if err != nil || newest != "" {
+		return newest, err
+	}
+	return dslack.TS(at), nil
 }

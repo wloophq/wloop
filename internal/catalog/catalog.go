@@ -173,14 +173,24 @@ func States(f Facts) []api.ActionState {
 	return out
 }
 
-// UnitStates are the intents' actions a row of a provider other than GitHub offers now, in the order of
-// the specs: the built-in actions act on pull requests or on the loop's rounds, which such a row has none of.
+// UnitStates are the actions a row of a provider other than GitHub offers now: the intents', in the order of
+// the specs, then the unitBuiltins; the other built-in actions act on pull requests or on the loop's rounds,
+// which such a row has none of.
 func UnitStates(f Facts) []api.ActionState {
 	out := []api.ActionState{}
 	if f.Intents == nil {
 		return out
 	}
-	return append(out, registryActions{f.Intents}.States(f)...)
+	out = append(out, registryActions{f.Intents}.States(f)...)
+	for _, b := range builtinActions {
+		if !slices.Contains(unitBuiltins, b.spec.ID) {
+			continue
+		}
+		if st, ok := b.offer(f); ok {
+			out = append(out, texted(f.Intents, b.spec.ID, st, intentload.ActionFactMap(f.Get)))
+		}
+	}
+	return out
 }
 
 // WithOffers are states, then each action of offered they do not hold,

@@ -247,6 +247,19 @@ func (p *Provider) conversation(ctx context.Context, cache map[string]store.Conv
 	return c, nil
 }
 
+// Newest is the ts of u's newest stored message, "" when it has none.
+func (p *Provider) Newest(ctx context.Context, u unit.Unit) (string, error) {
+	k, err := dslack.ParseUnit(u)
+	if err != nil {
+		return "", err
+	}
+	_, msgs, err := p.facts(ctx, k)
+	if err != nil || len(msgs) == 0 {
+		return "", err
+	}
+	return msgs[len(msgs)-1].TS, nil
+}
+
 // facts are the unit's object and messages: a thread's replies, or the
 // messages a DM segment's range anchors.
 func (p *Provider) facts(ctx context.Context, k dslack.Key) (store.ObjectRow, []store.MessageRow, error) {
@@ -289,6 +302,23 @@ func (in *Input) Messages() []store.MessageRow { return in.msgs }
 
 // State is the unit's last extraction; false before any.
 func (in *Input) State() (store.ExtractionState, bool) { return in.state, in.hasState }
+
+// Closed says a closure ended the unit: the extraction read one posted, or a unit.closed marked it and nobody
+// but the viewer posted after the newest message it saw.
+func (in *Input) Closed() bool {
+	if in.state.ClosurePosted {
+		return true
+	}
+	if !in.state.ClosureMarked {
+		return false
+	}
+	for _, m := range slices.Backward(in.msgs) {
+		if m.User != in.viewer || in.viewer == "" {
+			return !dslack.TSTime(m.TS).After(dslack.TSTime(in.state.ClosedTS))
+		}
+	}
+	return true
+}
 
 // Items are the unit's items in the host's ledger.
 func (in *Input) Items() []items.Item { return in.items }
