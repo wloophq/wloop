@@ -174,3 +174,40 @@ func TestARecentAnswerServesOnlyWhileTheNextReadCanLand(t *testing.T) {
 		}
 	})
 }
+
+// A key no caller asked for since its last answer stopped serving is let go,
+// so the reads of every unit a card ever showed do not pile up; one whose read
+// is on its way stays.
+func TestRecentBasesLetGoOfKeysNoLongerServed(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		live := &liveBases{}
+		other := unit.Unit{Provider: pull.Provider, Key: "acme/api#9"}
+		live.Set(pull, "c1")
+		live.Set(other, "c9")
+		clock := &fakeClock{now: t0}
+		var reads sync.WaitGroup
+		b := &RecentBases{Bases: live, Clock: clock, Fresh: 30 * time.Second, ReadTimeout: 10 * time.Second, Reads: &reads}
+		ctx := context.Background()
+		if _, err := b.Recent(ctx, pull.Provider, other, "review"); err != nil {
+			t.Fatal(err)
+		}
+		synctest.Wait()
+		clock.now = t0.Add(40*time.Second - time.Nanosecond)
+		if _, err := b.Recent(ctx, pull.Provider, pull, "review"); err != nil {
+			t.Fatal(err)
+		}
+		synctest.Wait()
+		if n := b.keys(); n != 2 {
+			t.Fatalf("%d keys before Fresh and ReadTimeout passed, want both", n)
+		}
+		clock.now = t0.Add(40 * time.Second)
+		if _, err := b.Recent(ctx, pull.Provider, pull, "review"); err != nil {
+			t.Fatal(err)
+		}
+		synctest.Wait()
+		if n := b.keys(); n != 1 {
+			t.Fatalf("%d keys once Fresh and ReadTimeout passed since the other's read, want only the one asked for", n)
+		}
+		reads.Wait()
+	})
+}

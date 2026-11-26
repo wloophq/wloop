@@ -103,12 +103,18 @@ func (b *RecentBases) read(publisher unit.ProviderID, u unit.Unit, kind string) 
 }
 
 // shared is the read of key on its way or fresh at now, else a new one, started true, that its caller runs, with
-// the newest read of key that answered.
+// the newest read of key that answered. Every other key whose newest read answered and serves no caller any more,
+// Fresh and ReadTimeout after it started, is let go.
 func (b *RecentBases) shared(key string, now time.Time) (r, answer *basisRead, started bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.reads == nil {
 		b.reads = map[string]*basisReads{}
+	}
+	for k, rs := range b.reads {
+		if k != key && rs.newest.answered() && now.Sub(rs.newest.at) >= b.Fresh+b.ReadTimeout {
+			delete(b.reads, k)
+		}
 	}
 	rs := b.reads[key]
 	if rs == nil {
