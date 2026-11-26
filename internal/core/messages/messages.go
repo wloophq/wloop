@@ -41,6 +41,7 @@ type Turns interface {
 	Answer(ctx context.Context, r turns.AnswerRequest) (turns.AnswerResult, error)
 	Continue(ctx context.Context, u unit.Unit) error
 	Dismiss(ctx context.Context, u unit.Unit) error
+	DismissTurn(ctx context.Context, u unit.Unit, seq int64, reason string) error
 	MarkRead(ctx context.Context, u unit.Unit, ids []int64) error
 }
 
@@ -62,6 +63,7 @@ type Tasks interface {
 type Gates interface {
 	Open(ctx context.Context, g gate.Gate, p gates.Policy) (gate.Gate, error)
 	Supersede(ctx context.Context, id int64, by task.Actor) error
+	SupersedeQuestion(ctx context.Context, id int64, settle func(context.Context) (bool, error)) (bool, error)
 	Where(ctx context.Context, q gates.Query) ([]gate.Gate, error)
 }
 
@@ -108,6 +110,8 @@ type Service struct {
 	Drafts OptionDrafts
 	// ChatDeps serve the chat on the tasks; zero serves none.
 	ChatDeps ChatDeps
+	// Ready closes once Drafts can be read; the background passes (Run) wait for it. Nil runs them at once.
+	Ready <-chan struct{}
 
 	mu sync.Mutex
 	// gating serializes opening the messages' gates, so a message gets one.

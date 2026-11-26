@@ -1209,7 +1209,7 @@ The fields each notice reads besides `Name` and `Command`:
   - `session_woken`: A dormant agent session woken.
   - `session_merged`: An agent session merged into another.
   - `mcp_seen`: An agent session reached the loop's tools.
-  - `turn_dismissed`: A turn dismissed by a rule.
+  - `turn_dismissed`: A turn the loop dismissed: by a workflow's step, or once every draft its question offered to post left without a pick.
   - `answer_refused`: An answer refused.
   - `answer_read`: An answer read by its session.
   - `view_applied`: A view's change applied.

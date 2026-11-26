@@ -31,6 +31,36 @@ func (s *Service) SupersedeForAgent(ctx context.Context, id int64, session strin
 	return s.d.Store.Resolve(ctx, id, Resolution{Status: gate.Superseded, By: task.ActorAgent, Session: session})
 }
 
+// SupersedeQuestion closes open question gate id as superseded by the workflow once settle, run under the question's
+// claim so no pick decides it meanwhile, settles its subject and says it is gone; it reports whether it closed the
+// gate. A question being decided, or one no longer open, is left as it is, and so is one settle keeps.
+func (s *Service) SupersedeQuestion(ctx context.Context, id int64, settle func(context.Context) (bool, error)) (bool, error) {
+	release, ok := s.claimQuestion(id)
+	if !ok {
+		return false, nil
+	}
+	defer release()
+	g, err := s.d.Reader.Get(ctx, id)
+	switch {
+	case err != nil:
+		return false, err
+	case g.Kind != gate.KindQuestion:
+		return false, fmt.Errorf("%w: gate %d is a %s gate, not a question", ErrRefused, id, g.Kind)
+	case g.Status != gate.Open:
+		return false, nil
+	}
+	if ok, err := settle(ctx); err != nil || !ok {
+		return false, err
+	}
+	if _, err := s.d.Store.Resolve(ctx, id, Resolution{Status: gate.Superseded, By: task.ActorWorkflow}); err != nil {
+		if errors.Is(err, ErrResolved) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
 // TaskOf is the task gate g is placed on when it opens: its own when it names one, else the one Open picks,
 // which may be a capture task opened now.
 func (s *Service) TaskOf(ctx context.Context, g gate.Gate) (task.ID, error) {
@@ -85,7 +115,7 @@ func (s *Service) PickOption(ctx context.Context, id int64, r Resolution, rev in
 	case err != nil:
 		return err
 	case !ok:
-		return fmt.Errorf("%w: the answer to question gate %d picks no draft waiting on the user", ErrRefused, id)
+		return fmt.Errorf("%w: the answer to question gate %d picks no draft waiting on the user: its option pins none, or its draft was discarded, withdrawn or posted since", ErrRefused, id)
 	}
 	return s.approveOption(ctx, q, r, drafted, rev, edit)
 }

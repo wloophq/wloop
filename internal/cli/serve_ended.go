@@ -87,6 +87,9 @@ func reconcileEnded(ctx context.Context, s *messages.Service, changes port.Chang
 		}
 	})
 	defer cancel()
+	if !s.WaitReady(ctx) {
+		return
+	}
 	for {
 		select {
 		case <-ctx.Done():

@@ -9,24 +9,28 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// Run reconciles every book and proposal, then the units of each TopicTurns and TopicTasks note, so a gate
-// leaves a task that closed, and the proposals on each TopicItems note, on its own goroutine, until ctx ends:
-// the subscriber only queues them.
+// Run reconciles every book and proposal, then the units of each TopicTurns and TopicTasks note, so a gate leaves a
+// task that closed, and the proposals on each TopicItems note, on its own goroutine, until ctx ends: the subscriber
+// only queues them. After each pass over books, and each TopicDrafts note, it closes the questions whose drafts left.
 func (s *Service) Run(ctx context.Context, changes port.Changes) {
+	if !s.WaitReady(ctx) {
+		return
+	}
 	var mu sync.Mutex
 	var units []unit.Unit
 	all, proposals := true, true
 	kick := make(chan struct{}, 1)
 	cancel := changes.Subscribe(func(c port.Change) {
-		turnsNoted, itemsNoted, tasksNoted := c.Has(port.TopicTurns), c.Has(port.TopicItems), c.Has(port.TopicTasks) && !c.All
-		if !turnsNoted && !itemsNoted && !tasksNoted {
+		turnsNoted, itemsNoted := c.Has(port.TopicTurns), c.Has(port.TopicItems)
+		unitsNoted := (c.Has(port.TopicTasks) || c.Has(port.TopicDrafts)) && !c.All
+		if !turnsNoted && !itemsNoted && !unitsNoted {
 			return
 		}
 		mu.Lock()
 		if turnsNoted {
 			all = all || c.All
 		}
-		if turnsNoted || tasksNoted {
+		if turnsNoted || unitsNoted {
 			units = append(units, c.Units...)
 		}
 		proposals = proposals || itemsNoted
@@ -51,6 +55,19 @@ func (s *Service) Run(ctx context.Context, changes port.Changes) {
 	}
 }
 
+// WaitReady waits until Ready closes, or ctx ends, which it reports as false.
+func (s *Service) WaitReady(ctx context.Context) bool {
+	if s.Ready == nil {
+		return true
+	}
+	select {
+	case <-s.Ready:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
 func (s *Service) sweep(ctx context.Context, units []unit.Unit, all, proposals bool) {
 	switch {
 	case all:
@@ -69,6 +86,11 @@ func (s *Service) sweep(ctx context.Context, units []unit.Unit, all, proposals b
 		})
 		if err := s.Reconcile(ctx, slices.Compact(units)...); err != nil {
 			s.logf("messages: reconciling the questions of %d units: %v", len(units), err)
+		}
+	}
+	if all || len(units) > 0 {
+		if err := s.CloseLeftQuestions(ctx); err != nil {
+			s.logf("messages: closing the questions whose drafts left: %v", err)
 		}
 	}
 	if proposals {

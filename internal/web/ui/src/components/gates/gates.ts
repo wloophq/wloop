@@ -83,6 +83,12 @@ export function pinnedOf(g: J, pick: string): J {
   return (subject.pinned || []).find((d: J) => d.id === option.draft.id) || null;
 }
 
+// pinGone says whether option pick of g pins a draft the card no longer serves: it left, so the option posts nothing.
+export function pinGone(g: J, pick: string): boolean {
+  const option = (subjectOf(g).options || []).find((o: J) => o.id === pick);
+  return !!option && !!option.draft && !pinnedOf(g, pick);
+}
+
 // pinArgs are what a pick of the option pinning d sends: the rev the person sees and, while they edit it, its text
 // and fields as edited.
 function pinArgs(d: J): Record<string, string> {
@@ -99,7 +105,10 @@ export async function resolveGate(e: J, g: J, id: string, option?: string): Prom
   const key = String(g.id);
   const args: Record<string, string> = {};
   if (intent.answer) {
-    const pick = option === undefined ? gateOption(g) : option;
+    const chosen = option === undefined ? gateOption(g) : option;
+    const gone = !!chosen && pinGone(g, chosen);
+    if (gone) gateState.picked.delete(key);
+    const pick = gone ? "" : chosen;
     const text = (gateState.answers.get(key) || "").trim();
     if (!text && !pick) {
       setNotice(t("{action}: write the answer first", { action: intent.label }), true);

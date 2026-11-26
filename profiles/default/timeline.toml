@@ -190,7 +190,7 @@ label = "agent reached the loop"
 tone = "loop"
 
 [events.turn_dismissed]
-label = "turn dismissed by a rule"
+label = "turn dismissed by the loop"
 tone = "loop"
 
 [events.answer_refused]

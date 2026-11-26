@@ -79,6 +79,10 @@ func (g *Gates) Supersede(ctx context.Context, id int64, by task.Actor) error {
 	return g.Service.Supersede(ctx, id, by)
 }
 
+func (g *Gates) SupersedeQuestion(ctx context.Context, id int64, settle func(context.Context) (bool, error)) (bool, error) {
+	return g.Service.SupersedeQuestion(ctx, id, settle)
+}
+
 func (g *Gates) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {
 	return g.Store.Where(ctx, q)
 }

@@ -55,3 +55,22 @@ func TestAPinnedQuestionServesItsDrafts(t *testing.T) {
 		t.Errorf("the confirm's view %+v, want its pin and the pinned draft", v)
 	}
 }
+
+// TestAPinnedDraftThatLeftIsNotServed: a question's view serves only the pinned drafts that still wait on the user,
+// so no surface offers an option whose draft was discarded as one that posts.
+func TestAPinnedDraftThatLeftIsNotServed(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	ctx := context.Background()
+	a := r.propose(t, r7u, "Ship it.", draft.Wait)
+	b := r.propose(t, r7u, "One nit first.", draft.Wait)
+	if code, body := r.verb(t, b.ID, "dismiss", `{}`); code != 200 {
+		t.Fatalf("discarding draft b: %d %s", code, body)
+	}
+	m := dmessage.Message{ID: 9, Unit: r7u, Kind: dmessage.Question, Text: "Which review?",
+		Options: []record.Option{{ID: "a", Label: "Approve", Draft: &record.DraftRef{ID: int64(a.ID), Rev: a.Rev}},
+			{ID: "b", Label: "Comment", Draft: &record.DraftRef{ID: int64(b.ID), Rev: b.Rev}}}}
+	if got := r.s.pinnedDrafts(ctx, m); len(got) != 1 || got[0].ID != int64(a.ID) {
+		t.Fatalf("pinned %+v, want draft a alone", got)
+	}
+}
