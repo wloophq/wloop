@@ -312,6 +312,18 @@ describe("rf1_reattack5_test.go, a pinned recommendation", () => {
     expect(posts).toEqual([{ path: "/api/gates/3/answer", body: { source: "cockpit", args: { answer: "post\nand thank them", rev: "3" } } }]);
   });
 
+  test("TestAPickWhoseDraftLeftIsNotSent: an option picked before its draft left sends no answer that would only resume the turn", async () => {
+    const posts = recordPosts();
+    const g = pinned();
+    let c = card(g);
+    await fireEvent.click(byFocus(c, "gate:3:option:post"));
+    g.subject.pinned = [];
+    c = card(g);
+    await fireEvent.click(byFocus(c, "gate:3:answer"));
+    await settle();
+    expect(posts).toEqual([]);
+  });
+
   test("TestAPickCarriesThePersonsEditOfThePinnedDraft: the pinned draft is edited on the card and the pick sends the edit", async () => {
     const posts = recordPosts();
     const c = card(pinned());

@@ -22,8 +22,8 @@ func (e *Env) serveMessages(ctx context.Context, d daemon.Deps, db *sqlite.DB, c
 	if e.messages == nil {
 		e.messages = &messages.Service{Store: inventory.NewMessages(db), Books: openPRBooks{sqlite.New(db), e.reportedPRs()}, Turns: e.Turns,
 			Ledger: ledger, Tasks: tasks, Gates: draftGates{e, db, logf}, Drafts: optionDrafts{draftGates{e, db, logf}}, Intents: registryPort{e}, Clock: clockFunc(e.Now), Log: logf,
-			ProposalText: proposalText(e.loadedIntents, logf),
-			ChatDeps:     messages.ChatDeps{Sessions: e.Turns, Log: chatLog{db}, Units: db.Tasks(), Merged: db, Intent: e.chatIntent, Memory: e.memory}}
+			ProposalText: proposalText(e.loadedIntents, logf), Ready: e.outboxBuilt,
+			ChatDeps: messages.ChatDeps{Sessions: e.Turns, Log: chatLog{db}, Units: db.Tasks(), Merged: db, Intent: e.chatIntent, Memory: e.memory}}
 	}
 	e.Turns.Chats = e.messages.Chats()
 	d.Tasks, d.Messages = tasks, e.messages
@@ -34,17 +34,4 @@ func (e *Env) serveMessages(ctx context.Context, d daemon.Deps, db *sqlite.DB, c
 		e.background.Go(func() { reconcileEnded(ctx, e.messages, e.changes, logf) })
 	}
 	return d
-}
-
-// closeLeftQuestions reconciles every question once the outbox is built, so a question whose pinned drafts all left
-// while no daemon ran closes on start: the messages worker's first pass may run before the outbox reads its drafts.
-func (e *Env) closeLeftQuestions(ctx context.Context, logf func(string, ...any)) {
-	if e.messages == nil || e.changes == nil {
-		return
-	}
-	e.background.Go(func() {
-		if err := e.messages.Reconcile(ctx); err != nil {
-			logf("messages: reconciling the questions once the outbox is built: %v", err)
-		}
-	})
 }

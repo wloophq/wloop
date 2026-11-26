@@ -62,7 +62,7 @@ var EventKinds = []Value{
 	{Name: "session_woken", Doc: "A dormant agent session woken."},
 	{Name: "session_merged", Doc: "An agent session merged into another."},
 	{Name: "mcp_seen", Doc: "An agent session reached the loop's tools."},
-	{Name: "turn_dismissed", Doc: "A turn dismissed by a rule."},
+	{Name: "turn_dismissed", Doc: "A turn the loop dismissed: by a workflow's step, or once every draft its question offered to post left without a pick."},
 	{Name: "answer_refused", Doc: "An answer refused."},
 	{Name: "answer_read", Doc: "An answer read by its session."},
 	{Name: "view_applied", Doc: "A view's change applied."},

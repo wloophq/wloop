@@ -31,10 +31,10 @@ func (s *Service) SupersedeForAgent(ctx context.Context, id int64, session strin
 	return s.d.Store.Resolve(ctx, id, Resolution{Status: gate.Superseded, By: task.ActorAgent, Session: session})
 }
 
-// SupersedeQuestion closes open question gate id as superseded by the workflow when gone, run under the question's
-// claim so no pick decides it meanwhile, says its subject is gone; it reports whether it closed the gate. A question
-// being decided, or one no longer open, is left as it is.
-func (s *Service) SupersedeQuestion(ctx context.Context, id int64, gone func(context.Context) (bool, error)) (bool, error) {
+// SupersedeQuestion closes open question gate id as superseded by the workflow once settle, run under the question's
+// claim so no pick decides it meanwhile, settles its subject and says it is gone; it reports whether it closed the
+// gate. A question being decided, or one no longer open, is left as it is, and so is one settle keeps.
+func (s *Service) SupersedeQuestion(ctx context.Context, id int64, settle func(context.Context) (bool, error)) (bool, error) {
 	release, ok := s.claimQuestion(id)
 	if !ok {
 		return false, nil
@@ -49,7 +49,7 @@ func (s *Service) SupersedeQuestion(ctx context.Context, id int64, gone func(con
 	case g.Status != gate.Open:
 		return false, nil
 	}
-	if ok, err := gone(ctx); err != nil || !ok {
+	if ok, err := settle(ctx); err != nil || !ok {
 		return false, err
 	}
 	if _, err := s.d.Store.Resolve(ctx, id, Resolution{Status: gate.Superseded, By: task.ActorWorkflow}); err != nil {

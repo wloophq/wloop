@@ -15,7 +15,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
-	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 // ReasonOtherOption is why a draft another option pointed to is withdrawn once one option's draft is approved.
@@ -302,11 +301,13 @@ func (forThePerson) Decide(context.Context, gate.Gate) (gates.Decision, error) {
 // ReasonPinsLeft is why the turn of a question is dismissed once no draft its answers would post waits on the user.
 const ReasonPinsLeft = "pins_left"
 
-// closeLeftQuestions closes each open question on units, every one when none, whose every answer but a refusal posts
-// a draft (each option pins one, or the confirm does) and none of whose drafts waits on the user any longer: dropped,
-// withdrawn or sent without a pick. Its gate is superseded under the question's claim, so a pick in flight keeps it,
-// then the turn that asked it is dismissed for ReasonPinsLeft and the message closes with no answer.
-func (s *Service) closeLeftQuestions(ctx context.Context, units []unit.Unit) error {
+// closeLeftQuestions closes each open question whose every answer but a refusal posts a draft (each option pins one,
+// or the confirm does) and none of whose drafts waits on the user any longer: dropped, withdrawn or sent without a
+// pick. It looks at every open question whatever units the pass covers, since a draft may sit on another unit than
+// the turn that asked about it. Under the question's claim, so a pick in flight keeps it, the turn that asked it is
+// dismissed for ReasonPinsLeft before its gate is superseded, so no pass meanwhile opens it a new gate; the message
+// then closes with no answer.
+func (s *Service) closeLeftQuestions(ctx context.Context) error {
 	if s.Drafts == nil {
 		return nil
 	}
@@ -316,7 +317,7 @@ func (s *Service) closeLeftQuestions(ctx context.Context, units []unit.Unit) err
 	}
 	var errs []error
 	for _, m := range open {
-		if m.Kind != message.Question || len(units) > 0 && !slices.Contains(units, m.Unit) || !postsOnly(m) {
+		if m.Kind != message.Question || !postsOnly(m) {
 			continue
 		}
 		if left, err := s.pinsLeft(ctx, m); err != nil || !left {
@@ -328,17 +329,23 @@ func (s *Service) closeLeftQuestions(ctx context.Context, units []unit.Unit) err
 			errs = append(errs, err)
 			continue
 		}
-		closed, err := s.Gates.SupersedeQuestion(ctx, g.ID, func(ctx context.Context) (bool, error) { return s.pinsLeft(ctx, m) })
-		if err != nil || !closed {
+		dismissed := false
+		_, err = s.Gates.SupersedeQuestion(ctx, g.ID, func(ctx context.Context) (bool, error) {
+			if left, err := s.pinsLeft(ctx, m); err != nil || !left {
+				return false, err
+			}
+			var refused turns.Refusal
+			if err := s.Turns.DismissTurn(ctx, m.Unit, m.Origin.TurnSeq, ReasonPinsLeft); err != nil && !errors.As(err, &refused) {
+				return false, fmt.Errorf("dismissing the turn of question %d: %w", m.ID, err)
+			}
+			dismissed = true
+			return true, nil
+		})
+		if err != nil || !dismissed {
 			errs = append(errs, err)
 			continue
 		}
-		s.logf("messages: question %d on %s: no draft its answers post waits on the user; gate %d superseded, its turn dismissed", m.ID, m.Unit, g.ID)
-		var refused turns.Refusal
-		if err := s.Turns.DismissTurn(ctx, m.Unit, m.Origin.TurnSeq, ReasonPinsLeft); err != nil && !errors.As(err, &refused) {
-			errs = append(errs, fmt.Errorf("dismissing the turn of question %d: %w", m.ID, err))
-			continue
-		}
+		s.logf("messages: question %d on %s: no draft its answers post waits on the user; its turn dismissed, gate %d superseded", m.ID, m.Unit, g.ID)
 		s.mu.Lock()
 		errs = append(errs, s.close(ctx, m, ""))
 		s.mu.Unlock()

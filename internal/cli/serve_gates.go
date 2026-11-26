@@ -141,8 +141,8 @@ func (g draftGates) Supersede(ctx context.Context, id int64, by task.Actor) erro
 	return g.e.newGates(g.db, g.logf).Supersede(ctx, id, by)
 }
 
-func (g draftGates) SupersedeQuestion(ctx context.Context, id int64, gone func(context.Context) (bool, error)) (bool, error) {
-	return g.e.newGates(g.db, g.logf).SupersedeQuestion(ctx, id, gone)
+func (g draftGates) SupersedeQuestion(ctx context.Context, id int64, settle func(context.Context) (bool, error)) (bool, error) {
+	return g.e.newGates(g.db, g.logf).SupersedeQuestion(ctx, id, settle)
 }
 
 func (g draftGates) SupersedeForAgent(ctx context.Context, id int64, session string) (gate.Gate, error) {

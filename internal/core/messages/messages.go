@@ -63,7 +63,7 @@ type Tasks interface {
 type Gates interface {
 	Open(ctx context.Context, g gate.Gate, p gates.Policy) (gate.Gate, error)
 	Supersede(ctx context.Context, id int64, by task.Actor) error
-	SupersedeQuestion(ctx context.Context, id int64, gone func(context.Context) (bool, error)) (bool, error)
+	SupersedeQuestion(ctx context.Context, id int64, settle func(context.Context) (bool, error)) (bool, error)
 	Where(ctx context.Context, q gates.Query) ([]gate.Gate, error)
 }
 
@@ -110,6 +110,8 @@ type Service struct {
 	Drafts OptionDrafts
 	// ChatDeps serve the chat on the tasks; zero serves none.
 	ChatDeps ChatDeps
+	// Ready closes once Drafts can be read; the background passes (Run) wait for it. Nil runs them at once.
+	Ready <-chan struct{}
 
 	mu sync.Mutex
 	// gating serializes opening the messages' gates, so a message gets one.
@@ -140,7 +142,7 @@ func (s *Service) Reconcile(ctx context.Context, units ...unit.Unit) error {
 			errs = append(errs, err)
 		}
 	}
-	errs = append(errs, s.closeLeftQuestions(ctx, units))
+	errs = append(errs, s.closeLeftQuestions(ctx))
 	return errors.Join(errs...)
 }
 

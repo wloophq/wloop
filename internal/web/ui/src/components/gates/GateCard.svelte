@@ -5,7 +5,7 @@
   import ActionResult from "../actions/ActionResult.svelte";
   import ActionButton from "../common/ActionButton.svelte";
   import Markdown from "../common/Markdown.svelte";
-  import { gateOption, gateResolving, orderedOptions, pickOption, pinnedOf, planReason, resolveGate, subjectOf } from "./gates";
+  import { gateOption, gateResolving, orderedOptions, pickOption, pinGone, planReason, resolveGate, subjectOf } from "./gates";
   import PinnedDraft from "./PinnedDraft.svelte";
   import PlanDoes from "./PlanDoes.svelte";
   import PlanTarget from "./PlanTarget.svelte";
@@ -66,7 +66,7 @@
         {#each options as o (o.id)}
           <div class="opt-col">
           <button type="button" class={"opt" + (o.id === picked ? " on" : "")} aria-pressed={o.id === picked ? "true" : "false"} data-focus={`gate:${gate.id}:option:${o.id}`}
-            data-pin={o.draft ? `${o.draft.id}@${o.draft.rev}` : undefined} disabled={!!o.draft && !pinnedOf(gate, o.id)} onclick={() => pickOption(gate, o.id)}>
+            data-pin={o.draft ? `${o.draft.id}@${o.draft.rev}` : undefined} disabled={pinGone(gate, o.id)} onclick={() => pickOption(gate, o.id)}>
             <span class="r" aria-hidden="true"></span>
             <span class="lb">{o.label}</span>
             {#if o.id === subject.recommend}<span class="rec">{t("recommended")}</span>{/if}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 
@@ -246,4 +247,90 @@ func TestAnAnsweredQuestionIsNotMooted(t *testing.T) {
 	if slices.ContainsFunc(r.books.Events(), func(ev port.Event) bool { return ev.Kind == turns.KindTurnDismissedByRule }) {
 		t.Fatalf("events %+v, want no dismissal", r.books.Events())
 	}
+}
+
+// TestADraftOfAnotherUnitClosesItsQuestion: draft 43 posts on r8 though its turn ran on r7; a pass over r8, the unit
+// its change notes, closes r7's question once both drafts left.
+func TestADraftOfAnotherUnitClosesItsQuestion(t *testing.T) {
+	r := newRig(t)
+	od := newOptionDrafts(t, r)
+	od.put(heldDraft(42, r7, 1, 1), "term_1")
+	elsewhere := heldDraft(43, r8, 1, 1)
+	elsewhere.Origin.Unit = r7
+	od.put(elsewhere, "term_1")
+	r.started(r7)
+	r.record(t, r7, 1, askedRecord(postQuestion()))
+	r.live()
+	r.reconcile(t, r7)
+	m := r.only(t)
+	od.leave(42, draft.Dropped, "user", gate.Rejected)
+	r.reconcile(t, r7)
+	od.leave(43, draft.Dropped, draft.WithdrawMoot, gate.Superseded)
+	r.reconcile(t, r8)
+	requireMoot(t, r, m)
+}
+
+// reconcilingGates run one pass over r7 right after the first question gate the close supersedes, as the worker
+// may.
+type reconcilingGates struct {
+	serviceGates
+	r    *rig
+	once *atomic.Bool
+}
+
+func (g reconcilingGates) SupersedeQuestion(ctx context.Context, id int64, settle func(context.Context) (bool, error)) (bool, error) {
+	closed, err := g.serviceGates.SupersedeQuestion(ctx, id, settle)
+	var rerr error
+	if g.once.CompareAndSwap(false, true) {
+		rerr = g.r.svc.Reconcile(ctx, r7)
+	}
+	if rerr != nil {
+		return closed, rerr
+	}
+	return closed, err
+}
+
+// TestAPassDuringTheCloseOpensNoGate: a pass that runs once the question's gate is superseded finds its turn
+// dismissed already, so it closes the message instead of opening it a new gate.
+func TestAPassDuringTheCloseOpensNoGate(t *testing.T) {
+	r, od, m := pinsRig(t, postQuestion())
+	r.svc.Gates = reconcilingGates{serviceGates{r.gates, r.gateStore}, r, &atomic.Bool{}}
+	od.leave(42, draft.Dropped, "user", gate.Rejected)
+	od.leave(43, draft.Dropped, "user", gate.Rejected)
+	r.reconcile(t, r7)
+	requireMoot(t, r, m)
+	all, err := r.gateStore.Where(context.Background(), gates.Query{Kind: gate.KindQuestion, Statuses: []gate.Status{gate.Open, gate.Answered,
+		gate.Dismissed, gate.Superseded}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 1 {
+		t.Fatalf("question gates %+v, want the first alone, no gate reopened", all)
+	}
+}
+
+// TestTheWorkerHealsOnceItsDraftsAreReadable: the daemon starts with a question whose drafts all left while it was
+// down; the worker's first pass waits for Ready, the outbox being built, and then closes it.
+func TestTheWorkerHealsOnceItsDraftsAreReadable(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r, od, m := pinsRig(t, postQuestion())
+		od.leave(42, draft.Dropped, "user", gate.Rejected)
+		od.leave(43, draft.Dropped, "user", gate.Rejected)
+		ready := make(chan struct{})
+		r.svc.Ready = ready
+		ctx, cancel := context.WithCancel(context.Background())
+		var wg sync.WaitGroup
+		wg.Go(func() { r.svc.Run(ctx, change.NewLog(64, t.Logf)) })
+		t.Cleanup(func() {
+			cancel()
+			wg.Wait()
+		})
+		synctest.Wait()
+		if len(r.open(t)) != 1 {
+			t.Fatal("the worker ran a pass before its drafts were readable")
+		}
+		close(ready)
+		synctest.Wait()
+		requireMoot(t, r, m)
+	})
 }

@@ -13,6 +13,9 @@ import (
 // leaves a task that closed, the units of each TopicDrafts note, so a question whose drafts left closes, and the
 // proposals on each TopicItems note, on its own goroutine, until ctx ends: the subscriber only queues them.
 func (s *Service) Run(ctx context.Context, changes port.Changes) {
+	if !s.WaitReady(ctx) {
+		return
+	}
 	var mu sync.Mutex
 	var units []unit.Unit
 	all, proposals := true, true
@@ -49,6 +52,19 @@ func (s *Service) Run(ctx context.Context, changes port.Changes) {
 			return
 		case <-kick:
 		}
+	}
+}
+
+// WaitReady waits until Ready closes, or ctx ends, which it reports as false.
+func (s *Service) WaitReady(ctx context.Context) bool {
+	if s.Ready == nil {
+		return true
+	}
+	select {
+	case <-s.Ready:
+		return true
+	case <-ctx.Done():
+		return false
 	}
 }
 
