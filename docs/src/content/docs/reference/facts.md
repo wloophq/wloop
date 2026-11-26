@@ -314,7 +314,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `pr.ended` | bool | The pull request merged or closed: the GitHub plugin's word that the unit has ended. |
 | `pr.changed_files` | int | How many files the pull request changes, as GitHub last reported it; 0 when not read. |
 | `pr.head` | string | The head commit's oid. |
-| `pr.commits` | list | The oids of the commits the store has read on the pull request: every push it recorded, and the newest 50 commits of its last full read, merges included. A commit among them that is not pr.head is one the stored head moved past; a commit read elsewhere and not yet stored is not among them. |
+| `pr.commits` | list | The oids of the commits the store has read on the pull request up to its stored head: every push it recorded, and the newest 50 commits of its last full read, merges included, leaving out those after pr.head, which the store has not recorded the head moving to yet. A commit among them that is not pr.head is one the stored head moved past; a commit read elsewhere and not yet stored is not among them. |
 | `pr.conflicting_for` | duration | How long the pull request has conflicted with its base, from when the inventory first saw it; zero when it does not. |
 | `pr.checks` | string | The checks' rollup on the head: success, failure, pending, error or expected; empty with no checks. |
 | `pr.stalled` | bool | The checks stalled on the head. |

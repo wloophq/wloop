@@ -296,4 +296,9 @@ func TestCommitsAreThePushesAndTheFullReadsCommits(t *testing.T) {
 	if v := commits(); !reflect.DeepEqual(v, src.List("c1", "c2", "m3")) {
 		t.Fatalf("the pushes c1 c2 and the merge m3 of the full read: %+v", v)
 	}
+	in.PR.HeadOid = "c2"
+	in.Events = append(in.Events, push("c4"))
+	if v := commits(); !reflect.DeepEqual(v, src.List("c1", "c2")) {
+		t.Fatalf("a push stored before the head moved to it, and the commits after the stored head c2: %+v", v)
+	}
 }
