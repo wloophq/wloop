@@ -3,8 +3,9 @@ import { APIError, getJSON } from "./api";
 import { state } from "./store.svelte";
 import { CONN_CLOSED, DEBOUNCE_MS, timer, type Follow } from "./sync.svelte";
 
-// The floating widget's state: the queue of every decision kind in the daemon's order, the live turns, which item
-// is current, and whether the widget shows as a pill, a peek or the open panel. Nothing is drawn here.
+// The floating widget's state, which each of its two pages keeps on its own: the queue of every decision kind in the
+// daemon's order and the live turns, which both read; where the tab sits; and, in the panel's page, which item is
+// current and whether it shows a peek, the full panel or nothing. Nothing is drawn here.
 
 export const FLOAT_QUEUE = "/api/queue";
 export const FLOAT_TURNS = "/api/turns/live";
@@ -16,34 +17,38 @@ export const FLOAT_QUIET_MS = 10000;
 // FLOAT_RETRY_MS is the first wait before a failed read is retried, doubling up to FLOAT_RETRY_MAX_MS.
 export const FLOAT_RETRY_MS = 2000;
 export const FLOAT_RETRY_MAX_MS = 60000;
+// FLOAT_HOVER_OPEN_MS is how long the pointer rests on the tab before it asks for the panel; the host closes it.
 export const FLOAT_HOVER_OPEN_MS = 120;
-export const FLOAT_HOVER_CLOSE_MS = 400;
 
-export type FloatMode = "pill" | "panel" | "peek";
-export const FLOAT_MODES: readonly FloatMode[] = ["pill", "panel", "peek"];
+// FloatMode is what the panel's page shows: nothing while its window is hidden, a peek, or the full panel.
+export type FloatMode = "" | "peek" | "panel";
+export const FLOAT_MODES: readonly FloatMode[] = ["", "peek", "panel"];
 
 // FloatHide is how long the host hides the widget: until something new arrives, for an hour, or until tomorrow.
 export type FloatHide = "quiet" | "hour" | "tomorrow";
 
-// FloatPlace is where the host keeps the pill: docked on a side edge, which stands it upright and opens the panel
-// away from that edge, whether the panel opens upward, as it does from the screen's bottom half, or leftward, from its
-// right half, and the room from the pill's corner to the far side of the screen's visible frame, 0 until the host
-// names one.
+// FloatPlace is where the host keeps the tab: docked on a side edge, which stands it upright, or free.
 export interface FloatPlace {
   edge: "" | "left" | "right";
-  up: boolean;
-  leftward: boolean;
+}
+
+// PanelPlace is where the host puts the panel's window: on which side of the tab, and the room it may fill there,
+// 0 until the host names one.
+export interface PanelPlace {
+  side: "" | "left" | "right" | "above" | "below";
   maxW: number;
   maxH: number;
 }
 
-// floatDeps are what the widget reaches beyond its state: resolving an item's gate, running any other primary, opening an item's unit at its source,
-// and posting a message to the window that hosts it. The page wires them; each is inert until then.
+// floatDeps are what the widget reaches beyond its state: resolving an item's gate, running any other primary,
+// opening an item's unit at its source, posting a message to the window that hosts it, and asking for a peek at an
+// item that arrived, which only the tab's page does. The page wires them; each is inert until then.
 export const floatDeps = {
   resolve: async (_item: J, _intent: string, _option?: string): Promise<unknown> => null,
   run: async (_item: J): Promise<unknown> => null,
   openUnit: (_item: J): void => {},
   post: (_message: J): void => {},
+  peek: (_item: J): void => {},
 };
 
 // FloatRead is how the last read went: answered, the daemon unreachable, or the queue refused by a daemon that answers.
@@ -55,10 +60,12 @@ const fresh = () => ({
   title: "",
   empty: "",
   turns: null as J,
-  mode: "pill" as FloatMode,
-  peeked: null as J,
+  mode: "" as FloatMode,
+  peekKey: "",
+  peeking: false,
   pinned: false,
-  place: { edge: "", up: false, leftward: false, maxW: 0, maxH: 0 } as FloatPlace,
+  place: { edge: "" } as FloatPlace,
+  room: { side: "", maxW: 0, maxH: 0 } as PanelPlace,
   read: "ok" as FloatRead,
   turnsFailed: false,
   loaded: false,
@@ -109,17 +116,18 @@ function successor(prev: J[], at: number, next: J[]): number {
   return Math.min(at, next.length - 1);
 }
 
+// endPeek stops a peek showing; the page lets its card leave, then closes.
 function endPeek(): void {
   timer.clear(marks.timers.peek);
-  fl.peeked = null;
-  if (fl.mode === "peek") fl.mode = "pill";
+  fl.peeking = false;
 }
 
-function peek(item: J): void {
-  if (!item) return;
-  fl.peeked = item;
-  marks.focus = itemKey(item);
-  if (fl.mode === "pill") fl.mode = "peek";
+// peekAt shows the peek of the item keyed key for FLOAT_PEEK_MS, and makes it the one the panel opens on for
+// FLOAT_FOCUS_MS.
+function peekAt(key: string): void {
+  if (!key || fl.mode === "panel") return;
+  Object.assign(fl, { mode: "peek", peekKey: key, peeking: true });
+  marks.focus = key;
   timer.clear(marks.timers.peek);
   marks.timers.peek = timer.set(endPeek, FLOAT_PEEK_MS);
   timer.clear(marks.timers.focus);
@@ -128,15 +136,16 @@ function peek(item: J): void {
   }, FLOAT_FOCUS_MS);
 }
 
-// arrived peeks at item unless a burst is on; every arrival keeps the burst on until FLOAT_QUIET_MS pass without one.
-function arrived(item: J, collapsed: boolean): void {
+// arrived asks for a peek at item unless a burst is on; every arrival keeps the burst on until FLOAT_QUIET_MS pass
+// without one.
+function arrived(item: J): void {
   const quiet = !marks.burst;
   marks.burst = true;
   timer.clear(marks.timers.quiet);
   marks.timers.quiet = timer.set(() => {
     marks.burst = false;
   }, FLOAT_QUIET_MS);
-  if (quiet && collapsed) peek(item);
+  if (quiet) floatDeps.peek(item);
 }
 
 function applyQueue(q: J): void {
@@ -150,16 +159,14 @@ function applyQueue(q: J): void {
   fl.loaded = true;
   marks.seen = new Set(keys);
   if (marks.focus && !marks.seen.has(marks.focus)) marks.focus = "";
-  if (fl.peeked && !marks.seen.has(itemKey(fl.peeked))) endPeek();
   if (fl.failed.key && !marks.seen.has(fl.failed.key)) fl.failed = { key: "", text: "" };
-  if (arrivals.length) arrived(arrivals[0], fl.mode !== "panel");
+  if (arrivals.length) arrived(arrivals[0]);
 }
 
 // lose forgets what the daemon served, so no count outlives it; what was seen stays, so a recovery peeks only at
 // what is new.
 function lose(read: FloatRead): void {
   Object.assign(fl, { read, items: [], current: 0, turns: null, turnsFailed: false });
-  endPeek();
 }
 
 function retry(): void {
@@ -233,30 +240,52 @@ export const floatFollow: Follow = {
   lost: () => lose("offline"),
 };
 
+// setPlace keeps where the host says the tab sits.
 function setPlace(p: Partial<FloatPlace> | undefined): void {
   if (!p || typeof p !== "object") return;
-  const size = (n: unknown) => (typeof n === "number" && n > 0 ? n : 0);
-  fl.place = { edge: p.edge === "left" || p.edge === "right" ? p.edge : "", up: !!p.up, leftward: !!p.leftward, maxW: size(p.maxW), maxH: size(p.maxH) };
+  fl.place = { edge: p.edge === "left" || p.edge === "right" ? p.edge : "" };
 }
 
-// setMode shows the widget as m, at place when the host gives one.
-function setMode(m: FloatMode, place?: Partial<FloatPlace>): void {
-  setPlace(place);
-  if (!FLOAT_MODES.includes(m)) return;
-  if (m === "panel") {
-    const at = marks.focus ? fl.items.findIndex((it) => itemKey(it) === marks.focus) : -1;
-    if (at >= 0) fl.current = at;
-    endPeek();
-  } else {
-    fl.pinned = false;
+const SIDES: readonly PanelPlace["side"][] = ["left", "right", "above", "below"];
+
+// show shows m in the panel's page, at the place the host gives: the full panel on item's key, else on the item
+// last peeked at, a peek at item, or nothing. The same mode again with no item only takes the new place.
+function show(m: FloatMode, p?: Partial<PanelPlace> & { item?: string }): void {
+  if (p && typeof p === "object") {
+    const size = (n: unknown) => (typeof n === "number" && n > 0 ? n : 0);
+    fl.room = { side: SIDES.includes(p.side as PanelPlace["side"]) ? (p.side as PanelPlace["side"]) : "", maxW: size(p.maxW), maxH: size(p.maxH) };
   }
-  if (m === "peek") {
-    if (!fl.items.length) return;
-    fl.mode = "pill";
-    return peek(fl.items[fl.current] || fl.items[0]);
-  }
-  if (m === "pill") endPeek();
-  fl.mode = m;
+  const item = p && typeof p.item === "string" ? p.item : "";
+  if (!FLOAT_MODES.includes(m) || (m === fl.mode && !item)) return;
+  if (m === "panel") return openPanel(item);
+  if (m === "peek") return peekAt(item);
+  shut();
+}
+
+// openPanel shows the full panel on the item keyed key, else on the one last peeked at.
+function openPanel(key = ""): void {
+  const at = key || marks.focus;
+  const i = at ? fl.items.findIndex((it) => itemKey(it) === at) : -1;
+  if (i >= 0) fl.current = i;
+  endPeek();
+  Object.assign(fl, { mode: "panel", peekKey: "" });
+}
+
+// shut shows nothing, unpinned, as the host hid the window.
+function shut(): void {
+  endPeek();
+  Object.assign(fl, { mode: "", peekKey: "", pinned: false });
+}
+
+// close shows nothing and asks the host to hide the panel's window.
+function close(): void {
+  shut();
+  floatDeps.post({ type: "float:close" });
+}
+
+// leave closes a full panel that is not pinned, as the pointer has left both windows or the window lost the keyboard.
+function leave(): void {
+  if (fl.mode === "panel" && !fl.pinned) close();
 }
 
 function move(delta: number): void {
@@ -322,20 +351,20 @@ function openUnit(): void {
   if (item) floatDeps.openUnit(item);
 }
 
-// hide asks the host to hide the widget for mode; the page collapses to the pill it comes back as.
+// hide asks the host to hide the widget for mode, closing the panel.
 function hide(mode: FloatHide): void {
-  setMode("pill");
+  if (fl.mode) close();
   floatDeps.post({ type: "float:hide", mode });
 }
 
 function setPinned(on: boolean): void {
   fl.pinned = on;
-  if (on) setMode("panel");
+  if (on && fl.mode !== "panel") openPanel();
 }
 
-// blur collapses a panel that is not pinned, as the float loses the keyboard.
-function blur(): void {
-  if (fl.mode === "panel" && !fl.pinned) setMode("pill");
+// askPanel asks the host for the full panel beside the tab, or, on a click, to close it when it shows.
+function askPanel(toggle = false): void {
+  floatDeps.post(toggle ? { type: "float:panel", toggle } : { type: "float:panel" });
 }
 
 // floatState is the widget's state and what moves it.
@@ -363,14 +392,25 @@ export function floatState() {
     get mode(): FloatMode {
       return fl.mode;
     },
+    // peeked is the item the peek shows, null until the queue holds it.
     get peeked(): J {
-      return fl.peeked;
+      return fl.peekKey ? fl.items.find((it) => itemKey(it) === fl.peekKey) || null : null;
+    },
+    get peekKey(): string {
+      return fl.peekKey;
+    },
+    // peeking says the peek still shows; once it ends the page lets its card leave, then closes.
+    get peeking(): boolean {
+      return fl.peeking;
     },
     get pinned(): boolean {
       return fl.pinned;
     },
     get place(): FloatPlace {
       return fl.place;
+    },
+    get room(): PanelPlace {
+      return fl.room;
     },
     get busy(): boolean {
       return fl.busy;
@@ -389,10 +429,14 @@ export function floatState() {
     get online(): boolean {
       return this.read === "ok";
     },
-    peek,
-    setMode,
+    setPlace,
+    show,
+    openPanel,
+    close,
+    leave,
+    blur: leave,
+    askPanel,
     setPinned,
-    blur,
     move,
     select: (i: number) => {
       if (i >= 0 && i < fl.items.length) fl.current = i;

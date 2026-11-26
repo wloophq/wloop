@@ -17,6 +17,10 @@ import (
 var clientTokens = map[string]string{
 	"Backspace":     "a key's name as the served bindings spell it",
 	"Float":         "the suffix of the floating widget's window property after the brand's command",
+	"place":         "a method of the floating widget's page bridge the host calls",
+	"show":          "a method of the floating widget's page bridge the host calls",
+	"leave":         "a method of the floating widget's page bridge the host calls",
+	"blur":          "a method of the floating widget's page bridge the host calls",
 	"Enter":         "a key's name as the served bindings spell it",
 	"Esc":           "a key's name as the served bindings spell it",
 	"Tab":           "a key's name as the served bindings spell it",
@@ -60,7 +64,7 @@ var clientTokens = map[string]string{
 }
 
 // clientTokenUses is how many literals clientTokens lets pass; a new one raises it on purpose, in review.
-const clientTokenUses = 66
+const clientTokenUses = 70
 
 var (
 	singleWord = regexp.MustCompile(`^[\s(·,;:—–-]*\pL[\pL'’…-]*\pL[\s.,:;!?…)·]*$`)

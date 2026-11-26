@@ -2,31 +2,28 @@
   import { onMount, untrack } from "svelte";
   import { fmtNumber, t, tn } from "../../lib/i18n.svelte";
   import { typing, type J } from "../../lib/util";
-  import { FLOAT_HOVER_CLOSE_MS, FLOAT_HOVER_OPEN_MS, floatState, type FloatHide } from "../../state/float.svelte";
+  import { floatState, type FloatHide } from "../../state/float.svelte";
   import { notice } from "../../state/store.svelte";
   import Agents from "./Agents.svelte";
-  import { floatSize, hovered, peekLeaveMS } from "./float";
+  import { floatSize, hovered, peekLeaveMS, resetFloatSize } from "./float";
   import Peek from "./Peek.svelte";
-  import Pill from "./Pill.svelte";
   import Queue from "./Queue.svelte";
 
-  // The floating widget's page: the pill, and beside it the panel with the agents and the queue, or, while a peek
-  // shows on the tab of a docked pill, what arrived. The page is transparent and reports its size, so the window that
-  // hosts it fits what it draws.
+  // The floating widget's panel page, in a window the host places beside the tab: the panel with the agents and the
+  // queue, or a peek's card of what arrived, or nothing while the window is hidden. It reports its size and mode, so
+  // the window fits what it draws, and asks the host to hide the window as it closes, which it says once as it loads.
   const f = floatState();
   const open = $derived(f.mode === "panel");
   const n = $derived(f.items.length);
-  // shown is the item the peek draws, kept while its card leaves after the peek ends; the window shrinks once it is
-  // gone, so the fade is not clipped.
-  let shown: J = $state(null);
+  const peeked: J = $derived(f.mode === "peek" ? f.peeked : null);
+  const maxW = $derived(f.room.maxW || window.screen.availWidth);
+  const maxH = $derived(f.room.maxH || window.screen.availHeight);
+
+  // leaving says the peek ended and its card fades out; the page closes once it is gone, so the fade is not clipped.
   let leaving = $state(false);
   let gone: ReturnType<typeof setTimeout> | undefined;
-  const flyout = $derived(!open && f.place.edge && shown);
-  const maxW = $derived(f.place.maxW || window.screen.availWidth);
-  const maxH = $derived(f.place.maxH || window.screen.availHeight);
 
   let root: HTMLElement | undefined = $state();
-  let hover: ReturnType<typeof setTimeout> | undefined;
   let menu = $state(false);
 
   const HIDES: { mode: FloatHide; label: () => string }[] = [
@@ -35,35 +32,33 @@
     { mode: "tomorrow", label: () => t("Hide until tomorrow") },
   ];
 
-  const report = (force = false) => floatSize(root, f.mode, force);
-
-  function left(): void {
-    clearTimeout(gone);
-    shown = null;
-    leaving = false;
-  }
+  const report = (force = false) => {
+    if (f.mode === "panel" || peeked) floatSize(root, f.mode, force);
+  };
 
   $effect(() => {
-    const peeked = f.peeked;
-    const panel = open;
+    const peek = f.mode === "peek";
+    const peeking = f.peeking;
     untrack(() => {
-      if (peeked) {
-        clearTimeout(gone);
-        shown = peeked;
-        leaving = false;
-      } else if (panel || !shown) {
-        left();
-      } else if (!leaving) {
-        const ms = peekLeaveMS();
-        if (!ms) return left();
-        leaving = true;
-        gone = setTimeout(left, ms);
-      }
+      clearTimeout(gone);
+      leaving = false;
+      if (!peek || peeking) return;
+      const ms = peekLeaveMS();
+      if (!ms) return f.close();
+      leaving = true;
+      gone = setTimeout(() => f.close(), ms);
     });
   });
 
   $effect(() => {
-    void [f.mode, f.items.length, shown, f.read, f.place.edge, f.place.up, maxW, maxH, menu, f.turns];
+    if (!f.mode) {
+      menu = false;
+      resetFloatSize();
+    }
+  });
+
+  $effect(() => {
+    void [f.mode, f.peeked, f.items.length, f.read, maxW, maxH, menu, f.turns];
     queueMicrotask(() => report());
   });
 
@@ -72,36 +67,10 @@
     f.hide(mode);
   }
 
-  function later(fn: () => void, ms: number): void {
-    clearTimeout(hover);
-    hover = setTimeout(fn, ms);
-  }
-
-  const enterPill = () => {
-    if (!open) later(() => f.setMode("panel"), FLOAT_HOVER_OPEN_MS);
-    else clearTimeout(hover);
-  };
-  const enterPanel = () => clearTimeout(hover);
-  const leave = () => {
-    if (f.pinned) return clearTimeout(hover);
-    later(() => f.setMode("pill"), open ? FLOAT_HOVER_CLOSE_MS : 0);
-  };
-
-  function toggle(): void {
-    clearTimeout(hover);
-    f.setMode(open ? "pill" : "panel");
-  }
-
-  function blur(): void {
-    if (f.pinned) return;
-    clearTimeout(hover);
-    f.blur();
-  }
-
   function keydown(e: KeyboardEvent): void {
     if (e.key === "Escape") {
       e.preventDefault();
-      f.setMode("pill");
+      f.close();
       return;
     }
     if (!open || e.metaKey || e.ctrlKey || e.altKey || typing(e.target as Element)) return;
@@ -125,34 +94,31 @@
     document.documentElement.classList.add("float-page");
     const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => report());
     if (ro && root) ro.observe(root);
-    report();
+    f.close();
     return () => {
       if (ro) ro.disconnect();
-      clearTimeout(hover);
       clearTimeout(gone);
       document.documentElement.classList.remove("float-page");
     };
   });
 </script>
 
-<svelte:window onkeydown={keydown} onblur={blur} />
+<svelte:window onkeydown={keydown} onblur={() => f.blur()} />
 
 <div
-  class={["fl", open && "open", !f.online && "offline", f.place.up && "up", f.place.leftward && "leftward"]}
-  data-mode={f.mode}
-  data-edge={f.place.edge || undefined}
+  class={["fl", !f.online && "offline"]}
+  data-mode={f.mode || undefined}
+  data-side={f.room.side || undefined}
   style:--fl-max-w="{maxW}px"
   style:--fl-max-h="{maxH}px"
   bind:this={root}
   role="presentation"
-  onpointerleave={leave}
 >
-  <Pill {f} peek={shown} {leaving} onenter={enterPill} ontoggle={toggle} ondrop={() => report(true)} />
-  {#if flyout}
-    <button type="button" class="fl-flyout" data-state={leaving ? "leaving" : "shown"} use:hovered onclick={() => f.setMode("panel")}><span class="fl-flyout-text"><Peek item={flyout} /></span></button>
+  {#if peeked}
+    <button type="button" class="fl-flyout" data-state={leaving ? "leaving" : "shown"} use:hovered onclick={() => f.openPanel(f.peekKey)}><span class="fl-flyout-text"><Peek item={peeked} /></span></button>
   {/if}
   {#if open}
-    <section class="fl-panel" aria-label={f.title || undefined} onpointerenter={enterPanel}>
+    <section class="fl-panel" aria-label={f.title || undefined}>
       <header class="fl-head">
         <i class="fl-mark" aria-hidden="true"></i>
         <h2>{n ? tn("{n} wait on you", n) : t("Nothing waits on you")}</h2>

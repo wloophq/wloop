@@ -963,20 +963,14 @@ body.panel-omnibox .omni-panel { --wails-draggable: drag; }
 body.panel-omnibox .omni-panel :is(input, button, a, .omni-results) { --wails-draggable: no-drag; }
 body.panel-omnibox .omni-keys { cursor: grab; }
 
-/* The floating widget (#/float): a pill and its panel on a transparent page that a native panel window fits.
-   Its shadow and backdrop blur are the one elevation exception design/README.md records. */
+/* The floating widget: the tab (#/float/tab) and the panel beside it (#/float/panel), each on a transparent page that
+   a native panel window of its own fits. Its shadow and backdrop blur are the one elevation exception design/README.md
+   records. */
 html.float-page, html.float-page body { background: transparent; height: auto; }
 html.float-page body { display: block; overflow: hidden; }
-/* --fl-max-w and --fl-max-h are the room from the float's anchor corner to the far side of its screen's visible frame,
-   which the page sets; the window is sized to what the page draws, so its viewport cannot bound the panel. These are where nothing sets them. */
-.fl { display: inline-flex; width: max-content; flex-direction: column; align-items: flex-start; gap: var(--space-6); padding: var(--space-8); font: var(--text-body)/1.4 var(--sans); color: var(--ink); --fl-max-w: 1440px; --fl-max-h: 900px; }
-.fl.up { flex-direction: column-reverse; }
-.fl[data-edge="left"] { flex-direction: row; align-items: flex-start; }
-.fl[data-edge="right"] { flex-direction: row-reverse; align-items: flex-start; }
-/* The host keeps the float's anchor corner still as the window resizes, so the pill sits at that corner and the panel
-   grows away from it. */
-.fl.up[data-edge] { align-items: flex-end; }
-.fl.leftward:not([data-edge]) { align-items: flex-end; }
+/* --fl-max-w and --fl-max-h are the room beside the tab the host gives the panel, which the panel's page sets; its
+   window is sized to what the page draws, so its viewport cannot bound the panel. These are where nothing sets them. */
+.fl { display: inline-flex; width: max-content; flex-direction: column; align-items: flex-start; padding: var(--space-8); font: var(--text-body)/1.4 var(--sans); color: var(--ink); --fl-max-w: 1440px; --fl-max-h: 900px; }
 .fl-sp { flex: 1; }
 .fl-mark { display: inline-block; width: 3px; height: 14px; border-radius: var(--radius-xs); background: var(--me); flex: none; }
 .fl .tone-me { --tone: var(--me); --tone-text: var(--me-text); }
@@ -998,34 +992,35 @@ html.float-page body { display: block; overflow: hidden; }
 .fl-running { display: inline-flex; align-items: center; gap: var(--space-4); color: var(--loop-text); }
 .fl-age { color: var(--faint); font: var(--text-meta) var(--mono); font-feature-settings: "tnum"; white-space: nowrap; }
 .fl-age.late { color: var(--late); background: var(--late-bg); padding: 0 var(--space-4); border-radius: var(--radius-sm); }
-.fl-peek { overflow: hidden; text-overflow: ellipsis; max-width: 300px; font-family: var(--sans); color: var(--ink); }
-.fl-peek b, .fl-flyout b { color: var(--tone-text, var(--me-text)); font-weight: 600; }
+.fl-flyout b { color: var(--tone-text, var(--me-text)); font-weight: 600; }
 .fl[data-edge] .fl-pill { flex-direction: column; justify-content: center; width: 34px; height: auto; min-height: 84px; padding: var(--space-8) 0; gap: var(--space-6); }
 .fl[data-edge] .fl-pill .fl-mark { width: 14px; height: 3px; }
 .fl[data-edge] .fl-pill .fl-count, .fl[data-edge] .fl-pill .fl-running { flex-direction: column; }
 .fl[data-edge] .fl-pill .fl-age { display: none; }
-/* A docked tab has no room for a peek, so it shows as a card beside the tab, where the panel opens. */
+/* A peek is a card in the panel's window, beside the tab. */
 .fl-flyout {
-  display: block; max-width: min(340px, calc(var(--fl-max-w) - 60px)); padding: var(--space-8) var(--space-12); text-align: left;
+  display: block; max-width: min(340px, calc(var(--fl-max-w) - 16px)); padding: var(--space-8) var(--space-12); text-align: left;
   border-radius: var(--radius-lg); border: 1px solid var(--rule); background: color-mix(in srgb, var(--panel) 88%, transparent);
   box-shadow: 0 6px 24px #0000002e; backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4);
   font: var(--text-meta)/1.4 var(--sans); color: var(--ink); cursor: pointer;
 }
 .fl-flyout:hover, .fl-flyout[data-hover] { border-color: var(--rule-strong); }
-.fl.up .fl-flyout { align-self: flex-end; }
-/* A peek slides in from the pill's side and fades out back toward it; the page keeps a leaving card until its
-   transition ends, so the window shrinks after it. */
-.fl-peek, .fl-flyout { --fl-peek-side: -1; transition: opacity var(--motion-peek-in) var(--motion-ease), transform var(--motion-peek-in) var(--motion-ease); }
-.fl[data-edge="right"] .fl-flyout { --fl-peek-side: 1; }
-@starting-style { .fl-peek, .fl-flyout { opacity: 0; transform: translateX(calc(var(--fl-peek-side) * 12px)); } }
-.fl-peek[data-state="leaving"], .fl-flyout[data-state="leaving"] { opacity: 0; transform: translateX(calc(var(--fl-peek-side) * 6px)); transition: opacity var(--motion-peek-out) var(--motion-exit-ease), transform var(--motion-peek-out) var(--motion-exit-ease); }
+/* A peek slides in from the tab's side and fades out back toward it; the page closes its window once the leaving
+   card's transition ends. --fl-peek-x and --fl-peek-y point from the card to the tab. */
+.fl-flyout { --fl-peek-x: 0; --fl-peek-y: 0; transition: opacity var(--motion-peek-in) var(--motion-ease), transform var(--motion-peek-in) var(--motion-ease); }
+.fl[data-side="left"] .fl-flyout { --fl-peek-x: 1; }
+.fl[data-side="right"] .fl-flyout { --fl-peek-x: -1; }
+.fl[data-side="above"] .fl-flyout { --fl-peek-y: 1; }
+.fl[data-side="below"] .fl-flyout { --fl-peek-y: -1; }
+@starting-style { .fl-flyout { opacity: 0; transform: translate(calc(var(--fl-peek-x) * 12px), calc(var(--fl-peek-y) * 12px)); } }
+.fl-flyout[data-state="leaving"] { opacity: 0; transform: translate(calc(var(--fl-peek-x) * 6px), calc(var(--fl-peek-y) * 6px)); transition: opacity var(--motion-peek-out) var(--motion-exit-ease), transform var(--motion-peek-out) var(--motion-exit-ease); }
 .fl-flyout-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
 .fl-ring { flex: none; }
 .fl-ring circle { fill: none; stroke-width: 2; }
 .fl-ring .track { stroke: var(--rule); }
 .fl-ring .arc { stroke: var(--loop); stroke-linecap: round; }
 .fl-panel {
-  display: flex; flex-direction: column; width: min(460px, calc(var(--fl-max-w) - 24px)); max-height: calc(var(--fl-max-h) - 48px);
+  display: flex; flex-direction: column; width: min(460px, calc(var(--fl-max-w) - 16px)); max-height: calc(var(--fl-max-h) - 16px);
   border: 1px solid var(--rule); border-radius: 14px; background: color-mix(in srgb, var(--panel) 94%, transparent);
   box-shadow: 0 18px 50px #00000040; backdrop-filter: blur(22px) saturate(1.4); -webkit-backdrop-filter: blur(22px) saturate(1.4); overflow: hidden;
 }

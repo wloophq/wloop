@@ -38,15 +38,25 @@ type Host interface {
 	ShowDetached(id, url string)
 	// OpenExternal opens url, a web address, in the default browser.
 	OpenExternal(url string)
-	// ShowFloat shows the floating widget at url on every space, without
-	// activating the app or taking the keyboard; reload loads url anew though
-	// the float shows it already.
+	// ShowFloat shows the floating widget's tab at url on every space,
+	// without activating the app or taking the keyboard; reload loads url anew
+	// though the tab shows it already.
 	ShowFloat(url string, reload bool)
+	// HideFloat hides the tab and the panel window.
 	HideFloat()
-	// SetFloatFrame moves and sizes the floating widget to r.
+	// SetFloatFrame moves and sizes the floating widget's tab to r.
 	SetFloatFrame(r Rect)
-	// PlaceFloat tells the float's page where it sits.
+	// PlaceFloat tells the tab's page where it sits.
 	PlaceFloat(p FloatPlace)
+	// LoadFloatPanel loads url in the float's panel window, creating the
+	// window, hidden, on the first call.
+	LoadFloatPanel(url string)
+	// TellFloatPanel tells the panel's page what to show.
+	TellFloatPanel(p PanelPlace)
+	// ShowFloatPanel moves and sizes the panel window to r and shows it,
+	// without taking the keyboard.
+	ShowFloatPanel(r Rect)
+	HideFloatPanel()
 	// Listen binds the hotkey, the reopen and opened links; an error leaves
 	// the reopen and the links bound.
 	Listen(h Handlers) error
@@ -65,7 +75,7 @@ type Handlers struct {
 	OnPanelHidden func()
 	// OnOpenURL runs for each deep link the system hands the app.
 	OnOpenURL func(link string)
-	// OnFloat runs for each message the float's page sends.
+	// OnFloat runs for each message the float's pages send.
 	OnFloat func(m FloatMessage)
 	// OnFloatMoving runs when the person starts moving the float, and
 	// OnFloatDropped with its frame once they let go.
@@ -121,6 +131,9 @@ type Controller struct {
 	screens     []Screen
 	floatHide   func(mode string)
 	floatHotkey func()
+	// tabFrame is where the tab was last put; panel is its panel window.
+	tabFrame Rect
+	panel    floatPanel
 	// dragging holds the frame still while the person drags it; tellPlace
 	// says the page is due its place, which it gets once it has loaded
 	// (pageReady: it sent a message since its last load) and the frame is set.

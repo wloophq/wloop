@@ -151,15 +151,6 @@ func addCollectionBehavior(win objc.ID, b application.MacWindowCollectionBehavio
 	win.Send(sel("setCollectionBehavior:"), current|uint(b))
 }
 
-// handBackKeyboard gives the keyboard back to the app the person was typing
-// in: a non-activating panel ordered out passes key status back to the
-// active app's window. It runs on the main thread, with no mouse button
-// down, since ordering out under a press drops its mouse-up.
-func handBackKeyboard(win objc.ID) {
-	win.Send(sel("orderOut:"), objc.ID(0))
-	win.Send(sel("orderFrontRegardless"))
-}
-
 func mouseButtonsUp() bool {
 	return objc.Send[uint](objc.ID(class("NSEvent")), sel("pressedMouseButtons")) == 0
 }
@@ -259,16 +250,20 @@ func floatPointerJS(kind string, x, y float64) string {
 	return floatPointerScript + "(" + string(bridge) + "," + string(k) + "," + strconv.FormatFloat(x, 'f', -1, 64) + "," + strconv.FormatFloat(y, 'f', -1, 64) + ")"
 }
 
-// floatTracked is what a tracking area's owner reaches: the float and its
-// web view.
-type floatTracked struct{ win, webview objc.ID }
+// floatTracked is what a tracking area's owner reaches: a float window, its
+// web view, and what hears the pointer enter and leave it.
+type floatTracked struct {
+	win, webview objc.ID
+	over         func(inside bool)
+}
 
 // trackTargets maps each tracking area's owner to what it tracks.
 var trackTargets sync.Map
 
-// pointerTo dispatches the pointer's kind of move in the float's page, as
-// pointerKind says: WebKit drops the mouse's moves in a window that is not
-// key, so its page would see no hover. It runs on the main thread.
+// pointerTo tells the window's hearer the pointer entered or left it, and
+// dispatches the pointer's kind of move in its page, as pointerKind says:
+// WebKit drops the mouse's moves in a window that is not key, so its page
+// would see no hover. It runs on the main thread.
 func pointerTo(s objc.SEL, kind string) objc.MethodDef {
 	return objc.MethodDef{Cmd: s, Fn: func(self objc.ID, _ objc.SEL, event objc.ID) {
 		v, ok := trackTargets.Load(self)
@@ -276,6 +271,9 @@ func pointerTo(s objc.SEL, kind string) objc.MethodDef {
 			return
 		}
 		t := v.(floatTracked)
+		if kind != pointerMoved {
+			t.over(kind == pointerEntered)
+		}
 		k := pointerKind(kind, objc.Send[bool](t.win, sel("isKeyWindow")))
 		if k == "" {
 			return
@@ -285,14 +283,23 @@ func pointerTo(s objc.SEL, kind string) objc.MethodDef {
 	}}
 }
 
-// floatOnly gives the float, and no other window, what a panel that is not
-// key needs: its panel becomes key only while keyable says so, its web view
-// takes the first click, and a tracking area active in any window hands its
-// page the pointer (pointerTo). The first two replace a method on the class
-// the float shares with the omnibox panel and every web view, answering as
-// before for those. Whatever it cannot do it logs to log; it runs on the main
-// thread, once.
-func floatOnly(win objc.ID, keyable func() bool, log warner) {
+// floatTracker is the class whose instances own the float windows' tracking
+// areas, registered once for both.
+var floatTracker struct {
+	once sync.Once
+	cls  objc.Class
+	err  error
+}
+
+// floatOnly gives a float window, and no other window, what a panel that is
+// not key needs: it becomes key only while keyable says so, its web view
+// takes the first click, and a tracking area active in any window tells over
+// the pointer entered or left it and hands its page the pointer (pointerTo).
+// The first two replace a method on the class the float windows share with
+// the omnibox panel and every web view, answering as before for every other
+// instance. Whatever it cannot do it logs to log; it runs on the main
+// thread, once per window.
+func floatOnly(win objc.ID, keyable func() bool, over func(inside bool), log warner) {
 	u := unready{log}
 	if win == 0 {
 		u.Warn("no float window")
@@ -314,15 +321,17 @@ func floatOnly(win objc.ID, keyable func() bool, log warner) {
 	if !answerFor(webview, realClass(webview), sel("acceptsFirstMouse:"), "B@:@", func() bool { return true }) {
 		u.Warn("the float's web view has no class to answer for")
 	}
-	tracker, err := objc.RegisterClass(brand.Name+"FloatTracker", objc.GetClass("NSObject"), nil, nil, []objc.MethodDef{
-		pointerTo(sel("mouseEntered:"), pointerEntered), pointerTo(sel("mouseMoved:"), pointerMoved), pointerTo(sel("mouseExited:"), pointerExited),
+	floatTracker.once.Do(func() {
+		floatTracker.cls, floatTracker.err = objc.RegisterClass(brand.Name+"FloatTracker", objc.GetClass("NSObject"), nil, nil, []objc.MethodDef{
+			pointerTo(sel("mouseEntered:"), pointerEntered), pointerTo(sel("mouseMoved:"), pointerMoved), pointerTo(sel("mouseExited:"), pointerExited),
+		})
 	})
-	if err != nil {
-		u.Warn("the float's tracking did not register", "error", err)
+	if floatTracker.err != nil {
+		u.Warn("the float's tracking did not register", "error", floatTracker.err)
 		return
 	}
-	owner := objc.ID(tracker).Send(sel("new"))
-	trackTargets.Store(owner, floatTracked{win: win, webview: webview})
+	owner := objc.ID(floatTracker.cls).Send(sel("new"))
+	trackTargets.Store(owner, floatTracked{win: win, webview: webview, over: over})
 	area := class("NSTrackingArea").Send(sel("alloc")).Send(sel("initWithRect:options:owner:userInfo:"), rect{}, uint(floatTracking), owner, objc.ID(0))
 	content.Send(sel("addTrackingArea:"), area)
 }

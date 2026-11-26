@@ -3,6 +3,7 @@ package window
 import (
 	"errors"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
@@ -147,11 +148,15 @@ func TestParseFloatMessage(t *testing.T) {
 		want FloatMessage
 		ok   bool
 	}{
-		{`{"type":"float:size","w":460,"h":600,"mode":"panel"}`, FloatMessage{Kind: FloatSize, W: 460, H: 600, Mode: ModePanel}, true},
-		{`{"type":"float:size","w":128,"h":48,"mode":"pill"}`, FloatMessage{Kind: FloatSize, W: 128, H: 48, Mode: ModePill}, true},
+		{`{"type":"float:size","w":476,"h":600,"mode":"panel"}`, FloatMessage{Kind: FloatSize, W: 476, H: 600, Mode: ModePanel}, true},
+		{`{"type":"float:size","w":128,"h":48}`, FloatMessage{Kind: FloatSize, W: 128, H: 48}, true},
 		{`{"type":"float:open","route":"task=t-1"}`, FloatMessage{Kind: FloatOpen, Route: "task=t-1"}, true},
 		{`{"type":"float:hide","mode":"quiet"}`, FloatMessage{Kind: FloatHide, Mode: "quiet"}, true},
-		{`{"type":"float:size","w":0,"h":32,"mode":"pill"}`, FloatMessage{}, false},
+		{`{"type":"float:panel","toggle":true}`, FloatMessage{Kind: FloatOpenPanel, Toggle: true}, true},
+		{`{"type":"float:peek","item":"gate:7"}`, FloatMessage{Kind: FloatPeek, Item: "gate:7"}, true},
+		{`{"type":"float:peek"}`, FloatMessage{}, false},
+		{`{"type":"float:close"}`, FloatMessage{Kind: FloatClose}, true},
+		{`{"type":"float:size","w":0,"h":32}`, FloatMessage{}, false},
 		{`{"type":"float:move","x":1}`, FloatMessage{}, false},
 		{`float:size {"w":460,"h":600}`, FloatMessage{}, false},
 		{`{"w":460,"h":600}`, FloatMessage{}, false},
@@ -165,8 +170,8 @@ func TestParseFloatMessage(t *testing.T) {
 	}
 }
 
-func TestTheFloatTakesTheKeyboardOnlyInPanelMode(t *testing.T) {
-	for mode, want := range map[string]bool{ModePill: false, ModePeek: false, ModePanel: true, "": false, "other": false} {
+func TestThePanelTakesTheKeyboardOnlyInPanelMode(t *testing.T) {
+	for mode, want := range map[string]bool{ModePeek: false, ModePanel: true, "": false, "other": false} {
 		if got := FloatKeyable(mode); got != want {
 			t.Errorf("mode %q keyable %v, want %v", mode, got, want)
 		}
@@ -184,9 +189,9 @@ func floatRig(t *testing.T, d Defaults, screens ...Screen) *rig {
 	return r
 }
 
-// size is a size message of the pill.
+// size is a size message of the tab.
 func size(w, h float64) FloatMessage {
-	return FloatMessage{Kind: FloatSize, W: w, H: h, Mode: ModePill}
+	return FloatMessage{Window: FloatTab, Kind: FloatSize, W: w, H: h}
 }
 
 // shownRig is a floatRig whose float shows and whose page has loaded, with
@@ -202,9 +207,9 @@ func shownRig(t *testing.T, d Defaults, screens ...Screen) *rig {
 	return r
 }
 
-// Growing from the bottom right, the frame keeps its right and bottom edges
-// where they were: the pill stays under the mouse while the panel opens.
-// The page learns where it sits once it has loaded.
+// A tab anchored at the bottom right keeps its right and bottom edges where
+// they were as its counts widen it. The page learns where it sits once it
+// has loaded.
 func TestFloatSizeKeepsAnchorCorner(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		d := memDefaults{}
@@ -213,10 +218,10 @@ func TestFloatSizeKeepsAnchorCorner(t *testing.T) {
 		if err := r.ctl.ShowFloat(); err != nil {
 			t.Fatal(err)
 		}
-		want(t, r.host.taken(), "float-frame {1288 868 112 32}", "float-load "+base+"#"+FloatRoute)
-		r.host.handlers().OnFloat(FloatMessage{Kind: FloatSize, W: 460, H: 600, Mode: ModePanel})
-		r.host.handlers().OnFloat(size(112, 32))
-		want(t, r.host.taken(), "float-frame {940 300 460 600}", `float-place "" true true 1400x867`, "float-frame {1288 868 112 32}")
+		want(t, r.host.taken(), "float-frame {1288 868 112 32}", "float-load "+base+"#"+FloatTabRoute)
+		r.host.handlers().OnFloat(size(140, 32))
+		r.host.handlers().OnFloat(size(140, 32))
+		want(t, r.host.taken(), "float-frame {1260 868 140 32}", `float-place ""`)
 	})
 }
 
@@ -226,7 +231,7 @@ func TestFloatSizeIsCappedToTheScreen(t *testing.T) {
 		d := memDefaults{}
 		SavePlacement(d, FloatPlacement{Corner: CornerBottomRight, X: 1400, Y: 900, W: 112, H: 32})
 		r := shownRig(t, d, laptop)
-		r.host.handlers().OnFloat(FloatMessage{Kind: FloatSize, W: 2000, H: 1200, Mode: ModePanel})
+		r.host.handlers().OnFloat(size(2000, 1200))
 		want(t, r.host.taken(), "float-frame {0 33 1512 911}")
 	})
 }
@@ -252,20 +257,7 @@ func TestTheFloatStartsDockedRight(t *testing.T) {
 			t.Fatalf("host calls %q, want a frame flush with the laptop's right edge", got)
 		}
 		r.host.handlers().OnFloat(size(34, 84))
-		want(t, r.host.taken(), "float-frame {1478 260.75 34 84}", `float-place "right" false true 1512x683.25`)
-	})
-}
-
-// A peek beside a tab docked on the right grows the frame leftward, keeping
-// the tab flush with the screen's edge, and its end shrinks it back.
-func TestAPeekBesideARightTabGrowsTheFrameLeftward(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		d := memDefaults{}
-		SavePlacement(d, FloatPlacement{Edge: EdgeRight, Corner: CornerTopRight, X: 1512, Y: 200, W: 34, H: 84})
-		r := shownRig(t, d, laptop)
-		r.host.handlers().OnFloat(FloatMessage{Kind: FloatSize, W: 400, H: 84, Mode: ModePeek})
-		r.host.handlers().OnFloat(size(34, 84))
-		want(t, r.host.taken(), "float-frame {1112 200 400 84}", "float-frame {1478 200 34 84}")
+		want(t, r.host.taken(), "float-frame {1478 260.75 34 84}", `float-place "right"`)
 	})
 }
 
@@ -280,8 +272,8 @@ func TestScreensChangingMoveTheFloatBack(t *testing.T) {
 		r.host.handlers().OnScreens([]Screen{laptop})
 		r.host.handlers().OnScreens([]Screen{laptop, wide})
 		want(t, r.host.taken(),
-			"float-frame {1400 912 112 32}", `float-place "" true true 1512x911`,
-			"float-frame {3788 1268 112 32}", `float-place "" true true 2388x1275`)
+			"float-frame {1400 912 112 32}", `float-place ""`,
+			"float-frame {3788 1268 112 32}", `float-place ""`)
 	})
 }
 
@@ -301,7 +293,7 @@ func TestADropIsSavedAndSnapped(t *testing.T) {
 		if want := (FloatPlacement{Edge: EdgeLeft, Corner: CornerBottomLeft, X: 0, Y: 532, W: 112, H: 32}); !ok || got != want {
 			t.Fatalf("saved %+v %v, want %+v", got, ok, want)
 		}
-		want(t, r.host.taken(), "float-frame {0 500 112 32}", `float-place "left" true false 1512x499`)
+		want(t, r.host.taken(), "float-frame {0 500 112 32}", `float-place "left"`)
 	})
 }
 
@@ -315,7 +307,7 @@ func TestASizeDuringADragWaitsForTheDrop(t *testing.T) {
 		r.host.handlers().OnFloat(size(34, 84))
 		want(t, r.host.taken())
 		r.host.handlers().OnFloatDropped(Rect{X: 10, Y: 500, W: 112, H: 32})
-		want(t, r.host.taken(), "float-frame {0 448 34 84}", `float-place "left" true false 1512x499`)
+		want(t, r.host.taken(), "float-frame {0 448 34 84}", `float-place "left"`)
 		if got, _ := LoadPlacement(d); got.W != 34 || got.H != 84 {
 			t.Fatalf("saved %+v, want the size sent during the drag", got)
 		}
@@ -325,7 +317,7 @@ func TestASizeDuringADragWaitsForTheDrop(t *testing.T) {
 func TestFloatOpenShowsTheRouteInTheMainWindow(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		r := floatRig(t, nil, laptop)
-		r.host.handlers().OnFloat(FloatMessage{Kind: FloatOpen, Route: "task=t-1"})
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatPanel, Kind: FloatOpen, Route: "task=t-1"})
 		want(t, r.host.taken(), "main "+base+"#task=t-1", "hide-panel")
 	})
 }
@@ -333,10 +325,10 @@ func TestFloatOpenShowsTheRouteInTheMainWindow(t *testing.T) {
 func TestFloatHideReachesItsHook(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		r := floatRig(t, nil, laptop)
-		r.host.handlers().OnFloat(FloatMessage{Kind: FloatHide, Mode: "quiet"})
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatHide, Mode: "quiet"})
 		var got []string
 		r.ctl.OnFloatHide(func(mode string) { got = append(got, mode) })
-		r.host.handlers().OnFloat(FloatMessage{Kind: FloatHide, Mode: "quiet"})
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatHide, Mode: "quiet"})
 		if len(got) != 1 || got[0] != "quiet" {
 			t.Fatalf("hook got %q", got)
 		}
@@ -422,7 +414,7 @@ func TestAFloatTheDaemonCouldNotServeShowsOnceItsEventsAnswer(t *testing.T) {
 		down.Store(false)
 		r.run(t)
 		synctest.Wait()
-		want(t, r.host.taken(), "float-load "+base+"#"+FloatRoute)
+		want(t, r.host.taken(), "float-load "+base+"#"+FloatTabRoute)
 	})
 }
 
@@ -435,13 +427,13 @@ func TestARefusedFloatPageLoadsAnewWhenTheDaemonComesBack(t *testing.T) {
 		if err := r.ctl.ShowFloat(); err != nil {
 			t.Fatal(err)
 		}
-		want(t, r.host.taken(), "float-load "+base+"#"+FloatRoute)
+		want(t, r.host.taken(), "float-load "+base+"#"+FloatTabRoute)
 		r.run(t)
 		synctest.Wait()
 		want(t, r.host.taken())
 		time.Sleep(reconnectAfter)
 		synctest.Wait()
-		want(t, r.host.taken(), "float-load "+base+"#"+FloatRoute)
+		want(t, r.host.taken(), "float-load "+base+"#"+FloatTabRoute)
 	})
 }
 
@@ -472,7 +464,7 @@ func TestAFloatShownAgainKeepsItsLoadedPageAndIsPlacedAtOnce(t *testing.T) {
 			t.Fatal(err)
 		}
 		got := r.host.taken()
-		if len(got) != 4 || got[0] != "hide-float" || !strings.HasPrefix(got[2], "float-place ") || got[3] != "float "+base+"#"+FloatRoute {
+		if len(got) != 4 || got[0] != "hide-float" || !strings.HasPrefix(got[2], "float-place ") || got[3] != "float "+base+"#"+FloatTabRoute {
 			t.Fatalf("host calls %q, want the frame, the place and a show without a load", got)
 		}
 	})
@@ -517,8 +509,12 @@ func TestTheFloatIsReadyOnceItsPageReportsIn(t *testing.T) {
 		if r.ctl.FloatReady() {
 			t.Fatal("ready before its page reported in")
 		}
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatPanel, Kind: FloatClose})
+		if r.ctl.FloatReady() || readies != 0 {
+			t.Fatal("the panel's page made the float ready")
+		}
 		r.host.handlers().OnFloat(size(112, 32))
-		r.host.handlers().OnFloat(size(460, 600))
+		r.host.handlers().OnFloat(size(140, 32))
 		if !r.ctl.FloatReady() || readies != 1 {
 			t.Fatalf("ready %v, hook ran %d times; want ready, once", r.ctl.FloatReady(), readies)
 		}
@@ -542,42 +538,227 @@ func TestAFloatPageNotYetReadyLoadsAnewOnTheFirstSubscription(t *testing.T) {
 		r.host.taken()
 		r.run(t)
 		synctest.Wait()
-		want(t, r.host.taken(), "float-load "+base+"#"+FloatRoute)
+		want(t, r.host.taken(), "float-load "+base+"#"+FloatTabRoute)
 	})
 }
 
-// The room a float may grow into runs from its anchor to the far side of its
-// screen's visible frame, so the panel it opens never pushes the pill.
-func TestTheRoomRunsFromTheAnchorToTheFarSideOfTheScreen(t *testing.T) {
+// The panel goes beside the tab, away from a docked edge, or below or above
+// a free pill, whichever has more room; it lines up with the tab's side
+// nearer the screen's middle and stays inside the visible frame on its own.
+func TestThePanelGoesBesideTheTab(t *testing.T) {
 	for _, c := range []struct {
-		name string
-		p    FloatPlacement
-		w, h float64
+		name  string
+		tab   Rect
+		edge  string
+		w, h  float64
+		on    []Screen
+		side  string
+		frame Rect
 	}{
-		{"docked right, a quarter down", FloatPlacement{Edge: EdgeRight, Corner: CornerTopRight, X: 1512, Y: 260.75, W: 34, H: 84}, 1512, 33 + 911 - 260.75},
-		{"docked left, low", FloatPlacement{Edge: EdgeLeft, Corner: CornerBottomLeft, X: 0, Y: 800, W: 34, H: 84}, 1512, 800 - 33},
-		{"free, top right quarter", FloatPlacement{Corner: CornerTopRight, X: 1200, Y: 100, W: 112, H: 32}, 1200, 33 + 911 - 100},
-		{"free, bottom left quarter", FloatPlacement{Corner: CornerBottomLeft, X: 300, Y: 900, W: 112, H: 32}, 1512 - 300, 900 - 33},
-		{"anchor above the visible frame", FloatPlacement{Corner: CornerTopLeft, X: 2000, Y: 5, W: 112, H: 32}, 1512 + 2560 - 2000, 1390},
+		{"docked right, high", Rect{X: 1478, Y: 260.75, W: 34, H: 84}, EdgeRight, 476, 600, []Screen{laptop}, SideLeft, Rect{X: 1002, Y: 260.75, W: 476, H: 600}},
+		{"docked right, low", Rect{X: 1478, Y: 800, W: 34, H: 84}, EdgeRight, 476, 600, []Screen{laptop}, SideLeft, Rect{X: 1002, Y: 284, W: 476, H: 600}},
+		{"docked left, taller than the room below it", Rect{X: 0, Y: 400, W: 34, H: 84}, EdgeLeft, 476, 900, []Screen{laptop}, SideRight, Rect{X: 34, Y: 44, W: 476, H: 900}},
+		{"docked left, taller than the screen", Rect{X: 0, Y: 400, W: 34, H: 84}, EdgeLeft, 476, 2000, []Screen{laptop}, SideRight, Rect{X: 34, Y: 33, W: 476, H: 911}},
+		{"free, top left", Rect{X: 100, Y: 100, W: 112, H: 32}, "", 476, 600, []Screen{laptop}, SideBelow, Rect{X: 100, Y: 132, W: 476, H: 600}},
+		{"free, bottom right", Rect{X: 1300, Y: 880, W: 112, H: 32}, "", 476, 600, []Screen{laptop}, SideAbove, Rect{X: 936, Y: 280, W: 476, H: 600}},
+		{"free, taller than the room below", Rect{X: 1300, Y: 300, W: 112, H: 32}, "", 476, 800, []Screen{laptop}, SideBelow, Rect{X: 936, Y: 332, W: 476, H: 612}},
+		{"free, wider than the screen", Rect{X: 100, Y: 100, W: 112, H: 32}, "", 2000, 300, []Screen{laptop}, SideBelow, Rect{X: 0, Y: 132, W: 1512, H: 300}},
+		{"docked right on the second screen", Rect{X: 4038, Y: 500, W: 34, H: 84}, EdgeRight, 476, 600, []Screen{laptop, wide}, SideLeft, Rect{X: 3562, Y: 500, W: 476, H: 600}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			w, h := RoomOf(c.p, []Screen{laptop, wide})
-			if w != c.w || h != c.h {
-				t.Fatalf("room %vx%v, want %vx%v", w, h, c.w, c.h)
+			side, _ := PanelRoom(c.tab, c.edge, c.on)
+			if side != c.side {
+				t.Fatalf("side %q, want %q", side, c.side)
 			}
+			wantRect(t, PanelFrame(c.tab, c.edge, c.w, c.h, c.on), c.frame)
 		})
 	}
 }
 
-// A float whose panel is as tall as the room it was told stays where its pill
-// was: the clamp never moves its anchor.
-func TestAPanelAsTallAsItsRoomKeepsThePillInPlace(t *testing.T) {
-	p := FloatPlacement{Edge: EdgeRight, Corner: CornerTopRight, X: 1512, Y: 260.75, W: 34, H: 84}
-	pill := ClampToScreens(p, []Screen{laptop})
-	w, h := RoomOf(p, []Screen{laptop})
-	p.W, p.H = min(476, w), h
-	panel := ClampToScreens(p, []Screen{laptop})
-	if panel.Y != pill.Y || panel.right() != pill.right() {
-		t.Fatalf("panel %+v moved the pill's corner from %+v", panel, pill)
+// The room the panel's page is told is where PanelFrame may put it: a panel
+// of that size fills it exactly.
+func TestThePanelsRoomIsWhereItGoes(t *testing.T) {
+	tab := Rect{X: 1478, Y: 260.75, W: 34, H: 84}
+	side, room := PanelRoom(tab, EdgeRight, []Screen{laptop})
+	if want := (Rect{X: 0, Y: 33, W: 1478, H: 911}); side != SideLeft || room != want {
+		t.Fatalf("room %q %+v, want %q %+v", side, room, SideLeft, want)
 	}
+	wantRect(t, PanelFrame(tab, EdgeRight, room.W, room.H, []Screen{laptop}), room)
+}
+
+// Wherever the tab sits and however large the panel, the panel never covers
+// the tab and stays inside the visible frame of the tab's screen.
+func TestThePanelNeverCoversTheTabNorLeavesTheScreen(t *testing.T) {
+	screens := []Screen{laptop, wide}
+	for _, s := range screens {
+		v := s.Visible
+		for _, edge := range []string{"", EdgeLeft, EdgeRight} {
+			for fy := 0.0; fy <= 1; fy += 0.125 {
+				for fx := 0.0; fx <= 1; fx += 0.125 {
+					for _, size := range [][2]float64{{340, 60}, {476, 600}, {476, 5000}, {5000, 300}} {
+						tab := Rect{W: 112, H: 32}
+						if edge != "" {
+							tab.W, tab.H = 34, 84
+						}
+						tab.X = v.X + fx*(v.W-tab.W)
+						tab.Y = v.Y + fy*(v.H-tab.H)
+						switch edge {
+						case EdgeLeft:
+							tab.X = v.X
+						case EdgeRight:
+							tab.X = v.right() - tab.W
+						}
+						p := PanelFrame(tab, edge, size[0], size[1], screens)
+						if a := p.overlap(tab); a > 0 {
+							t.Fatalf("edge %q tab %+v size %v: panel %+v covers the tab by %v", edge, tab, size, p, a)
+						}
+						if p.X < v.X || p.Y < v.Y || p.right() > v.right() || p.bottom() > v.bottom() {
+							t.Fatalf("edge %q tab %+v size %v: panel %+v leaves %+v", edge, tab, size, p, v)
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+// panelMsg is a message of the panel's page.
+func panelMsg(m FloatMessage) FloatMessage {
+	m.Window = FloatPanel
+	return m
+}
+
+// dockedRig is a shownRig whose tab is docked on the laptop's right edge,
+// a quarter down.
+func dockedRig(t *testing.T) *rig {
+	t.Helper()
+	d := memDefaults{}
+	SavePlacement(d, FloatPlacement{Edge: EdgeRight, Corner: CornerTopRight, X: 1512, Y: 260.75, W: 34, H: 84})
+	r := shownRig(t, d, laptop)
+	r.host.handlers().OnFloat(size(34, 84))
+	r.host.taken()
+	return r
+}
+
+const panelURL = base + "#" + FloatPanelRoute
+
+// The panel's window loads its page on the first open only, is told what to
+// show once that page reports in, and shows beside the tab at the size it
+// then reports; the tab's frame never changes.
+func TestThePanelLoadsOnItsFirstOpenAndShowsBesideTheTab(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := dockedRig(t)
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatOpenPanel})
+		want(t, r.host.taken(), "fpanel-load "+panelURL)
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatClose}))
+		want(t, r.host.taken(), `fpanel-tell "panel" "" "left" 1478x911`)
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatSize, W: 476, H: 600, Mode: ModePanel}))
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatSize, W: 476, H: 640, Mode: ModePanel}))
+		want(t, r.host.taken(), "fpanel-show {1002 260.75 476 600}", "fpanel-show {1002 260.75 476 640}")
+
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatClose}))
+		want(t, r.host.taken(), "fpanel-hide")
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatOpenPanel})
+		want(t, r.host.taken(), `fpanel-tell "panel" "" "left" 1478x911`)
+	})
+}
+
+// A peek asks the panel's page to show the item that arrived; one that
+// arrives while the full panel shows is dropped.
+func TestAPeekShowsInThePanelWindowUnlessThePanelIsOpen(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := dockedRig(t)
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatPeek, Item: "gate:7"})
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatClose}))
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatSize, W: 356, H: 60, Mode: ModePeek}))
+		want(t, r.host.taken(), "fpanel-load "+panelURL, `fpanel-tell "peek" "gate:7" "left" 1478x911`, "fpanel-show {1122 260.75 356 60}")
+
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatOpenPanel})
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatSize, W: 476, H: 600, Mode: ModePanel}))
+		r.host.taken()
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatPeek, Item: "gate:8"})
+		want(t, r.host.taken())
+	})
+}
+
+// A click on the tab opens the panel, and another closes it, telling its page.
+func TestAToggleClosesAnOpenPanel(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := dockedRig(t)
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatOpenPanel, Toggle: true})
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatClose}))
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatSize, W: 476, H: 600, Mode: ModePanel}))
+		r.host.taken()
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatOpenPanel, Toggle: true})
+		want(t, r.host.taken(), "fpanel-hide", `fpanel-tell "" "" "" 0x0`)
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatClose}))
+		want(t, r.host.taken())
+	})
+}
+
+// Dragging the tab closes the panel; hiding the float hides both windows.
+func TestADragOrAHideClosesThePanel(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := dockedRig(t)
+		open := func() {
+			r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatOpenPanel})
+			r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatSize, W: 476, H: 600, Mode: ModePanel}))
+			r.host.taken()
+		}
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatOpenPanel})
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatClose}))
+		open()
+		r.host.handlers().OnFloatMoving()
+		want(t, r.host.taken(), "fpanel-hide", `fpanel-tell "" "" "" 0x0`)
+		r.host.handlers().OnFloatDropped(Rect{X: 1478, Y: 260.75, W: 34, H: 84})
+		r.host.taken()
+		open()
+		r.ctl.HideFloat()
+		want(t, r.host.taken(), "fpanel-hide", `fpanel-tell "" "" "" 0x0`, "hide-float")
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatOpenPanel})
+		want(t, r.host.taken())
+	})
+}
+
+// A panel the daemon moved to another address loads anew on the next open;
+// the same address keeps its page.
+func TestThePanelLoadsAnewAtANewAddress(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		port := "7000"
+		r := &rig{host: &fakeHost{}, events: &fakeEvents{streams: []chan api.Change{make(chan api.Change)}, stop: make(chan struct{})}, logs: &logs{}}
+		var mu sync.Mutex
+		url := func(route string) (string, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			return "http://127.0.0.1:" + port + "/#" + route, nil
+		}
+		r.ctl = New(Config{Host: r.host, Daemon: r.events, CockpitURL: url})
+		r.run(t)
+		synctest.Wait()
+		r.host.handlers().OnScreens([]Screen{laptop})
+		if err := r.ctl.ShowFloat(); err != nil {
+			t.Fatal(err)
+		}
+		r.host.handlers().OnFloat(size(34, 84))
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatOpenPanel})
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatClose}))
+		r.host.taken()
+		mu.Lock()
+		port = "7001"
+		mu.Unlock()
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatOpenPanel})
+		if got := r.host.taken(); len(got) != 1 || got[0] != "fpanel-load http://127.0.0.1:7001/#"+FloatPanelRoute {
+			t.Fatalf("host calls %q, want the panel loaded at the new address", got)
+		}
+	})
+}
+
+// A size the panel's page reports while nothing asked it to show, as a late
+// one after a close, shows nothing.
+func TestALatePanelSizeShowsNothing(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := dockedRig(t)
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatSize, W: 476, H: 600, Mode: ModePanel}))
+		want(t, r.host.taken())
+	})
 }

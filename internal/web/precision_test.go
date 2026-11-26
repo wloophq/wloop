@@ -64,7 +64,7 @@ func TestMotionStopsUnderReducedMotion(t *testing.T) {
 	// and hover, focus or press on a control. The one exception is the float's peek, whose arrival and leave
 	// announce a decision that just arrived, once per burst. Any other class live data toggles moves nothing.
 	want := []string{"#detail", ".pal-back", ".d-gate, .d-draft", ".outbox .d-draft", ".find", ".views .nav", ".opt", ".tab", ".seg button", ".tools .pill",
-		".fl-peek, .fl-flyout", `.fl-peek[data-state="leaving"], .fl-flyout[data-state="leaving"]`}
+		".fl-flyout", `.fl-flyout[data-state="leaving"]`}
 	var got []string
 	for s := range moving {
 		got = append(got, s)
@@ -79,7 +79,7 @@ func TestMotionStopsUnderReducedMotion(t *testing.T) {
 			t.Errorf("%s moves: only an action's answer moves, add it here once it answers one", s)
 		}
 	}
-	for _, s := range []string{"#detail", ".pal-back", ".fl-peek, .fl-flyout"} {
+	for _, s := range []string{"#detail", ".pal-back", ".fl-flyout"} {
 		if !regexp.MustCompile(`@starting-style\s*\{\s*` + regexp.QuoteMeta(s) + `\s*\{`).MatchString(css) {
 			t.Errorf("%s has no @starting-style to open from", s)
 		}
@@ -105,25 +105,25 @@ func TestTheFloatsRootSizesToItsContentNotToItsWindow(t *testing.T) {
 	t.Fatal("no .fl rule")
 }
 
-// The pill sits at the float's anchor corner, which the host keeps still, so
-// opening the panel grows the window away from the pill without moving it:
-// at the bottom when the float opens upward from an edge, at the right when a
-// free float opens leftward.
-func TestThePillSitsAtTheFloatsAnchorCorner(t *testing.T) {
+// The peek's card moves toward and away from the tab on whichever side of
+// the panel's window the host put it.
+func TestThePeekMovesFromTheTabsSide(t *testing.T) {
 	b, err := files.ReadFile("static/app.css")
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]bool{".fl.up[data-edge]": false, ".fl.leftward:not([data-edge])": false}
-	end := regexp.MustCompile(`(^|;)\s*align-items:\s*flex-end\s*(;|$)`)
+	want := map[string]string{
+		`.fl[data-side="left"] .fl-flyout`:  "--fl-peek-x: 1",
+		`.fl[data-side="right"] .fl-flyout`: "--fl-peek-x: -1",
+		`.fl[data-side="above"] .fl-flyout`: "--fl-peek-y: 1",
+		`.fl[data-side="below"] .fl-flyout`: "--fl-peek-y: -1",
+	}
 	for _, r := range cssRules(string(b)) {
-		if _, ok := want[strings.TrimSpace(r[0])]; ok && end.MatchString(r[1]) {
-			want[strings.TrimSpace(r[0])] = true
+		if decl, ok := want[strings.TrimSpace(r[0])]; ok && strings.Contains(r[1], decl) {
+			delete(want, strings.TrimSpace(r[0]))
 		}
 	}
-	for sel, ok := range want {
-		if !ok {
-			t.Errorf("no %s { align-items: flex-end }", sel)
-		}
+	for sel, decl := range want {
+		t.Errorf("no %s { %s }", sel, decl)
 	}
 }

@@ -29,16 +29,20 @@ type recHost struct {
 	floats   int
 }
 
-func (h *recHost) ShowMain(url string)          { h.mu.Lock(); h.shown = append(h.shown, url); h.mu.Unlock() }
-func (h *recHost) ShowPanel(string)             {}
-func (h *recHost) HidePanel()                   {}
-func (h *recHost) Reword(*texts.Catalog)        { h.mu.Lock(); h.reworded++; h.mu.Unlock() }
-func (h *recHost) ShowDetached(string, string)  {}
-func (h *recHost) OpenExternal(string)          {}
-func (h *recHost) ShowFloat(string, bool)       { h.mu.Lock(); h.floats++; h.mu.Unlock() }
-func (h *recHost) HideFloat()                   {}
-func (h *recHost) SetFloatFrame(window.Rect)    {}
-func (h *recHost) PlaceFloat(window.FloatPlace) {}
+func (h *recHost) ShowMain(url string)              { h.mu.Lock(); h.shown = append(h.shown, url); h.mu.Unlock() }
+func (h *recHost) ShowPanel(string)                 {}
+func (h *recHost) HidePanel()                       {}
+func (h *recHost) Reword(*texts.Catalog)            { h.mu.Lock(); h.reworded++; h.mu.Unlock() }
+func (h *recHost) ShowDetached(string, string)      {}
+func (h *recHost) OpenExternal(string)              {}
+func (h *recHost) ShowFloat(string, bool)           { h.mu.Lock(); h.floats++; h.mu.Unlock() }
+func (h *recHost) HideFloat()                       {}
+func (h *recHost) SetFloatFrame(window.Rect)        {}
+func (h *recHost) PlaceFloat(window.FloatPlace)     {}
+func (h *recHost) LoadFloatPanel(string)            {}
+func (h *recHost) TellFloatPanel(window.PanelPlace) {}
+func (h *recHost) ShowFloatPanel(window.Rect)       {}
+func (h *recHost) HideFloatPanel()                  {}
 func (h *recHost) Listen(hs window.Handlers) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()

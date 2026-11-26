@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -123,8 +124,10 @@ type host struct {
 	// stop waits for.
 	done    chan struct{}
 	running sync.WaitGroup
-	// native is how the host reads and moves the float in AppKit.
-	native floatNative
+	// native is how the host reads and moves the float's tab in AppKit;
+	// panelNative the panel window's, made by makePanel on its first load.
+	native, panelNative floatNative
+	makePanel           func() floatNative
 
 	// links orders the deep links handed to the controller; pending are
 	// those that came before it listened.
@@ -139,32 +142,40 @@ type host struct {
 	// panelKey says the panel became key since it was last shown, so a
 	// focus loss is the person leaving it, not a late event of an earlier
 	// show.
-	panelKey bool
-	floatURL string
-	// floatShown, floatFrame, the frame last set or dropped, floatMode, the
-	// mode the float's page last said it draws in, and dragging, from the
-	// first move the person made to the drop.
+	panelKey                bool
+	floatURL, floatPanelURL string
+	// floatShown, floatFrame, the tab's frame last set or dropped, and
+	// dragging, from the first move the person made to the drop.
 	floatShown bool
 	floatFrame window.Rect
-	floatMode  string
 	dragging   bool
-	// handBackDue says a hand-back of the keyboard waits for the buttons to
-	// be up.
-	handBackDue bool
-	// floatKeyable is read on the main thread, where AppKit asks whether the
-	// float may become key.
-	floatKeyable atomic.Bool
+	// panelMode is the mode the panel's page last said it draws in, "" while
+	// closed; overTab and overPanel say the pointer is over each window, and
+	// grace counts the pointer's moves, so a grace a later move overtook
+	// does nothing.
+	panelMode          string
+	overTab, overPanel bool
+	grace              int
+	// panelKeyable is read on the main thread, where AppKit asks whether the
+	// panel window may become key.
+	panelKeyable atomic.Bool
 }
 
-const floatName = "float"
+// The names of the float's tab window and its panel window.
+const (
+	floatName      = "float"
+	floatPanelName = "float-panel"
+)
 
-// floatNative is the float's AppKit side the host reads and acts on.
+// floatNative is a float window's AppKit side the host reads and acts on.
 type floatNative struct {
 	buttonsUp func() bool
 	frame     func() window.Rect
-	isKey     func() bool
-	handBack  func()
 	run       func(js string)
+	load      func(url string)
+	show      func()
+	hide      func()
+	setFrame  func(r window.Rect)
 }
 
 func appKitFloat(w *application.WebviewWindow) floatNative {
@@ -174,9 +185,11 @@ func appKitFloat(w *application.WebviewWindow) floatNative {
 			application.InvokeSync(func() { f = frameOf(nsWindow(w)) })
 			return f
 		},
-		isKey:    func() bool { return isKey(w) },
-		handBack: func() { application.InvokeSync(func() { handBackKeyboard(nsWindow(w)) }) },
 		run:      func(js string) { evalJS(w, js) },
+		load:     func(url string) { w.SetURL(url) },
+		show:     func() { w.Show() },
+		hide:     func() { w.Hide() },
+		setFrame: func(r window.Rect) { application.InvokeSync(func() { setFrame(nsWindow(w), r) }) },
 	}
 }
 
@@ -187,11 +200,11 @@ func newHost(app *application.App, name string) *host {
 		Mac: insetTitleBar,
 	})
 	h.panel = app.Window.NewWithOptions(panelOptions(name))
-	h.float = app.Window.NewWithOptions(floatOptions(name))
+	h.float = app.Window.NewWithOptions(floatOptions(name, floatName))
 	h.native = appKitFloat(h.float)
+	h.makePanel = h.newFloatPanel
 	h.float.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) { e.Cancel() })
 	h.float.OnWindowEvent(events.Mac.WindowDidMove, func(*application.WindowEvent) { h.do(h.floatMoved) })
-	h.float.OnWindowEvent(events.Mac.WindowDidResignKey, func(*application.WindowEvent) { h.do(h.floatResigned) })
 	h.main.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
 		e.Cancel()
 		h.do(h.hideMain)
@@ -227,10 +240,11 @@ func panelOptions(name string) application.WebviewWindowOptions {
 	}
 }
 
-// floatOptions are the floating widget's, kept on top as panelOptions are.
-func floatOptions(name string) application.WebviewWindowOptions {
+// floatOptions are those of the floating widget's window named window, kept
+// on top as panelOptions are.
+func floatOptions(name, window string) application.WebviewWindowOptions {
 	return application.WebviewWindowOptions{
-		Name: floatName, Title: name, URL: "about:blank", Width: 112, Height: 32, Hidden: true, Frameless: true,
+		Name: window, Title: name, URL: "about:blank", Width: 112, Height: 32, Hidden: true, Frameless: true,
 		DisableResize: true, BackgroundType: application.BackgroundTypeTransparent, AlwaysOnTop: true,
 		Mac: application.MacWindow{
 			WindowClass:      application.MacWindowClassPanel,
@@ -256,11 +270,34 @@ func (h *host) stop() {
 	h.running.Wait()
 }
 
-// launched restores the main window's frame and readies the float for the
-// mouse and the keyboard; it runs on the main thread.
+// launched restores the main window's frame and readies the float's tab for
+// the mouse, never to take the keyboard; it runs on the main thread.
 func (h *host) launched() {
 	nsWindow(h.main).Send(objc.RegisterName("setFrameAutosaveName:"), nsString(frameAutosaveName))
-	floatOnly(nsWindow(h.float), h.floatKeyable.Load, h.app.Logger)
+	floatOnly(nsWindow(h.float), func() bool { return false }, h.pointerIn(window.FloatTab), h.app.Logger)
+}
+
+// newFloatPanel makes the float's panel window, hidden, readied for the
+// mouse and to take the keyboard only while it shows the full panel; it runs
+// on the worker.
+func (h *host) newFloatPanel() floatNative {
+	w := h.app.Window.NewWithOptions(floatOptions(h.name, floatPanelName))
+	w.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) { e.Cancel() })
+	w.OnWindowEvent(events.Mac.WindowDidResignKey, func(*application.WindowEvent) { h.do(h.panelResigned) })
+	over := h.handlers().FloatOverFullScreen
+	application.InvokeSync(func() {
+		floatOnly(nsWindow(w), h.panelKeyable.Load, h.pointerIn(window.FloatPanel), h.app.Logger)
+		if over {
+			addCollectionBehavior(nsWindow(w), application.MacWindowCollectionBehaviorFullScreenAuxiliary)
+		}
+	})
+	return appKitFloat(w)
+}
+
+// pointerIn is what the tracking of the window named win reports: the
+// pointer entering or leaving it.
+func (h *host) pointerIn(win string) func(inside bool) {
+	return func(inside bool) { h.do(func() { h.pointer(win, inside) }) }
 }
 
 func (h *host) do(fn func()) {
@@ -398,79 +435,170 @@ func (h *host) ShowFloat(url string, reload bool) {
 			navigate(h.float, &h.floatURL, url)
 		}
 		h.floatShown = true
-		h.float.Show()
+		h.native.show()
 	})
 }
 
 func (h *host) HideFloat() {
 	h.do(func() {
-		h.floatShown = false
-		h.float.Hide()
+		h.floatShown, h.overTab = false, false
+		h.native.hide()
+		h.hidePanel()
 	})
 }
 
 func (h *host) SetFloatFrame(r window.Rect) {
 	h.do(func() {
 		h.floatFrame = r
-		application.InvokeSync(func() { setFrame(nsWindow(h.float), r) })
+		h.native.setFrame(r)
 	})
 }
 
-// PlaceFloat tells the float's page where it sits, in the mode it draws in.
+// PlaceFloat tells the tab's page where it sits.
 func (h *host) PlaceFloat(p window.FloatPlace) {
-	h.do(func() { h.native.run(floatPlaceJS(h.floatMode, p)) })
+	h.do(func() { h.native.run(floatPlaceJS(p)) })
 }
 
-// floatResigned tells the open panel's page that the float lost the
+// LoadFloatPanel loads url in the panel window, making it on the first load.
+func (h *host) LoadFloatPanel(url string) {
+	h.do(func() {
+		if h.panelNative.load == nil {
+			h.panelNative = h.makePanel()
+		}
+		h.floatPanelURL = url
+		h.panelNative.load(url)
+	})
+}
+
+// TellFloatPanel tells the panel's page what to show.
+func (h *host) TellFloatPanel(p window.PanelPlace) {
+	h.do(func() {
+		if h.panelNative.run != nil {
+			h.panelNative.run(panelShowJS(p))
+		}
+	})
+}
+
+// ShowFloatPanel frames the panel window at r and orders it front; a
+// non-activating panel shown this way does not take the keyboard.
+func (h *host) ShowFloatPanel(r window.Rect) {
+	h.do(func() {
+		if h.panelNative.show == nil {
+			return
+		}
+		h.panelNative.setFrame(r)
+		h.panelNative.show()
+	})
+}
+
+func (h *host) HideFloatPanel() { h.do(h.hidePanel) }
+
+// hidePanel hides the panel window, which hands back the keyboard it held,
+// and forgets its mode and the pointer over it.
+func (h *host) hidePanel() {
+	if h.panelNative.hide == nil {
+		return
+	}
+	h.panelNative.hide()
+	h.overPanel = false
+	h.setPanelMode("")
+}
+
+// panelResigned tells the full panel's page that its window lost the
 // keyboard, as the person moved to another app, so a panel not pinned
-// collapses; WebKit may not fire the page's blur in a non-activating panel.
-func (h *host) floatResigned() {
-	if h.floatMode == window.ModePanel {
-		h.native.run(floatBlurJS())
+// closes; WebKit may not fire the page's blur in a non-activating panel.
+func (h *host) panelResigned() {
+	if h.panelMode == window.ModePanel {
+		h.panelNative.run(bridgeJS("blur"))
 	}
 }
 
-// floatBlurJS calls blur on the page's bridge.
-func floatBlurJS() string {
-	name, _ := json.Marshal(window.FloatBridge)
-	return "(function(b){if(b&&b.blur)b.blur()})(window[" + string(name) + "])"
-}
+// floatGrace is how long the pointer may be off both float windows before
+// the full panel's page is asked to leave: crossing from the tab to the
+// panel, or back, leaves one before it enters the other.
+const floatGrace = 150 * time.Millisecond
 
-// floatPlaceJS calls the page's bridge with mode, the pill when the page has
-// said none, and p.
-func floatPlaceJS(mode string, p window.FloatPlace) string {
-	if mode == "" {
-		mode = window.ModePill
+// pointer follows the pointer entering or leaving the float's window win.
+// Once it is over neither while the full panel shows, the panel's page is
+// asked to leave after floatGrace, unless the pointer entered either since;
+// the page closes unless pinned. It runs on the worker, which running counts.
+func (h *host) pointer(win string, inside bool) {
+	switch win {
+	case window.FloatTab:
+		h.overTab = inside
+	case window.FloatPanel:
+		h.overPanel = inside
 	}
-	name, _ := json.Marshal(window.FloatBridge)
-	m, _ := json.Marshal(mode)
-	place, _ := json.Marshal(struct {
-		Edge     string  `json:"edge"`
-		Up       bool    `json:"up"`
-		Leftward bool    `json:"leftward"`
-		MaxW     float64 `json:"maxW"`
-		MaxH     float64 `json:"maxH"`
-	}{p.Edge, p.Up, p.Leftward, p.MaxW, p.MaxH})
-	return "(function(b){if(b&&b.setMode)b.setMode(" + string(m) + "," + string(place) + ")})(window[" + string(name) + "])"
+	h.grace++
+	if h.overTab || h.overPanel || h.panelMode != window.ModePanel {
+		return
+	}
+	at := h.grace
+	h.running.Go(func() {
+		select {
+		case <-h.done:
+		case <-time.After(floatGrace):
+			h.do(func() {
+				if at == h.grace && h.panelMode == window.ModePanel {
+					h.panelNative.run(bridgeJS("leave"))
+				}
+			})
+		}
+	})
 }
 
-// pageMessage hands the controller a message the float's page sent from the
-// cockpit's origin, in its main frame, keeping the mode it says it draws in;
-// any other message is dropped.
+// bridgeJS calls method on the page's bridge with args, each as JSON.
+func bridgeJS(method string, args ...any) string {
+	name, _ := json.Marshal(window.FloatBridge)
+	parts := make([]string, len(args))
+	for i, a := range args {
+		b, _ := json.Marshal(a)
+		parts[i] = string(b)
+	}
+	return "(function(b){if(b&&b." + method + ")b." + method + "(" + strings.Join(parts, ",") + ")})(window[" + string(name) + "])"
+}
+
+// floatPlaceJS tells the tab's page p.
+func floatPlaceJS(p window.FloatPlace) string {
+	return bridgeJS("place", struct {
+		Edge string `json:"edge"`
+	}{p.Edge})
+}
+
+// panelShowJS tells the panel's page to show p.
+func panelShowJS(p window.PanelPlace) string {
+	return bridgeJS("show", p.Mode, struct {
+		Item string  `json:"item"`
+		Side string  `json:"side"`
+		MaxW float64 `json:"maxW"`
+		MaxH float64 `json:"maxH"`
+	}{p.Item, p.Side, p.MaxW, p.MaxH})
+}
+
+// pageMessage hands the controller a message one of the float's pages sent
+// from the origin its window loaded, in its main frame, naming the window it
+// came from and keeping the mode the panel's page says it draws in; any
+// other message is dropped.
 func (h *host) pageMessage(windowName, message, origin string, mainFrame bool) {
-	if windowName != floatName || !mainFrame {
+	from := map[string]string{floatName: window.FloatTab, floatPanelName: window.FloatPanel}[windowName]
+	if from == "" || !mainFrame {
 		return
 	}
 	m, ok := window.ParseFloatMessage(message)
 	if !ok {
 		return
 	}
+	m.Window = from
 	h.do(func() {
-		if !sameOrigin(origin, h.floatURL) {
+		loaded := h.floatURL
+		if from == window.FloatPanel {
+			loaded = h.floatPanelURL
+		}
+		if !sameOrigin(origin, loaded) {
 			return
 		}
-		if m.Kind == window.FloatSize && m.Mode != "" {
-			h.setFloatMode(m.Mode)
+		if from == window.FloatPanel {
+			h.panelMessage(m)
 		}
 		if on := h.handlers().OnFloat; on != nil {
 			on(m)
@@ -478,37 +606,27 @@ func (h *host) pageMessage(windowName, message, origin string, mainFrame bool) {
 	})
 }
 
+// panelMessage keeps the mode the panel's page says it draws in: the mode of
+// its size, or none as it closes.
+func (h *host) panelMessage(m window.FloatMessage) {
+	switch m.Kind {
+	case window.FloatSize:
+		h.setPanelMode(m.Mode)
+	case window.FloatClose:
+		h.setPanelMode("")
+	}
+}
+
+func (h *host) setPanelMode(mode string) {
+	h.panelMode = mode
+	h.panelKeyable.Store(window.FloatKeyable(mode))
+}
+
 // sameOrigin says whether two addresses share their scheme, host and port.
 func sameOrigin(a, b string) bool {
 	ua, errA := url.Parse(a)
 	ub, errB := url.Parse(b)
 	return errA == nil && errB == nil && ua.Scheme != "" && ua.Scheme == ub.Scheme && ua.Host == ub.Host
-}
-
-// setFloatMode keeps mode and, outside the panel, hands back the keyboard
-// the float holds.
-func (h *host) setFloatMode(mode string) {
-	h.floatMode = mode
-	h.floatKeyable.Store(window.FloatKeyable(mode))
-	h.releaseKeyboard()
-}
-
-// releaseKeyboard hands the keyboard back while the float holds it outside
-// the panel, once no mouse button is down: ordering the float out under a
-// press would drop its mouse-up.
-func (h *host) releaseKeyboard() {
-	if window.FloatKeyable(h.floatMode) || h.handBackDue || !h.native.isKey() {
-		return
-	}
-	if !h.native.buttonsUp() {
-		h.handBackDue = true
-		h.afterRelease(func() {
-			h.handBackDue = false
-			h.releaseKeyboard()
-		})
-		return
-	}
-	h.native.handBack()
 }
 
 // floatMoved starts following a move the person made, a frame other than the

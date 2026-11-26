@@ -2,22 +2,31 @@ import { brand } from "../../brand";
 import { conventionalLabel, tally, type Label, type LabelCount } from "../../lib/conventional";
 import { t } from "../../lib/i18n.svelte";
 import { isSet, safeURL, type J } from "../../lib/util";
-import { floatDeps, floatState, openRoute, taskRoute, type FloatMode, type FloatPlace } from "../../state/float.svelte";
+import { floatDeps, floatState, itemKey, openRoute, taskRoute, type FloatMode, type FloatPlace, type PanelPlace } from "../../state/float.svelte";
 import { resolveDraft, resolveGate } from "../gates/gates";
 import { queueDeps, queueDraft, queueDraftOf, queueUnit, queueVerb, unitLink } from "../screens/queue";
 
 // The floating widget's ends: resolving an item through the gates endpoint, and the bridge to the window that
-// hosts the page. The host calls window[FLOAT_BRIDGE].setMode, and blur as the float resigns key; the page posts
-// JSON messages through the Wails runtime's message handler, which a plain browser lacks, so there they go nowhere.
+// hosts each of its two pages. The host calls window[FLOAT_BRIDGE]: the tab's place, and the panel's show, leave as
+// the pointer has left both windows, and blur as its window resigns key; each page posts JSON messages through the
+// Wails runtime's message handler, which a plain browser lacks, so there they go nowhere.
 
 // FLOAT_BRIDGE is the window property the host calls: the brand's command followed by Float.
 export const FLOAT_BRIDGE = brand.command + "Float";
 
+// FloatRole is which of the widget's two pages a window loads.
+export type FloatRole = "tab" | "panel";
+
 // toneClass is the class that draws a thing in tone, a design token the daemon serves; "" for none.
 export const toneClass = (tone: unknown): string => (typeof tone === "string" && /^[a-z]+$/.test(tone) ? "tone-" + tone : "");
 
-export interface FloatBridge {
-  setMode: (m: FloatMode, place?: Partial<FloatPlace>) => void;
+export interface TabBridge {
+  place: (p?: Partial<FloatPlace>) => void;
+}
+
+export interface PanelBridge {
+  show: (m: FloatMode, p?: Partial<PanelPlace> & { item?: string }) => void;
+  leave: () => void;
   blur: () => void;
 }
 
@@ -35,7 +44,8 @@ export function floatPost(message: J, win: J = window): void {
 
 const sent = { w: -1, h: -1, mode: "" };
 
-// floatSize tells the host the size of what the page draws, el, in mode; again only when it changed, unless force.
+// floatSize tells the host the size of what the page draws, el, and the panel's mode, "" for the tab; again only
+// when it changed, unless force.
 export function floatSize(el: Element | undefined | null, mode: FloatMode, force = false): void {
   if (!el) return;
   const r = el.getBoundingClientRect();
@@ -43,7 +53,7 @@ export function floatSize(el: Element | undefined | null, mode: FloatMode, force
   const h = Math.ceil(r.height);
   if (!force && w === sent.w && h === sent.h && mode === sent.mode) return;
   Object.assign(sent, { w, h, mode });
-  floatDeps.post({ type: "float:size", w, h, mode });
+  floatDeps.post(mode ? { type: "float:size", w, h, mode } : { type: "float:size", w, h });
 }
 
 // peekLeaveMS is how long a peek's card takes to leave: the stylesheet's --motion-peek-out, 0 under reduced motion
@@ -61,7 +71,7 @@ export function resetFloatSize(): void {
 
 let dragging: (() => void) | null = null;
 
-// floatDrag hands a drag of the pill to the host, which moves the window as Wails moves any window it drags, and
+// floatDrag hands a drag of the tab to the host, which moves the window as Wails moves any window it drags, and
 // tells it the size again once the pointer is released, so it snaps and keeps the place where it dropped. The window
 // server may keep the release from the page, so the host's next place, or the next drag, ends the drag as well.
 export function floatDrag(dropped: () => void, win: J = window): void {
@@ -117,21 +127,27 @@ export function keepRoutes(doc: J): void {
   );
 }
 
-// installFloat exposes the bridge the host calls and wires the widget's ends.
-export function installFloat(win: J = window): FloatBridge {
+// installFloat exposes the bridge the host calls on role's page and wires the widget's ends; the tab's page asks
+// for the peeks.
+export function installFloat(win: J, role: "tab"): TabBridge;
+export function installFloat(win: J, role: "panel"): PanelBridge;
+export function installFloat(win: J, role: FloatRole): TabBridge | PanelBridge {
   const f = floatState();
-  const bridge: FloatBridge = {
-    setMode: (m, place) => {
-      if (place) floatDragEnd();
-      f.setMode(m, place);
-    },
-    blur: () => f.blur(),
-  };
+  const bridge: TabBridge | PanelBridge =
+    role === "tab"
+      ? {
+          place: (p) => {
+            floatDragEnd();
+            f.setPlace(p);
+          },
+        }
+      : { show: (m, p) => f.show(m, p), leave: () => f.leave(), blur: () => f.blur() };
   win[FLOAT_BRIDGE] = bridge;
   floatDeps.resolve = floatResolve;
   floatDeps.run = floatRun;
   floatDeps.openUnit = floatOpenUnit;
   floatDeps.post = (m) => floatPost(m, win);
+  if (role === "tab") floatDeps.peek = (item) => floatDeps.post({ type: "float:peek", item: itemKey(item) });
   return bridge;
 }
 
