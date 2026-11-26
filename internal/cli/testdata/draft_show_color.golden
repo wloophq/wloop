@@ -13,6 +13,6 @@
 [dim]Approval  [/]  wait
 [dim]Rev       [/]  0
 
-[dim]{{command}} outbox approve 12[/]
-[dim]{{command}} outbox discard 12[/]
-[dim]{{command}} outbox edit 12 <markdown> --rev 0[/]
+[dim]{{command}} needs approve 3[/]
+[dim]{{command}} draft discard 12[/]
+[dim]{{command}} draft edit 12 <markdown> --rev 0[/]

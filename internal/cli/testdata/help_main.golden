@@ -22,7 +22,7 @@ WHAT WAITS ON YOU
   status                 What needs you, by view, and the tracked pull requests
   tui                    The same views in the terminal, one-key actions
   open                   The cockpit, a workspace or a pull request
-  outbox                 Drafts waiting for your approval, and yours
+  needs                  What waits on you: questions, drafts, plans and steps
   task                   Create a task, or make this agent session a run of one
   explore                Open pull requests of others to help on
 
@@ -70,7 +70,7 @@ TROUBLESHOOTING
 FOR AGENTS AND SCRIPTS
   instructions           Run a turn by hand from an agent session
   turn end/answer        Record how a turn ended; read your answer
-  draft                  Write, read, revise, post or withdraw your drafts
+  draft                  Write, revise, post, discard or withdraw drafts
   hook                   The agent hooks install writes
   serve                  Run the daemon
   app                    macOS: the menu bar and notifications

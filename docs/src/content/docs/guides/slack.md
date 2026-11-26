@@ -87,10 +87,10 @@ The drafts made for a task are its draft gates, listed in its detail, where you 
 Write one, approve one with `a`, or from a terminal:
 
 ```sh
-{{command}} outbox new https://acme.slack.com/archives/C000/p1700000000000100 'Friday, after the freeze.'
-{{command}} outbox new https://acme.slack.com/archives/C000/p1700000000000100 --react eyes --send
-{{command}} outbox
-{{command}} outbox approve <id>
+{{command}} draft new https://acme.slack.com/archives/C000/p1700000000000100 'Friday, after the freeze.'
+{{command}} draft new https://acme.slack.com/archives/C000/p1700000000000100 --react eyes --send
+{{command}} needs --kind send-draft
+{{command}} needs approve <ref>
 ```
 
 `slack send` posts as you after a confirmation, through the running daemon. To a message ref or permalink it replies in the thread through the Outbox, as a draft of yours approved once you say yes (or at once with `--yes`), so the reply counts for the thread's items and shows in the Logbook; `--broadcast` asks that draft to also post to the conversation. To a channel, a person, or with `--thread=false`, it posts directly:

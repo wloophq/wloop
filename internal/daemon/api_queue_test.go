@@ -196,6 +196,29 @@ func TestQueueAllAcceptsTheLens(t *testing.T) {
 	}
 }
 
+func TestQueueAllNarrowsByKind(t *testing.T) {
+	t.Parallel()
+	q := newQueueRig(t, nil)
+	q.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "send the notes"},
+		task.Task{ID: "t-0000000000000002", State: "next", Category: task.CategoryReady, Title: "pick a name"},
+		task.Task{ID: "t-0000000000000003", State: "next", Category: task.CategoryReady, Title: "plan the move"})
+	q.open(t, "t-0000000000000001", gate.KindDraft, "41", 2*time.Hour)
+	q.open(t, "t-0000000000000002", gate.KindQuestion, "7", time.Hour)
+	q.open(t, "t-0000000000000003", gate.KindPlan, "1", 3*time.Hour)
+	var narrowed api.Queue
+	if code := get(t, q.s, api.QueueAllPath+"?kind=approve-plan&kind=answer", &narrowed); code != 200 {
+		t.Fatalf("%d", code)
+	}
+	if want := []string{"answer", "approve-plan"}; !slices.Equal(kindsOf(narrowed), want) || narrowed.Total != 2 {
+		t.Fatalf("kinds %v, total %d, want %v in the profile's order", kindsOf(narrowed), narrowed.Total, want)
+	}
+	rec := httptest.NewRecorder()
+	q.s.Handler().ServeHTTP(rec, apiRequest("GET", api.QueueAllPath+"?kind=merge", nil))
+	if rec.Code != 404 || !strings.Contains(rec.Body.String(), "last-step") {
+		t.Fatalf("an unknown kind: %d %s", rec.Code, rec.Body)
+	}
+}
+
 func TestQueueItemCarriesKindOnPerKindRoute(t *testing.T) {
 	t.Parallel()
 	r := newTasksRig(t, nil)
@@ -827,27 +850,6 @@ func TestAQueuePageReadsRelatedTasksFromItsPass(t *testing.T) {
 	}
 	if reads != 0 {
 		t.Errorf("%d reads of single tasks for a queue page whose pass holds them, want 0", reads)
-	}
-}
-
-func TestQueueAllNarrowsByKind(t *testing.T) {
-	t.Parallel()
-	q := newQueueRig(t, nil)
-	q.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "send the notes"},
-		task.Task{ID: "t-0000000000000002", State: "next", Category: task.CategoryReady, Title: "pick a name"},
-		task.Task{ID: "t-0000000000000003", State: "next", Category: task.CategoryReady, Title: "plan the move"})
-	q.open(t, "t-0000000000000001", gate.KindDraft, "41", 2*time.Hour)
-	q.open(t, "t-0000000000000002", gate.KindQuestion, "7", time.Hour)
-	q.open(t, "t-0000000000000003", gate.KindPlan, "1", 3*time.Hour)
-	var narrowed api.Queue
-	if code := get(t, q.s, api.QueueAllPath+"?kind=approve-plan&kind=answer", &narrowed); code != 200 {
-		t.Fatalf("%d", code)
-	}
-	if want := []string{"answer", "approve-plan"}; !slices.Equal(kindsOf(narrowed), want) || narrowed.Total != 2 {
-		t.Fatalf("narrowed %v over %d, want %v", kindsOf(narrowed), narrowed.Total, want)
-	}
-	if code := get(t, q.s, api.QueueAllPath+"?kind=nonsense", nil); code != 400 {
-		t.Fatalf("an unknown kind answered %d, want 400", code)
 	}
 }
 

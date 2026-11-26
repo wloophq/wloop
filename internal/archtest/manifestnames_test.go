@@ -276,7 +276,7 @@ func TestArchNoDeliveryList(t *testing.T) {
 // bundled manifest declares, by file, each naming something else: an intent, a task verb, a chat message, a
 // pull request's event.
 var manifestNameOwners = map[string][]string{
-	"internal/cli/outbox.go":                 {"edit"},                           // the edit verb's handler
+	"internal/cli/draft_person.go":           {"edit"},                           // the edit verb's handler
 	"internal/client/menubar/tasks.go":       {"reply"},                          // the reply verb's handler
 	"internal/client/menubar/types.go":       {"reply"},                          // the menu bar's reply action
 	"internal/client/tui/compose.go":         {"edit", "reply"},                  // the edit and reply verbs' handlers

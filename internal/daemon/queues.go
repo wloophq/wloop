@@ -30,11 +30,7 @@ import (
 func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
 	k := decision.Kind(r.PathValue("kind"))
 	if !decision.Valid(k) {
-		kinds := make([]string, len(decision.Kinds))
-		for i, x := range decision.Kinds {
-			kinds[i] = string(x)
-		}
-		writeError(w, http.StatusNotFound, fmt.Sprintf("unknown decision kind %q; the kinds are %s", k, strings.Join(kinds, ", ")))
+		writeUnknownKind(w, k)
 		return
 	}
 	g, ok := s.tasks(w)
@@ -58,7 +54,23 @@ func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, api.Queue{Kind: string(q.Kind), View: string(q.View), Title: q.Title, Empty: q.Empty, Total: len(items), Items: items})
 }
 
+func writeUnknownKind(w http.ResponseWriter, k decision.Kind) {
+	kinds := make([]string, len(decision.Kinds))
+	for i, x := range decision.Kinds {
+		kinds[i] = string(x)
+	}
+	writeError(w, http.StatusNotFound, fmt.Sprintf("unknown decision kind %q; the kinds are %s", k, strings.Join(kinds, ", ")))
+}
+
 func (s *Server) handleQueueAll(w http.ResponseWriter, r *http.Request) {
+	var only []decision.Kind
+	for _, k := range r.URL.Query()["kind"] {
+		if !decision.Valid(decision.Kind(k)) {
+			writeUnknownKind(w, decision.Kind(k))
+			return
+		}
+		only = append(only, decision.Kind(k))
+	}
 	g, ok := s.tasks(w)
 	if !ok {
 		return
@@ -68,20 +80,13 @@ func (s *Server) handleQueueAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d := s.loaded().Decisions
-	kinds := r.URL.Query()["kind"]
-	for _, k := range kinds {
-		if !decision.Valid(decision.Kind(k)) {
-			writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown decision kind %q", k))
-			return
-		}
-	}
 	all, err := s.home(g).QueueAll(ctx, d.Order, d.Sort, s.queueKeep(ctx, g, r))
 	if err != nil {
 		writeTasksError(w, err)
 		return
 	}
-	if len(kinds) > 0 {
-		all = slices.DeleteFunc(all, func(it home.Item) bool { return !slices.Contains(kinds, string(it.Found.Kind)) })
+	if len(only) > 0 {
+		all = slices.DeleteFunc(all, func(it home.Item) bool { return !slices.Contains(only, it.Found.Kind) })
 	}
 	items, err := s.queueItems(ctx, g, all)
 	if err != nil {

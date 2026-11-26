@@ -11,8 +11,8 @@ const QueuePath = "/api/queues/{kind}"
 
 // QueueAllPath serves the queue of every decision kind, as Queue with no Kind and with View the view drawn as
 // the queue: the kinds in the order decisions.toml gives, each kind's items oldest decision first, and Kinds every
-// kind in that order. Its query parameter q is QueuePath's; each kind parameter keeps the items of that kind, every
-// kind when none.
+// kind in that order. Its query parameter q is QueuePath's; kind, repeated, keeps the items of the kinds it names,
+// every kind when none.
 const QueueAllPath = "/api/queue"
 
 // Home is the briefing, the home's sections and the capture field.

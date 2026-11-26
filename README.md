@@ -49,7 +49,7 @@ After `brew upgrade`, run `wloop install` and, on macOS, `wloop app install` aga
 | `wloop take-over <url>` | Make a pull request someone else opened yours to develop |
 | `wloop nudge <url> [guidance]` | Ask whoever a pull request waits on for the next step, in one comment |
 | `wloop <intent> <target> [guidance]` | Run any intent of your profile on a pull request, a Slack thread or another unit it serves |
-| `wloop outbox` | The drafts that wait for your approval |
+| `wloop needs` | What waits on you, questions, drafts, plans and steps, to read, approve or answer |
 | `wloop status` | The tasks of the views the badge names, such as Inbox and Needs me, then the pull requests you track |
 | `wloop tui` | The same views in the terminal, with one-key actions |
 | `wloop open` | The cockpit, in the app's window on macOS or in the browser |

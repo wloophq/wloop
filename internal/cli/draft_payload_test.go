@@ -29,13 +29,13 @@ func reviewView() api.Draft {
 		}}
 }
 
-// TestTheCLIShowsADraftsWholePayload holds review focus 1 on the CLI: outbox show and the draft approve prints
+// TestTheCLIShowsADraftsWholePayload holds review focus 1 on the CLI: needs show and the draft needs approve prints
 // before it asks both carry the preview line and every value of the payload, each inline comment's file, line
 // and every line of its body.
 func TestTheCLIShowsADraftsWholePayload(t *testing.T) {
 	d := reviewView()
 	var show, approve bytes.Buffer
-	writeDraftView(&show, termfmt.Term{Width: 100}, d, outboxNow)
+	writeDraftView(&show, termfmt.Term{Width: 100}, d, draftNow)
 	printDraft(&approve, d, d.Text)
 	for name, out := range map[string]string{"show": show.String(), "approve": approve.String()} {
 		for _, want := range []string{"Request changes with 2 inline comments", "Verdict: Request changes (REQUEST_CHANGES)", "Inline comments:",
@@ -47,14 +47,14 @@ func TestTheCLIShowsADraftsWholePayload(t *testing.T) {
 	}
 }
 
-// TestOutboxShowReadsAStoredPayload runs outbox show against the daemon on a stored review draft: the payload it
+// TestNeedsShowReadsAStoredPayload runs needs show against the daemon on a stored review draft: the payload it
 // holds is printed, not only its text.
-func TestOutboxShowReadsAStoredPayload(t *testing.T) {
+func TestNeedsShowReadsAStoredPayload(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	db := outboxDaemon(t, te, true)
 	insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "Two findings block the merge.", State: draft.Held,
 		Payload: json.RawMessage(`{"event":"REQUEST_CHANGES","comments":[{"path":"api/handler.go","line":42,"body":"Return the error."}]}`)})
-	if code := te.run("outbox", "show", "1"); code != 0 {
+	if code := te.run("needs", "show", "1"); code != 0 {
 		t.Fatalf("show: exit %d: %s", code, te.err)
 	}
 	for _, want := range []string{"REQUEST_CHANGES", "api/handler.go", "42", "Return the error."} {

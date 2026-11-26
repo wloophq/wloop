@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"cmp"
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -24,58 +23,35 @@ import (
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
-	"github.com/wloophq/wloop/internal/termfmt"
 )
 
-var outboxUsage = "usage: " + brand.Command + " outbox [list [--color <when>] | show <id> [--color <when>] | new <unit|message> <markdown> [--react <emoji>] [--send] [--yes] | approve <id> [--text <markdown>] [--payload <json>] [--rev <n>] [--yes] | edit <id> <markdown> --rev <n> | discard <id> [--reason <why>] | retry <id> [--confirm] [--yes]]"
+var draftPersonUsage = "usage: " + brand.Command + " draft new <unit|message> <markdown> [--react <emoji>] [--send] [--yes] | draft edit <id> <markdown> --rev <n> | draft discard <id> [--reason <why>] | draft retry <id> [--confirm] [--yes]"
 
-// outboxInteractive says whether e reads from a terminal; tests replace it.
-var outboxInteractive = func(e *Env) bool {
-	f, ok := e.In.(*os.File)
-	return ok && term.IsTerminal(int(f.Fd()))
+// draftPersonVerbs are the draft commands a person runs, beside an agent session's draftCall verbs.
+var draftPersonVerbs = map[string]func(context.Context, *Env, *client.Client, []string) error{
+	"new": draftNew, "edit": draftEdit, "discard": draftDiscard, "retry": draftRetry,
 }
 
-func runOutbox(ctx context.Context, e *Env, args []string) error {
-	sub := "list"
-	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
-		sub, args = args[0], args[1:]
+// runDraftCommand runs a person's draft command, or an agent session's.
+func runDraftCommand(ctx context.Context, e *Env, args []string) error {
+	if len(args) == 0 {
+		return exitCode(runDraft(ctx, e, args))
 	}
-	run, ok := map[string]func(context.Context, *Env, *client.Client, []string) error{
-		"list": outboxList, "show": outboxShow, "new": outboxNew, "approve": outboxApprove, "edit": outboxEdit, "discard": outboxDiscard, "retry": outboxRetry,
-	}[sub]
+	run, ok := draftPersonVerbs[args[0]]
 	if !ok {
-		return usageError{usage: outboxUsage, why: fmt.Sprintf("unknown outbox command %q", sub)}
+		return exitCode(runDraft(ctx, e, args))
 	}
 	c, err := e.daemonClient(ctx)
 	if err != nil {
 		return err
 	}
-	return run(ctx, e, c, args)
+	return run(ctx, e, c, args[1:])
 }
 
-func outboxList(ctx context.Context, e *Env, c *client.Client, args []string) error {
-	fs := flag.NewFlagSet("outbox list", flag.ContinueOnError)
-	fs.SetOutput(e.Err)
-	var color termfmt.Mode
-	fs.Var(&color, "color", "lay the list out for a terminal: auto, always or never")
-	pos, err := parseInterspersed(fs, args)
-	if err != nil || len(pos) > 0 {
-		return usageError{usage: outboxUsage}
-	}
-	ds, err := c.Drafts(ctx)
-	if err != nil {
-		return err
-	}
-	t := e.term(color)
-	switch {
-	case !t.TTY:
-		writeOutboxPlain(e.Out, ds)
-	case len(ds) == 0:
-		fmt.Fprintln(e.Out, "the Outbox is empty")
-	default:
-		writeOutbox(e.Out, t, ds, e.Now())
-	}
-	return nil
+// draftInteractive says whether e reads from a terminal; tests replace it.
+var draftInteractive = func(e *Env) bool {
+	f, ok := e.In.(*os.File)
+	return ok && term.IsTerminal(int(f.Fd()))
 }
 
 // draftLabel names the draft's unit as its row does: the label and the title, else the unit key.
@@ -133,7 +109,7 @@ const (
 	ownDismiss   = "drop"
 )
 
-// draftVerb runs on draft id's Outbox task the verb of the profile that runs handler: a draft's delivery actions,
+// draftVerb runs on draft id's own task the verb of the profile that runs handler: a draft's delivery actions,
 // which no gate decides.
 func draftVerb(ctx context.Context, c *client.Client, id int64, handler string, args map[string]string) error {
 	cat, err := c.Views(ctx)
@@ -151,34 +127,13 @@ func draftVerb(ctx context.Context, c *client.Client, id int64, handler string, 
 // draftArg is the one draft id args hold.
 func draftArg(args []string) (int64, error) {
 	if len(args) != 1 {
-		return 0, usageError{usage: outboxUsage}
+		return 0, usageError{usage: draftPersonUsage}
 	}
 	id, err := strconv.ParseInt(args[0], 10, 64)
 	if err != nil || id <= 0 {
-		return 0, usageError{usage: outboxUsage, why: fmt.Sprintf("%q is not a draft id", args[0])}
+		return 0, usageError{usage: draftPersonUsage, why: fmt.Sprintf("%q is not a draft id", args[0])}
 	}
 	return id, nil
-}
-
-func outboxShow(ctx context.Context, e *Env, c *client.Client, args []string) error {
-	fs := flag.NewFlagSet("outbox show", flag.ContinueOnError)
-	fs.SetOutput(e.Err)
-	var color termfmt.Mode
-	fs.Var(&color, "color", "color the draft: auto, always or never")
-	pos, err := parseInterspersed(fs, args)
-	if err != nil {
-		return usageError{usage: outboxUsage}
-	}
-	id, err := draftArg(pos)
-	if err != nil {
-		return err
-	}
-	d, err := c.Draft(ctx, id)
-	if err != nil {
-		return err
-	}
-	writeDraftView(e.Out, e.term(color), d, e.Now())
-	return nil
 }
 
 var mentionPattern = regexp.MustCompile(`@\{(?:group:[^{}\n]+|[^{}\s]+)\}|(?:^|[^\w@{])@[A-Za-z0-9][\w./-]*`)
@@ -261,23 +216,23 @@ func printDraft(w io.Writer, d api.Draft, text string) {
 // to ask in: what posts is approved by the user, who reads it whole first. A session's shell that names its handle
 // and says yes asks nothing here: the daemon takes it only from a session the user drives, whose agent asks them
 // in the conversation.
-func (e *Env) userAtTerminal(verb string, yes bool) error {
-	if err := e.namedAgent(verb); err != nil {
+func (e *Env) userAtTerminal(cmd string, yes bool) error {
+	if err := e.namedAgent(cmd); err != nil {
 		return err
 	}
 	if yes && e.sessionHandle() != "" {
 		return nil
 	}
-	if !outboxInteractive(e) {
-		return fmt.Errorf("outbox %s posts as you, so it shows the draft and asks at a terminal, and standard input is not one: approve the draft in the cockpit or the terminal UI", verb)
+	if !draftInteractive(e) {
+		return fmt.Errorf("%s %s posts as you, so it shows the draft and asks at a terminal, and standard input is not one: decide it in the cockpit or the terminal UI", brand.Command, cmd)
 	}
 	return nil
 }
 
-// namedAgent refuses outbox verb from a shell an agent session runs that names no session handle: the daemon
+// namedAgent refuses command cmd from a shell an agent session runs that names no session handle: the daemon
 // takes a session's request for yours only when the user drives that session, so a shell that names none
 // would pass for you.
-func (e *Env) namedAgent(verb string) error {
+func (e *Env) namedAgent(cmd string) error {
 	getenv := e.Getenv
 	if getenv == nil {
 		getenv = os.Getenv
@@ -287,7 +242,7 @@ func (e *Env) namedAgent(verb string) error {
 	}
 	for _, kind := range slices.Sorted(maps.Keys(e.Harness.Agents)) {
 		if e.Harness.Agents[kind].SessionID(getenv) != "" {
-			return fmt.Errorf("outbox %s posts as you, and this shell belongs to a %s agent session that names no workspace manager's handle: approve the draft in the cockpit or the terminal UI, or run this in a terminal of your own", verb, kind)
+			return fmt.Errorf("%s %s acts as you, and this shell belongs to a %s agent session that names no workspace manager's handle: decide it in the cockpit or the terminal UI, or run this in a terminal of your own", brand.Command, cmd, kind)
 		}
 	}
 	return nil
@@ -304,73 +259,13 @@ func (e *Env) confirmed(question string) bool {
 	return a == "y" || a == "yes"
 }
 
-func outboxApprove(ctx context.Context, e *Env, c *client.Client, args []string) error {
-	fs := flag.NewFlagSet("outbox approve", flag.ContinueOnError)
-	fs.SetOutput(e.Err)
-	text := fs.String("text", "", "the text to post instead of the draft's")
-	yes := fs.Bool("yes", false, "approve without asking, after showing the draft")
-	payload := fs.String("payload", "", "the payload to post instead of the draft's, whole, as JSON, such as a review's {\"event\":\"COMMENT\"}")
-	rev := fs.Int64("rev", -1, "with --text or --payload: the rev of the draft you read, as outbox show prints it")
-	pos, err := parseInterspersed(fs, args)
-	if err != nil {
-		return err
-	}
-	id, err := draftArg(pos)
-	if err != nil {
-		return err
-	}
-	if err := e.userAtTerminal("approve", *yes); err != nil {
-		return err
-	}
-	d, err := c.Draft(ctx, id)
-	if err != nil {
-		return err
-	}
-	shown, seen := d.Text, d.Rev
-	decision := map[string]string{}
-	if flagSet(fs, "text") || flagSet(fs, "payload") {
-		if *rev < 0 {
-			return usageError{usage: outboxUsage, why: "approve --text or --payload takes --rev, the rev of the draft you read (outbox show prints it)"}
-		}
-		seen = *rev
-	}
-	if flagSet(fs, "text") {
-		shown = *text
-	}
-	if flagSet(fs, "payload") {
-		if !json.Valid([]byte(*payload)) {
-			return usageError{usage: outboxUsage, why: "approve --payload takes the draft's whole payload as JSON"}
-		}
-		decision["payload"] = *payload
-		d.Fields = nil
-	}
-	printDraft(e.Out, d, shown)
-	if flagSet(fs, "payload") {
-		fmt.Fprintf(e.Out, "payload:  %s\n", *payload)
-	}
-	if !*yes && !e.confirmed("Approve and post this?") {
-		fmt.Fprintln(e.Out, "Not approved.")
-		return exitCode(1)
-	}
-	decision["text"], decision["rev"] = shown, strconv.FormatInt(seen, 10)
-	if err := decideDraft(ctx, c, d, gate.Approved, decision); err != nil {
-		return err
-	}
-	got, err := c.Draft(ctx, id)
-	if err != nil {
-		return err
-	}
-	fmt.Fprintf(e.Out, "draft %d %s; it posts on the daemon's next send\n", got.ID, got.State)
-	return nil
-}
-
-// outboxNew writes a draft on a unit: saved to the Outbox for approval, or with --send posted through it
+// draftNew writes a draft on a unit: saved for the user's approval, or with --send posted
 // after the user reads it at a terminal and says yes, or at once with --yes.
-func outboxNew(ctx context.Context, e *Env, c *client.Client, args []string) error {
-	fs := flag.NewFlagSet("outbox new", flag.ContinueOnError)
+func draftNew(ctx context.Context, e *Env, c *client.Client, args []string) error {
+	fs := flag.NewFlagSet("draft new", flag.ContinueOnError)
 	fs.SetOutput(e.Err)
 	react := fs.String("react", "", "react with this emoji instead of replying: to the Slack message named, else to the unit's message")
-	send := fs.Bool("send", false, "post it now instead of saving it to the Outbox")
+	send := fs.Bool("send", false, "post it now instead of saving it for your approval")
 	yes := fs.Bool("yes", false, "with --send, post without asking")
 	pos, err := parseInterspersed(fs, args)
 	if err != nil {
@@ -378,9 +273,9 @@ func outboxNew(ctx context.Context, e *Env, c *client.Client, args []string) err
 	}
 	switch {
 	case *react == "" && len(pos) != 2, *react != "" && len(pos) != 1:
-		return usageError{usage: outboxUsage, why: "outbox new takes a unit and the reply's markdown, or a unit and --react <emoji>"}
+		return usageError{usage: draftPersonUsage, why: "draft new takes a unit and the reply's markdown, or a unit and --react <emoji>"}
 	case *yes && !*send:
-		return usageError{usage: outboxUsage, why: "--yes goes with --send"}
+		return usageError{usage: draftPersonUsage, why: "--yes goes with --send"}
 	}
 	u, err := e.unitTarget(ctx, pos[0])
 	if err != nil {
@@ -400,17 +295,17 @@ func outboxNew(ctx context.Context, e *Env, c *client.Client, args []string) err
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(e.Out, "draft %d saved to the Outbox for your approval: %s\n", d.ID, draftLabel(d))
+		fmt.Fprintf(e.Out, "draft %d saved for your approval: %s\n", d.ID, draftLabel(d))
 		return nil
 	}
-	if err := e.namedAgent("new --send"); err != nil {
+	if err := e.namedAgent("draft new --send"); err != nil {
 		return err
 	}
-	return e.sendUserDraft(ctx, c, cr, *yes || e.sessionHandle() != "", func() error { return e.userAtTerminal("new --send", *yes) }, true)
+	return e.sendUserDraft(ctx, c, cr, *yes || e.sessionHandle() != "", func() error { return e.userAtTerminal("draft new --send", *yes) }, true)
 }
 
 // sendUserDraft creates cr and approves it: at once with yes, else once ready says the user is at a
-// terminal, they read the draft and say yes. A no discards the draft, or keeps it in the Outbox with keep.
+// terminal, they read the draft and say yes. A no discards the draft, or keeps it waiting for approval with keep.
 // It then waits a moment for the post.
 func (e *Env) sendUserDraft(ctx context.Context, c *client.Client, cr api.DraftCreate, yes bool, ready func() error, keep bool) error {
 	if yes {
@@ -435,11 +330,11 @@ func (e *Env) sendUserDraft(ctx context.Context, c *client.Client, cr api.DraftC
 	printDraft(e.Out, d, d.Text)
 	if !e.confirmed("Post this?") {
 		if keep {
-			fmt.Fprintf(e.Out, "Not sent; draft %d stays in the Outbox.\n", d.ID)
+			fmt.Fprintf(e.Out, "Not sent; draft %d waits for your approval.\n", d.ID)
 			return exitCode(1)
 		}
 		if err := decideDraft(ctx, c, d, gate.Rejected, nil); err != nil {
-			return fmt.Errorf("not sent, and draft %d stays in the Outbox: %w", d.ID, err)
+			return fmt.Errorf("not sent, and draft %d waits for your approval: %w", d.ID, err)
 		}
 		fmt.Fprintln(e.Out, "Not sent.")
 		return exitCode(1)
@@ -487,8 +382,8 @@ func (e *Env) reportPosted(ctx context.Context, c *client.Client, d api.Draft, w
 	return nil
 }
 
-func outboxRetry(ctx context.Context, e *Env, c *client.Client, args []string) error {
-	fs := flag.NewFlagSet("outbox retry", flag.ContinueOnError)
+func draftRetry(ctx context.Context, e *Env, c *client.Client, args []string) error {
+	fs := flag.NewFlagSet("draft retry", flag.ContinueOnError)
 	fs.SetOutput(e.Err)
 	confirm := fs.Bool("confirm", false, "post again a draft that may have been posted")
 	yes := fs.Bool("yes", false, "retry without asking, after showing the draft")
@@ -500,7 +395,13 @@ func outboxRetry(ctx context.Context, e *Env, c *client.Client, args []string) e
 	if err != nil {
 		return err
 	}
-	if err := e.userAtTerminal("retry", *yes); err != nil {
+	return e.retryDraft(ctx, c, "draft retry", id, *confirm, *yes)
+}
+
+// retryDraft posts failed draft id again once the user, at a terminal, reads it and says yes, or at once with yes;
+// confirm says it may post twice.
+func (e *Env) retryDraft(ctx context.Context, c *client.Client, cmd string, id int64, confirm, yes bool) error {
+	if err := e.userAtTerminal(cmd, yes); err != nil {
 		return err
 	}
 	d, err := c.Draft(ctx, id)
@@ -508,11 +409,11 @@ func outboxRetry(ctx context.Context, e *Env, c *client.Client, args []string) e
 		return err
 	}
 	printDraft(e.Out, d, d.Text)
-	if !*yes && !e.confirmed("Post this again?") {
+	if !yes && !e.confirmed("Post this again?") {
 		fmt.Fprintln(e.Out, "Not retried.")
 		return exitCode(1)
 	}
-	if err := draftVerb(ctx, c, id, handlerRetry, map[string]string{"confirm": strconv.FormatBool(*confirm), "rev": strconv.FormatInt(d.Rev, 10)}); err != nil {
+	if err := draftVerb(ctx, c, id, handlerRetry, map[string]string{"confirm": strconv.FormatBool(confirm), "rev": strconv.FormatInt(d.Rev, 10)}); err != nil {
 		return err
 	}
 	got, err := c.Draft(ctx, id)
@@ -523,21 +424,21 @@ func outboxRetry(ctx context.Context, e *Env, c *client.Client, args []string) e
 	return nil
 }
 
-func outboxEdit(ctx context.Context, e *Env, c *client.Client, args []string) error {
-	fs := flag.NewFlagSet("outbox edit", flag.ContinueOnError)
+func draftEdit(ctx context.Context, e *Env, c *client.Client, args []string) error {
+	fs := flag.NewFlagSet("draft edit", flag.ContinueOnError)
 	fs.SetOutput(e.Err)
-	rev := fs.Int64("rev", -1, "the rev of the draft you read, as outbox show prints it")
+	rev := fs.Int64("rev", -1, "the rev of the draft you read, as needs show prints it")
 	pos, err := parseInterspersed(fs, args)
 	if err != nil {
 		return err
 	}
 	if len(pos) != 2 {
-		return usageError{usage: outboxUsage}
+		return usageError{usage: draftPersonUsage}
 	}
 	if *rev < 0 {
-		return usageError{usage: outboxUsage, why: "edit takes --rev, the rev of the draft you read (outbox show prints it)"}
+		return usageError{usage: draftPersonUsage, why: "edit takes --rev, the rev of the draft you read (needs show prints it)"}
 	}
-	if err := e.namedAgent("edit"); err != nil {
+	if err := e.namedAgent("draft edit"); err != nil {
 		return err
 	}
 	id, err := draftArg(pos[:1])
@@ -551,15 +452,15 @@ func outboxEdit(ctx context.Context, e *Env, c *client.Client, args []string) er
 	return nil
 }
 
-func outboxDiscard(ctx context.Context, e *Env, c *client.Client, args []string) error {
-	fs := flag.NewFlagSet("outbox discard", flag.ContinueOnError)
+func draftDiscard(ctx context.Context, e *Env, c *client.Client, args []string) error {
+	fs := flag.NewFlagSet("draft discard", flag.ContinueOnError)
 	fs.SetOutput(e.Err)
 	reason := fs.String("reason", "", "why a draft its gate approved is dropped")
 	pos, err := parseInterspersed(fs, args)
 	if err != nil {
 		return err
 	}
-	if err := e.namedAgent("discard"); err != nil {
+	if err := e.namedAgent("draft discard"); err != nil {
 		return err
 	}
 	id, err := draftArg(pos)
