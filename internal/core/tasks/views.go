@@ -209,6 +209,48 @@ func PageOnce[T any](ctx context.Context, key string, load func() (T, error)) (T
 	return Once(WithPass(ctx, p), key, load)
 }
 
+// PageTask is task id as the pass of the page ctx serves holds it; false outside a page or a pass, or when the
+// pass does not hold it, as for an alias of a merged task.
+func PageTask(ctx context.Context, id task.ID) (task.Task, bool) {
+	if _, page := ctx.Value(pageKey{}).(*Pass); !page {
+		return task.Task{}, false
+	}
+	pass, ok := PassOf(ctx)
+	if !ok {
+		return task.Task{}, false
+	}
+	return pass.Task(id)
+}
+
+// PageTasksOf are the tasks of the pass of the page ctx serves that hold u or one of its items, held or resolved;
+// false outside a page or a pass.
+func PageTasksOf(ctx context.Context, u unit.Unit) ([]task.Task, bool) {
+	if _, page := ctx.Value(pageKey{}).(*Pass); !page {
+		return nil, false
+	}
+	pass, ok := PassOf(ctx)
+	if !ok {
+		return nil, false
+	}
+	byUnit, _ := PageOnce(ctx, "tasks.of", func() (map[unit.Unit][]task.Task, error) {
+		out := map[unit.Unit][]task.Task{}
+		for _, e := range pass.Tasks {
+			seen := map[unit.Unit]bool{}
+			for _, h := range e.Units {
+				seen[h] = true
+			}
+			for _, r := range slices.Concat(e.Items, e.Resolved) {
+				seen[r.Unit] = true
+			}
+			for h := range seen {
+				out[h] = append(out[h], e)
+			}
+		}
+		return out, nil
+	})
+	return byUnit[u], true
+}
+
 // ItemsKey is the Once key of the items of every unit of a pass, a map[unit.Unit][]items.Item, which the facts
 // and the draft step share.
 const ItemsKey = "items"

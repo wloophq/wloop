@@ -118,3 +118,32 @@ func TestAPageLoadsEachKeyOnceAndNothingOutsideItIsKept(t *testing.T) {
 		t.Errorf("PageOnce outside a page = %d, want a load each call", got)
 	}
 }
+
+func TestAPageReadsTasksFromItsPass(t *testing.T) {
+	u, v := unit.Unit{Provider: "acme", Key: "1"}, unit.Unit{Provider: "acme", Key: "2"}
+	w := unit.Unit{Provider: "acme", Key: "3"}
+	pass := &Pass{Tasks: []task.Task{{ID: "t-1", Units: []unit.Unit{u}}, {ID: "t-2", Items: []task.ItemRef{{Unit: u, Item: "a"}, {Unit: v, Item: "b"}},
+		Resolved: []task.ItemRef{{Unit: w, Item: "c"}}}}}
+	ctx := WithPage(WithPass(context.Background(), pass))
+	if e, ok := PageTask(ctx, "t-2"); !ok || e.ID != "t-2" {
+		t.Errorf("PageTask = %+v, %t", e, ok)
+	}
+	if _, ok := PageTask(ctx, "t-9"); ok {
+		t.Error("PageTask held a task the pass does not")
+	}
+	if es, ok := PageTasksOf(ctx, u); !ok || len(es) != 2 {
+		t.Errorf("PageTasksOf(u) = %+v, %t, want both tasks", es, ok)
+	}
+	if es, _ := PageTasksOf(ctx, v); len(es) != 1 || es[0].ID != "t-2" {
+		t.Errorf("PageTasksOf(v) = %+v, want t-2", es)
+	}
+	if es, _ := PageTasksOf(ctx, w); len(es) != 1 || es[0].ID != "t-2" {
+		t.Errorf("PageTasksOf(w) = %+v, want t-2, which resolved an item of it", es)
+	}
+	if _, ok := PageTask(WithPass(context.Background(), pass), "t-1"); ok {
+		t.Error("PageTask read a pass outside a page")
+	}
+	if _, ok := PageTasksOf(WithPage(context.Background()), u); ok {
+		t.Error("PageTasksOf read a page without a pass")
+	}
+}
