@@ -99,6 +99,8 @@ const marks = {
   timers: { peek: undefined as Timer, focus: undefined as Timer, quiet: undefined as Timer, sync: undefined as Timer, retry: undefined as Timer },
   queued: null as Reads | null,
   chain: Promise.resolve(),
+  idle: false,
+  missed: null as Reads | null,
 };
 
 // itemKey names an item across reads, as the menu bar does: its gate, else its task's decision of its kind and
@@ -195,7 +197,28 @@ function lose(read: FloatRead): void {
 function retry(): void {
   timer.clear(marks.timers.retry);
   const wait = Math.min(FLOAT_RETRY_MAX_MS, FLOAT_RETRY_MS * 2 ** marks.retries++);
-  marks.timers.retry = timer.set(() => void floatLoad(), wait);
+  marks.timers.retry = timer.set(() => (asleep() ? miss({ queue: true, turns: true }) : void floatLoad()), wait);
+}
+
+// floatIdleWhileHidden makes the page read nothing while it shows nothing, as the panel's page, whose window stays
+// hidden until it shows a peek or the panel: what the events asked for meanwhile is read as it shows.
+export function floatIdleWhileHidden(): void {
+  marks.idle = true;
+}
+
+const asleep = (): boolean => marks.idle && fl.mode === "";
+
+// miss keeps what a read asked for while the page slept.
+function miss(what: Reads): void {
+  const m = marks.missed || { queue: false, turns: false };
+  marks.missed = { queue: m.queue || what.queue, turns: m.turns || what.turns };
+}
+
+// wake reads what the page missed while it slept.
+function wake(): void {
+  const what = marks.missed;
+  marks.missed = null;
+  if (what) void floatLoad(what);
 }
 
 async function read(asked: Reads): Promise<void> {
@@ -223,6 +246,7 @@ export function floatLoad(what: Reads = { queue: true, turns: true }): Promise<v
 }
 
 function schedule(what: Reads): void {
+  if (asleep()) return miss(what);
   const q = marks.queued || { queue: false, turns: false };
   marks.queued = { queue: q.queue || what.queue, turns: q.turns || what.turns };
   timer.clear(marks.timers.sync);
@@ -280,9 +304,11 @@ function show(m: FloatMode, p?: Partial<PanelPlace> & { item?: string }): void {
   }
   const item = p && typeof p.item === "string" ? p.item : "";
   if (!FLOAT_MODES.includes(m) || (m === fl.mode && !item)) return;
-  if (m === "panel") return openPanel(item);
-  if (m === "peek") return peekAt(item);
-  shut();
+  const waking = asleep() && m !== "";
+  if (m === "panel") openPanel(item);
+  else if (m === "peek") peekAt(item);
+  else shut();
+  if (waking) wake();
 }
 
 // openPanel shows the full panel on the item keyed key, else on the one last peeked at.
@@ -493,7 +519,7 @@ export type FloatState = ReturnType<typeof floatState>;
 // resetFloat puts the widget back as the page starts; tests call it between cases.
 export function resetFloat(): void {
   for (const id of Object.values(marks.timers)) timer.clear(id);
-  Object.assign(marks, { seen: new Set<string>(), focus: "", burst: false, retries: 0, queued: null, chain: Promise.resolve() });
+  Object.assign(marks, { seen: new Set<string>(), focus: "", burst: false, retries: 0, queued: null, chain: Promise.resolve(), idle: false, missed: null });
   marks.timers = { peek: undefined, focus: undefined, quiet: undefined, sync: undefined, retry: undefined };
   Object.assign(fl, fresh());
 }

@@ -5,7 +5,7 @@ import { FakeDaemon } from "../testing/fakedaemon";
 import { resetStore } from "../testing/reset.svelte";
 import { Reply } from "../testing/fakedaemon";
 import { state } from "./store.svelte";
-import { FLOAT_ARM_MS, FLOAT_PEEK_MS, FLOAT_QUIET_MS, FLOAT_RETRY_MS, floatChange, itemKey, floatDeps, floatFollow, floatLoad, floatState, resetFloat } from "./float.svelte";
+import { FLOAT_ARM_MS, FLOAT_PEEK_MS, FLOAT_QUIET_MS, FLOAT_RETRY_MS, floatChange, itemKey, floatDeps, floatFollow, floatIdleWhileHidden, floatLoad, floatState, resetFloat } from "./float.svelte";
 import { connect, DEBOUNCE_MS, stream, type EventSourceLike } from "./sync.svelte";
 
 function gateItem(id: number, title: string): J {
@@ -337,4 +337,23 @@ test("a stale draft's primary is refused as the cockpit's card refuses it, and n
   await f.act();
   expect(posts()).toEqual([]);
   expect(f.failed).toContain("The thread moved since the draft was written.");
+});
+
+test("a hidden panel page reads nothing on events, and reads what it missed as it shows", async () => {
+  floatIdleWhileHidden();
+  await floatLoad();
+  const f = floatState();
+  daemon.clear();
+  served = queue(gateItem(1, "Ana's retry change"), gateItem(4, "Di's new review"));
+  floatChange({ data: JSON.stringify({ type: "changed", gates: true, turns: true }) });
+  await vi.advanceTimersByTimeAsync(DEBOUNCE_MS * 4);
+  expect(daemon.urls).toEqual([]);
+  f.show("peek", { item: "gate:4" });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(daemon.urls).toEqual(["/api/queue", "/api/turns/live"]);
+  expect(f.peeked && f.peeked.task.id).toBe("t-4");
+  daemon.clear();
+  floatChange({ data: JSON.stringify({ type: "changed", gates: true }) });
+  await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+  expect(daemon.urls).toEqual(["/api/queue"]);
 });
