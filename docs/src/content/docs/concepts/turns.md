@@ -18,7 +18,7 @@ The daemon keeps every turn in its store. What GitHub does not keep (your answer
 | `settled` | a review round with nothing new to publish |
 | `failed` | the turn broke; nothing went out |
 | `unrecorded` | the session stopped without a record, or never started the turn |
-| `dismissed` | you closed the question or the stopped turn without answering |
+| `dismissed` | you closed the question or the stopped turn without answering, a workflow dismissed it, or every draft its question offered to post left without a pick ([A question's option may point to a draft](/concepts/approval/)) |
 | `replaced` | a newer turn of the same intent took over while this one was open |
 
 ## Instructions
