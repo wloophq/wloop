@@ -1,5 +1,5 @@
 {
-  "version": "cebd8fec8e2f",
+  "version": "3fbb7a86e93a",
   "specs": [
     {
       "id": "answer",
@@ -380,6 +380,7 @@
       "surfaces": [
         "row",
         "detail",
+        "task",
         "tui",
         "menubar"
       ],

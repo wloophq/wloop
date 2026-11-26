@@ -94,7 +94,7 @@
      "status": ""
     }
    },
-   "specs_version": "cebd8fec8e2f",
+   "specs_version": "3fbb7a86e93a",
    "summary": {
     "closed": false,
     "line": "",
@@ -206,7 +206,7 @@
      "status": ""
     }
    },
-   "specs_version": "cebd8fec8e2f",
+   "specs_version": "3fbb7a86e93a",
    "summary": {
     "closed": false,
     "line": "",
@@ -3097,6 +3097,7 @@
     "surfaces": [
      "row",
      "detail",
+     "task",
      "tui",
      "menubar"
     ]
@@ -3308,7 +3309,7 @@
     ]
    }
   ],
-  "version": "cebd8fec8e2f"
+  "version": "3fbb7a86e93a"
  },
  "stringsEn": {
   "\"state\" to wait until the situation changes": "\"state\" to wait until the situation changes",

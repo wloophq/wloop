@@ -266,12 +266,19 @@ func TestATurnEndingRefreshesTheRowWithoutThePlugin(t *testing.T) {
 
 func TestARowOffersCloseWhenItsPluginClosesWithNoMessage(t *testing.T) {
 	u := acmeUnit("one")
-	r := &reports{snaps: map[unit.Unit]src.Snapshot{u: report("one")}}
+	resolved := report("one")
+	resolved.Items[0].State = "resolved"
+	r := &reports{snaps: map[unit.Unit]src.Snapshot{u: resolved}}
 	p := reportedProvider(t, r, &books{by: map[unit.Unit]turn.Book{}}, nil, nil, nil)
-	ins, err := p.Load(context.Background(), []unit.Unit{u})
-	if err != nil {
-		t.Fatal(err)
+	load := func() map[unit.Unit]any {
+		t.Helper()
+		ins, err := p.Load(context.Background(), []unit.Unit{u})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ins
 	}
+	ins := load()
 	offers := func(base readmodel.Base) (api.ActionState, bool) {
 		t.Helper()
 		base.Intents = acmeRole(t)
@@ -290,6 +297,11 @@ func TestARowOffersCloseWhenItsPluginClosesWithNoMessage(t *testing.T) {
 	}
 	if st, ok := offers(readmodel.Base{}); ok {
 		t.Errorf("close %+v offered on a unit nothing closes", st)
+	}
+	r.snaps[u] = report("one")
+	ins = load()
+	if st, ok := offers(readmodel.Base{Closes: func(unit.ProviderID) bool { return true }}); ok {
+		t.Errorf("close %+v offered on a unit with an open item, which its closure would leave in the view", st)
 	}
 }
 
