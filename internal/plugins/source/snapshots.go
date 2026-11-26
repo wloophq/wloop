@@ -7,6 +7,7 @@ import (
 	"hash/maphash"
 	"maps"
 	"slices"
+	"strconv"
 	"sync"
 	"time"
 
@@ -120,13 +121,21 @@ func (s *Snapshots) Reported(ctx context.Context, units []unit.Unit) (map[unit.U
 	}
 	out := make(map[unit.Unit]src.Snapshot, len(got))
 	for u, st := range got {
-		snap, err := Decode(st)
+		snap, err := decoded(ctx, st)
 		if err != nil {
 			return nil, err
 		}
 		out[u] = snap
 	}
 	return out, nil
+}
+
+// decoded is st decoded; in a pass, each unit's snapshot as stored at a rev and time is decoded once.
+func decoded(ctx context.Context, st snapshot.Stored) (src.Snapshot, error) {
+	key := "snapshot.decoded." + st.Unit.String() + "@" + strconv.FormatUint(st.Rev, 10) + "@" + strconv.FormatInt(st.At.UnixNano(), 10)
+	return coretasks.Once(ctx, key, func() (src.Snapshot, error) {
+		return Decode(st)
+	})
 }
 
 // Unextracted is when the oldest message not yet extracted arrived, across the extraction health of units'
