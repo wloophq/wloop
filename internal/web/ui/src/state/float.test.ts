@@ -97,42 +97,64 @@ test("an item that leaves on a refetch hands the focus to its successor, and act
   expect(posts()).toEqual(["/api/gates/1/approve"]);
 });
 
-test("a burst of arrivals while collapsed peeks once, at the first of them", async () => {
+// peeks records the peeks the page asks for, by task.
+const peeks = (): string[] => {
+  const asked: string[] = [];
+  floatDeps.peek = (it) => asked.push(it.task.id);
+  return asked;
+};
+
+test("a burst of arrivals asks for one peek, at the first of them, and the first read asks for none", async () => {
+  const asked = peeks();
   served = queue(gateItem(1, "Ana's retry change"));
   await floatLoad();
-  const f = floatState();
-  expect(f.peeked).toBeNull();
-  const seen: string[] = [];
+  expect(asked).toEqual([]);
   for (let i = 2; i <= 21; i++) {
     served = queue(...served.items, gateItem(i, "Arrival " + i));
     await floatLoad();
-    if (f.peeked) seen.push(f.peeked.task.id);
     await vi.advanceTimersByTimeAsync(400);
   }
-  expect(new Set(seen)).toEqual(new Set(["t-2"]));
+  expect(asked).toEqual(["t-2"]);
+});
+
+test("a peek the host shows lasts its while, then ends, and the item stays the one the panel opens on", async () => {
+  served = queue(gateItem(1, "Ana's retry change"), gateItem(2, "Bo's export fix"));
+  await floatLoad();
+  const f = floatState();
+  f.show("peek", { item: itemKey(served.items[1]), side: "left", maxW: 1400, maxH: 900 });
+  expect([f.mode, f.peeking, f.peeked.task.id, f.room]).toEqual(["peek", true, "t-2", { side: "left", maxW: 1400, maxH: 900 }]);
   await vi.advanceTimersByTimeAsync(FLOAT_PEEK_MS);
-  expect(f.peeked).toBeNull();
-  expect(f.mode).toBe("pill");
+  expect([f.mode, f.peeking]).toEqual(["peek", false]);
+  f.show("panel");
+  expect([f.mode, f.items[f.current].task.id]).toEqual(["panel", "t-2"]);
 });
 
-test("an arrival while the panel is open does not peek", async () => {
-  served = queue(gateItem(1, "Ana's retry change"));
+test("the host opens the panel on the item it names, and a peek over the open panel changes nothing", async () => {
   await floatLoad();
   const f = floatState();
-  f.setMode("panel");
-  served = queue(gateItem(1, "Ana's retry change"), gateItem(2, "Bo's export fix"));
-  await floatLoad();
-  expect(f.peeked).toBeNull();
+  f.show("panel", { item: itemKey(served.items[2]) });
+  expect(f.items[f.current].task.id).toBe("t-3");
+  f.show("peek", { item: itemKey(served.items[0]) });
+  expect([f.mode, f.peekKey, f.items[f.current].task.id]).toEqual(["panel", "", "t-3"]);
+  f.show("", {});
+  expect([f.mode, f.pinned]).toEqual(["", false]);
 });
 
-test("opening the panel while a peek shows makes the peeked item current", async () => {
-  served = queue(gateItem(1, "Ana's retry change"));
-  await floatLoad();
-  served = queue(gateItem(1, "Ana's retry change"), gateItem(2, "Bo's export fix"));
+test("leaving closes the open panel and asks the host to hide its window, unless pinned; closing unpins", async () => {
+  const posted: J[] = [];
+  floatDeps.post = (m) => posted.push(m);
   await floatLoad();
   const f = floatState();
-  f.setMode("panel");
-  expect(f.items[f.current].task.id).toBe("t-2");
+  f.show("panel");
+  f.setPinned(true);
+  f.leave();
+  f.blur();
+  expect([f.mode, posted]).toEqual(["panel", []]);
+  f.close();
+  expect([f.mode, f.pinned, posted]).toEqual(["", false, [{ type: "float:close" }]]);
+  f.show("panel");
+  f.leave();
+  expect([f.mode, posted.length]).toEqual(["", 2]);
 });
 
 test("a change reads the queue on a gate or task move and the turns only when they moved", async () => {
@@ -163,24 +185,19 @@ test("a daemon that stops answering leaves no stale count", async () => {
 });
 
 test("a trickle of arrivals for 30 s peeks once, and the next arrival after a quiet spell peeks again", async () => {
+  const asked = peeks();
   served = queue(gateItem(1, "Ana's retry change"));
   await floatLoad();
-  const f = floatState();
-  const peeks: string[] = [];
-  let last = "";
   for (let i = 2; i <= 16; i++) {
     served = queue(...served.items, gateItem(i, "Arrival " + i));
     await floatLoad();
-    const now = f.peeked ? f.peeked.task.id : "";
-    if (now && now !== last) peeks.push(now);
-    last = now;
     await vi.advanceTimersByTimeAsync(2000);
   }
-  expect(peeks).toEqual(["t-2"]);
+  expect(asked).toEqual(["t-2"]);
   await vi.advanceTimersByTimeAsync(FLOAT_QUIET_MS);
   served = queue(...served.items, gateItem(40, "After the quiet"));
   await floatLoad();
-  expect(f.peeked.task.id).toBe("t-40");
+  expect(asked).toEqual(["t-2", "t-40"]);
 });
 
 test("act waits for the read under way and sends nothing when it took the item away", async () => {

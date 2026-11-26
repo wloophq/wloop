@@ -1,8 +1,9 @@
 import { mount } from "svelte";
 import App from "./App.svelte";
 import { pluginKeyDown } from "./components/chrome/plugins.svelte";
-import Float from "./components/float/Float.svelte";
-import { installFloat, keepRoutes } from "./components/float/float";
+import FloatPanel from "./components/float/FloatPanel.svelte";
+import FloatTab from "./components/float/FloatTab.svelte";
+import { installFloat, keepRoutes, type FloatRole } from "./components/float/float";
 import { explore } from "./components/chrome/explore";
 import { keyHooks } from "./components/keys/appEnv";
 import PanelOmnibox from "./components/overlay/PanelOmnibox.svelte";
@@ -12,7 +13,7 @@ import { queueDeps, queueKeyAction } from "./components/screens/queue";
 import { panelInstall, postWindow } from "./components/window/panel";
 import { copyViewLink, detachView, followWindowChrome, installExternalLinks, installWindow, tellLinkNotice } from "./components/window/window.svelte";
 import { loadStrings } from "./lib/i18n.svelte";
-import { isFloatRoute, readRoute } from "./lib/routes";
+import { floatRole, readRoute } from "./lib/routes";
 import { scheduler } from "./state/actions.svelte";
 import { getJSON } from "./state/api";
 import { floatFollow, floatLoad } from "./state/float.svelte";
@@ -54,16 +55,17 @@ function followRoute(win: Window): void {
   });
 }
 
-// startFloat boots the floating widget's page: the queue and the live turns alone, following the event stream.
-function startFloat(win: Window, doc: Document): void {
-  installFloat(win);
+// startFloat boots one of the floating widget's pages: the queue and the live turns alone, following the event stream.
+function startFloat(win: Window, doc: Document, role: FloatRole): void {
+  if (role === "tab") installFloat(win, "tab");
+  else installFloat(win, "panel");
   installExternalLinks(doc, win, postWindow);
   keepRoutes(doc);
   scheduler.load = () => void floatLoad({ queue: true, turns: false });
   startClock();
   wire();
   loadStrings(getJSON).then(() => {
-    mount(Float, { target: doc.body });
+    mount(role === "tab" ? FloatTab : FloatPanel, { target: doc.body });
     void floatLoad();
     connect(floatFollow);
   });
@@ -72,7 +74,8 @@ function startFloat(win: Window, doc: Document): void {
 // start boots the page. The window chrome and the panel install their listeners first, so a detached window's or
 // the panel's pin sees each route before the page follows it.
 export function start(win: Window = window, doc: Document = document): void {
-  if (isFloatRoute(win.location.hash)) return startFloat(win, doc);
+  const role = floatRole(win.location.hash);
+  if (role) return startFloat(win, doc, role);
   const panel = panelInstall(win, doc, postWindow);
   const inset = installWindow(win, doc);
   followWindowChrome(doc.body, inset);

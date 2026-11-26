@@ -79,81 +79,109 @@ func TestARoundedFrameIsTheOneSet(t *testing.T) {
 	}
 }
 
-const cockpit = "http://127.0.0.1:7000/?token=a#/float"
+const (
+	cockpit      = "http://127.0.0.1:7000/?token=a#/float/tab"
+	cockpitPanel = "http://127.0.0.1:7001/?token=b#/float/panel"
+)
 
-// Only the float's own page, in its main frame and from the cockpit's
-// origin, reaches the controller.
-func TestOnlyTheCockpitsPageSendsFloatMessages(t *testing.T) {
+// Only the float's own pages, in their main frame and from the origin each
+// window loaded, reach the controller, named by the window they came from.
+func TestOnlyTheCockpitsPagesSendFloatMessages(t *testing.T) {
 	open := `{"type":"float:open","route":"task=t-1"}`
 	for _, c := range []struct {
 		window, origin string
 		main           bool
 		msg            string
-		delivered      bool
+		from           string
 	}{
-		{floatName, "http://127.0.0.1:7000/?token=a#/float", true, open, true},
-		{floatName, "http://127.0.0.1:7000/", true, open, true},
-		{floatName, "http://127.0.0.1:7001/", true, open, false},
-		{floatName, "https://elsewhere.example/", true, open, false},
-		{floatName, "", true, open, false},
-		{floatName, "http://127.0.0.1:7000/", false, open, false},
-		{"panel", "http://127.0.0.1:7000/", true, open, false},
-		{floatName, "http://127.0.0.1:7000/", true, `float:open {"route":"task=t-1"}`, false},
+		{floatName, "http://127.0.0.1:7000/?token=a#/float/tab", true, open, window.FloatTab},
+		{floatName, "http://127.0.0.1:7000/", true, open, window.FloatTab},
+		{floatName, "http://127.0.0.1:7001/", true, open, ""},
+		{floatPanelName, "http://127.0.0.1:7001/", true, open, window.FloatPanel},
+		{floatPanelName, "http://127.0.0.1:7000/", true, open, ""},
+		{floatName, "https://elsewhere.example/", true, open, ""},
+		{floatName, "", true, open, ""},
+		{floatName, "http://127.0.0.1:7000/", false, open, ""},
+		{"panel", "http://127.0.0.1:7000/", true, open, ""},
+		{floatName, "http://127.0.0.1:7000/", true, `float:open {"route":"task=t-1"}`, ""},
 	} {
 		var got []window.FloatMessage
-		h := &host{floatURL: cockpit, listening: window.Handlers{OnFloat: func(m window.FloatMessage) { got = append(got, m) }}}
+		h := &host{floatURL: cockpit, floatPanelURL: cockpitPanel, listening: window.Handlers{OnFloat: func(m window.FloatMessage) { got = append(got, m) }}}
 		h.pageMessage(c.window, c.msg, c.origin, c.main)
 		for _, fn := range h.queue {
 			fn()
 		}
-		if delivered := len(got) == 1 && got[0] == (window.FloatMessage{Kind: window.FloatOpen, Route: "task=t-1"}); delivered != c.delivered {
-			t.Errorf("%s from %q main=%v %q: delivered %v, want %v", c.window, c.origin, c.main, c.msg, delivered, c.delivered)
+		from := ""
+		if len(got) == 1 && got[0].Kind == window.FloatOpen && got[0].Route == "task=t-1" {
+			from = got[0].Window
+		}
+		if len(got) > 1 || from != c.from {
+			t.Errorf("%s from %q main=%v %q: delivered %+v, want from %q", c.window, c.origin, c.main, c.msg, got, c.from)
 		}
 	}
 }
 
-// The host calls the page's global the brand names, with the mode the page
-// last said it draws in, the pill until it says one.
-func TestThePlaceGoesToTheBrandsGlobal(t *testing.T) {
+// The host calls each page's global the brand names: the tab's place, and
+// what the panel shows, that it should leave, or that it lost the keyboard.
+func TestTheHostCallsTheBrandsGlobal(t *testing.T) {
 	name, _ := json.Marshal(window.FloatBridge)
-	want := `(function(b){if(b&&b.setMode)b.setMode("pill",{"edge":"left","up":true,"leftward":true,"maxW":1512,"maxH":911})})(window[` + string(name) + `])`
-	if got := floatPlaceJS("", window.FloatPlace{Edge: window.EdgeLeft, Up: true, Leftward: true, MaxW: 1512, MaxH: 911}); got != want {
-		t.Fatalf("js\n got %s\nwant %s", got, want)
+	call := func(method, args string) string {
+		return `(function(b){if(b&&b.` + method + `)b.` + method + `(` + args + `)})(window[` + string(name) + `])`
 	}
-	if got := floatPlaceJS(window.ModePanel, window.FloatPlace{}); !strings.Contains(got, `setMode("panel",{"edge":"","up":false,"leftward":false,"maxW":0,"maxH":0})`) {
-		t.Fatalf("js %s", got)
+	for _, c := range []struct{ got, want string }{
+		{floatPlaceJS(window.FloatPlace{Edge: window.EdgeLeft}), call("place", `{"edge":"left"}`)},
+		{panelShowJS(window.PanelPlace{Mode: window.ModePeek, Item: "gate:7", Side: window.SideLeft, MaxW: 1478, MaxH: 911}),
+			call("show", `"peek",{"item":"gate:7","side":"left","maxW":1478,"maxH":911}`)},
+		{panelShowJS(window.PanelPlace{}), call("show", `"",{"item":"","side":"","maxW":0,"maxH":0}`)},
+		{bridgeJS("leave"), call("leave", "")},
+		{bridgeJS("blur"), call("blur", "")},
+	} {
+		if c.got != c.want {
+			t.Errorf("js\n got %s\nwant %s", c.got, c.want)
+		}
 	}
 }
 
-// fakeFloat is the float's AppKit side: the mouse buttons, the frame, the
-// key status and the hand-backs, each read under mu.
+// fakeFloat is a float window's AppKit side: the mouse buttons, the frame,
+// and what the host did to it, each read under mu.
 type fakeFloat struct {
-	mu        sync.Mutex
-	up, key   bool
-	frame     window.Rect
-	handBacks int
-	ran       []string
+	mu     sync.Mutex
+	up     bool
+	frame  window.Rect
+	ran    []string
+	did    []string
+	frames []window.Rect
 }
 
 func (f *fakeFloat) set(fn func(f *fakeFloat)) { f.mu.Lock(); fn(f); f.mu.Unlock() }
 
-func (f *fakeFloat) handedBack() int { f.mu.Lock(); defer f.mu.Unlock(); return f.handBacks }
+func (f *fakeFloat) taken() (ran, did []string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	ran, did = f.ran, f.did
+	f.ran, f.did = nil, nil
+	return ran, did
+}
 
 func (f *fakeFloat) native() floatNative {
 	read := func(fn func() any) any { f.mu.Lock(); defer f.mu.Unlock(); return fn() }
 	return floatNative{
 		buttonsUp: func() bool { return read(func() any { return f.up }).(bool) },
 		frame:     func() window.Rect { return read(func() any { return f.frame }).(window.Rect) },
-		isKey:     func() bool { return read(func() any { return f.key }).(bool) },
-		handBack:  func() { f.set(func(f *fakeFloat) { f.handBacks++; f.key = false }) },
 		run:       func(js string) { f.set(func(f *fakeFloat) { f.ran = append(f.ran, js) }) },
+		load:      func(url string) { f.set(func(f *fakeFloat) { f.did = append(f.did, "load "+url) }) },
+		show:      func() { f.set(func(f *fakeFloat) { f.did = append(f.did, "show") }) },
+		hide:      func() { f.set(func(f *fakeFloat) { f.did = append(f.did, "hide") }) },
+		setFrame:  func(r window.Rect) { f.set(func(f *fakeFloat) { f.frames = append(f.frames, r) }) },
 	}
 }
 
-// runningHost is a host whose worker runs on f until the test ends, then
-// stops with every release poll awaited.
-func runningHost(t *testing.T, f *fakeFloat, hs window.Handlers) *host {
+// runningHost is a host whose worker runs on the tab f until the test ends,
+// then stops with every poll and grace awaited; its panel window is panel,
+// made on first use.
+func runningHost(t *testing.T, f, panel *fakeFloat, hs window.Handlers) *host {
 	h := &host{native: f.native(), listening: hs}
+	h.makePanel = panel.native
 	h.start()
 	t.Cleanup(h.stop)
 	return h
@@ -169,7 +197,7 @@ func TestADragIsFollowedUntilTheButtonsAreUp(t *testing.T) {
 		var moving int
 		var dropped []window.Rect
 		var droppedAt time.Time
-		h := runningHost(t, f, window.Handlers{
+		h := runningHost(t, f, &fakeFloat{}, window.Handlers{
 			OnFloatMoving:  func() { mu.Lock(); moving++; mu.Unlock() },
 			OnFloatDropped: func(r window.Rect) { mu.Lock(); dropped = append(dropped, r); droppedAt = time.Now(); mu.Unlock() },
 		})
@@ -209,69 +237,179 @@ func TestADragIsFollowedUntilTheButtonsAreUp(t *testing.T) {
 	})
 }
 
-// Leaving the panel under a held button hands the keyboard back once the
-// button is up, not under the press; back in the panel before then, it
-// keeps it.
-func TestTheKeyboardGoesBackOnceTheButtonsAreUp(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		f := &fakeFloat{up: false, key: true}
-		h := runningHost(t, f, window.Handlers{})
-		h.do(func() { h.setFloatMode(window.ModePill) })
-		time.Sleep(3 * dropPoll)
-		synctest.Wait()
-		if f.handedBack() != 0 {
-			t.Fatal("handed the keyboard back under a held button")
-		}
-		f.set(func(f *fakeFloat) { f.up = true })
-		time.Sleep(dropPoll)
-		synctest.Wait()
-		if n := f.handedBack(); n != 1 {
-			t.Fatalf("handed back %d times, want once", n)
-		}
-
-		f.set(func(f *fakeFloat) { f.up, f.key = false, true })
-		h.do(func() { h.setFloatMode(window.ModePeek) })
-		h.do(func() { h.setFloatMode(window.ModePanel) })
-		synctest.Wait()
-		f.set(func(f *fakeFloat) { f.up = true })
-		time.Sleep(dropPoll)
-		synctest.Wait()
-		if n := f.handedBack(); n != 1 {
-			t.Fatalf("handed back %d times after returning to the panel, want still once", n)
-		}
-	})
-}
-
-// The float resigning key tells the open panel's page, which collapses
-// unless pinned; the pill, never key, is told nothing.
-func TestTheOpenPanelHearsTheFloatResignKey(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		f := &fakeFloat{up: true}
-		h := runningHost(t, f, window.Handlers{})
-		h.do(func() { h.setFloatMode(window.ModePill) })
-		h.do(h.floatResigned)
-		h.do(func() { h.setFloatMode(window.ModePanel) })
-		h.do(h.floatResigned)
-		synctest.Wait()
-		name, _ := json.Marshal(window.FloatBridge)
-		want := `(function(b){if(b&&b.blur)b.blur()})(window[` + string(name) + `])`
-		f.mu.Lock()
-		defer f.mu.Unlock()
-		if len(f.ran) != 1 || f.ran[0] != want {
-			t.Fatalf("ran %q, want once %s", f.ran, want)
-		}
-	})
-}
-
-// Stopping the host ends a poll still waiting for a release.
+// Stopping the host ends a poll still waiting for a release and a grace
+// still running.
 func TestStoppingTheHostEndsAWaitingPoll(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		f := &fakeFloat{up: false, key: true}
+		f := &fakeFloat{up: false, frame: window.Rect{X: 9, Y: 9, W: 34, H: 84}}
 		h := &host{native: f.native()}
+		h.makePanel = (&fakeFloat{}).native
 		h.start()
-		h.do(func() { h.setFloatMode(window.ModePill) })
+		h.LoadFloatPanel(cockpitPanel)
+		h.do(func() { h.floatShown = true })
+		h.do(h.floatMoved)
+		h.do(func() {
+			h.showPanel(window.Rect{W: 1, H: 1}, window.ModePanel)
+		})
+		h.do(func() { h.pointer(window.FloatTab, false) })
 		synctest.Wait()
 		h.stop()
+	})
+}
+
+// The panel window is made on the first load only and loads each URL it is
+// given; showing it frames it first. Before the first load, nothing is made.
+func TestThePanelWindowIsMadeOnItsFirstLoad(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		panel := &fakeFloat{up: true}
+		made := 0
+		h := runningHost(t, &fakeFloat{up: true}, panel, window.Handlers{})
+		h.makePanel = func() floatNative { made++; return panel.native() }
+		h.ShowFloatPanel(window.Rect{W: 1, H: 1}, window.ModePanel)
+		h.HideFloatPanel()
+		h.LoadFloatPanel(cockpitPanel)
+		h.LoadFloatPanel(cockpitPanel)
+		h.ShowFloatPanel(window.Rect{X: 1002, Y: 260.75, W: 476, H: 600}, window.ModePanel)
+		h.HideFloat()
+		synctest.Wait()
+		_, did := panel.taken()
+		if made != 1 || !slices.Equal(did, []string{"load " + cockpitPanel, "load " + cockpitPanel, "show", "hide"}) {
+			t.Fatalf("made %d, did %q; want one window that loads twice, shows and hides", made, did)
+		}
+		if len(panel.frames) != 1 || panel.frames[0] != (window.Rect{X: 1002, Y: 260.75, W: 476, H: 600}) {
+			t.Fatalf("frames %v", panel.frames)
+		}
+	})
+}
+
+// Only the full panel may take the keyboard; a peek and a hidden panel never
+// do, and a size the panel's page sends never makes its window keyable: only
+// a show of the controller's does.
+func TestOnlyTheFullPanelMayBecomeKey(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		h := runningHost(t, &fakeFloat{up: true}, &fakeFloat{up: true}, window.Handlers{})
+		h.LoadFloatPanel(cockpitPanel)
+		keyable := func(step string, want bool) {
+			t.Helper()
+			synctest.Wait()
+			if got := h.panelKeyable.Load(); got != want {
+				t.Fatalf("after %s keyable %v, want %v", step, got, want)
+			}
+		}
+		h.ShowFloatPanel(window.Rect{W: 356, H: 60}, window.ModePeek)
+		keyable("a peek", false)
+		h.ShowFloatPanel(window.Rect{W: 476, H: 600}, window.ModePanel)
+		keyable("the full panel", true)
+		h.HideFloatPanel()
+		keyable("a hide", false)
+		h.pageMessage(floatPanelName, `{"type":"float:size","w":476,"h":600,"mode":"panel"}`, cockpitPanel, true)
+		keyable("a late size of the page", false)
+	})
+}
+
+// The pointer leaving both windows asks an open panel's page to leave once
+// floatGrace has passed; entering either window before then keeps it, and a
+// peek is never asked.
+func TestLeavingBothWindowsAsksThePanelToLeaveAfterTheGrace(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		panel := &fakeFloat{up: true}
+		h := runningHost(t, &fakeFloat{up: true}, panel, window.Handlers{})
+		h.LoadFloatPanel(cockpitPanel)
+		mode := func(m string) {
+			h.do(func() { h.showPanel(window.Rect{W: 476, H: 600}, m) })
+		}
+		pointer := func(w string, in bool) { h.do(func() { h.pointer(w, in) }) }
+		leaves := func() int {
+			synctest.Wait()
+			ran, _ := panel.taken()
+			n := 0
+			for _, js := range ran {
+				if js == bridgeJS("leave") {
+					n++
+				}
+			}
+			return n
+		}
+
+		mode(window.ModePanel)
+		pointer(window.FloatTab, true)
+		pointer(window.FloatTab, false)
+		time.Sleep(floatGrace / 2)
+		pointer(window.FloatPanel, true)
+		time.Sleep(floatGrace)
+		if n := leaves(); n != 0 {
+			t.Fatalf("crossing from the tab to the panel asked %d leaves", n)
+		}
+		pointer(window.FloatPanel, false)
+		synctest.Wait()
+		start := time.Now()
+		time.Sleep(floatGrace - time.Millisecond)
+		if n := leaves(); n != 0 {
+			t.Fatal("asked to leave before the grace passed")
+		}
+		time.Sleep(time.Millisecond)
+		if n := leaves(); n != 1 || time.Since(start) != floatGrace {
+			t.Fatalf("asked %d leaves after %v, want one after %v", n, time.Since(start), floatGrace)
+		}
+
+		mode(window.ModePeek)
+		pointer(window.FloatTab, true)
+		pointer(window.FloatTab, false)
+		time.Sleep(2 * floatGrace)
+		if n := leaves(); n != 0 {
+			t.Fatal("a peek was asked to leave")
+		}
+	})
+}
+
+// A full panel that shows after the pointer already left both windows, as
+// when the pointer left the tab before the panel's page drew, is asked to
+// leave after the grace too.
+func TestAPanelThatShowsWithThePointerGoneIsAskedToLeave(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		panel := &fakeFloat{up: true}
+		h := runningHost(t, &fakeFloat{up: true}, panel, window.Handlers{})
+		h.LoadFloatPanel(cockpitPanel)
+		h.do(func() { h.pointer(window.FloatTab, true) })
+		h.do(func() { h.pointer(window.FloatTab, false) })
+		h.do(func() {
+			h.showPanel(window.Rect{W: 476, H: 600}, window.ModePanel)
+		})
+		synctest.Wait()
+		time.Sleep(floatGrace)
+		synctest.Wait()
+		if ran, _ := panel.taken(); !slices.Contains(ran, bridgeJS("leave")) {
+			t.Fatalf("ran %q, want a leave", ran)
+		}
+		h.do(func() { h.pointer(window.FloatTab, true) })
+		h.do(func() {
+			h.showPanel(window.Rect{W: 476, H: 640}, window.ModePanel)
+		})
+		time.Sleep(2 * floatGrace)
+		synctest.Wait()
+		if ran, _ := panel.taken(); slices.Contains(ran, bridgeJS("leave")) {
+			t.Fatal("asked to leave with the pointer on the tab")
+		}
+	})
+}
+
+// The panel window resigning key tells the full panel's page, which closes
+// unless pinned; a peek, never key, is told nothing.
+func TestTheOpenPanelHearsItsWindowResignKey(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		panel := &fakeFloat{up: true}
+		h := runningHost(t, &fakeFloat{}, panel, window.Handlers{})
+		h.LoadFloatPanel(cockpitPanel)
+		h.do(func() { h.showPanel(window.Rect{W: 1, H: 1}, window.ModePeek) })
+		h.do(h.panelResigned)
+		h.do(func() {
+			h.showPanel(window.Rect{W: 1, H: 1}, window.ModePanel)
+		})
+		h.do(h.panelResigned)
+		synctest.Wait()
+		if ran, _ := panel.taken(); len(ran) != 1 || ran[0] != bridgeJS("blur") {
+			t.Fatalf("ran %q, want once %s", ran, bridgeJS("blur"))
+		}
 	})
 }
 
@@ -299,7 +437,7 @@ func (w *warnings) Warn(msg string, args ...any) {
 // A float with no window is logged, not left unready in silence.
 func TestAFloatItCannotReadyIsLogged(t *testing.T) {
 	var w warnings
-	floatOnly(0, func() bool { return false }, &w)
+	floatOnly(0, func() bool { return false }, func(bool) {}, &w)
 	if len(w) != 1 || !strings.Contains(w[0], "no float window") {
 		t.Fatalf("logged %q", w)
 	}
@@ -334,7 +472,7 @@ func TestAKeyFloatOnlyResetsThePointerOnExit(t *testing.T) {
 // it first becomes key, so the floating panels ask for it too: false would
 // drop them to the normal level, under other apps' windows.
 func TestThePanelsStayFloatingOnceTheyBecomeKey(t *testing.T) {
-	for _, o := range []application.WebviewWindowOptions{panelOptions("App"), floatOptions("App")} {
+	for _, o := range []application.WebviewWindowOptions{panelOptions("App"), floatOptions("App", floatName), floatOptions("App", floatPanelName)} {
 		if !o.Hidden || !o.AlwaysOnTop || o.Mac.WindowLevel != application.MacWindowLevelFloating || o.Mac.WindowClass != application.MacWindowClassPanel {
 			t.Errorf("%s: hidden %v, always on top %v, level %q, class %v; want a hidden floating panel kept on top",
 				o.Name, o.Hidden, o.AlwaysOnTop, o.Mac.WindowLevel, o.Mac.WindowClass)

@@ -29,16 +29,31 @@ test("durations read in the figure's compact words, and progress stops at the us
   expect(oldest([{ since: "2026-11-20T10:00:00Z" }, { since: "2026-11-19T10:00:00Z" }, {}])).toBe(Date.parse("2026-11-19T10:00:00Z"));
 });
 
-test("the host bridge sets the mode, and the page posts JSON through the Wails handler, nowhere in a browser", () => {
+test("the tab's bridge takes its place, and the page posts JSON through the Wails handler, nowhere in a browser", () => {
   const sent: string[] = [];
   const win: Record<string, unknown> = { webkit: { messageHandlers: { external: { postMessage: (m: string) => sent.push(m) } } } };
-  const bridge = installFloat(win);
+  const bridge = installFloat(win, "tab");
   expect(win[FLOAT_BRIDGE]).toBe(bridge);
-  bridge.setMode("panel", { edge: "right", up: true, leftward: true, maxW: 1512, maxH: 911 });
-  expect([floatState().mode, floatState().place]).toEqual(["panel", { edge: "right", up: true, leftward: true, maxW: 1512, maxH: 911 }]);
+  bridge.place({ edge: "right" });
+  expect(floatState().place).toEqual({ edge: "right" });
+  bridge.place({ edge: "top" as "left" });
+  expect(floatState().place).toEqual({ edge: "" });
   floatDeps.post({ type: "float:size", w: 112, h: 32 });
-  expect(sent).toEqual(['{"type":"float:size","w":112,"h":32}']);
+  floatDeps.peek({ gate: { id: 7 } });
+  expect(sent).toEqual(['{"type":"float:size","w":112,"h":32}', '{"type":"float:peek","item":"gate:7"}']);
   expect(() => floatPost({ type: "float:hide", mode: "quiet" }, {})).not.toThrow();
+});
+
+test("the panel's bridge shows what the host says, and its page never asks for a peek", () => {
+  const sent: string[] = [];
+  const win: Record<string, unknown> = { webkit: { messageHandlers: { external: { postMessage: (m: string) => sent.push(m) } } } };
+  const bridge = installFloat(win, "panel");
+  expect(win[FLOAT_BRIDGE]).toBe(bridge);
+  bridge.show("panel", { side: "below", maxW: 1512, maxH: 600 });
+  expect([floatState().mode, floatState().room]).toEqual(["panel", { side: "below", maxW: 1512, maxH: 600 }]);
+  floatDeps.peek({ gate: { id: 7 } });
+  bridge.leave();
+  expect([floatState().mode, sent]).toEqual(["", ['{"type":"float:close"}']]);
 });
 
 test("a drag whose release never reaches the page drops on the host's next place, and a new drag never piles listeners", () => {
@@ -48,20 +63,21 @@ test("a drag whose release never reaches the page drops on the host's next place
     addEventListener: (_t: string, fn: unknown) => listening.add(fn),
     removeEventListener: (_t: string, fn: unknown) => listening.delete(fn),
   };
-  const bridge = installFloat(win);
+  const bridge = installFloat(win, "tab");
   let drops = 0;
   floatDrag(() => drops++, win);
   floatDrag(() => drops++, win);
   expect(listening.size).toBe(1);
-  bridge.setMode("pill", { edge: "left", up: false });
+  bridge.place({ edge: "left" });
   expect([listening.size, drops]).toEqual([0, 2]);
 });
 
-test("the host's word that the float lost the keyboard closes the panel unless it is pinned", () => {
-  const bridge = installFloat({});
-  bridge.setMode("panel");
+test("the host's word that the panel lost the keyboard closes it unless it is pinned", () => {
+  const bridge = installFloat({}, "panel");
+  bridge.show("panel");
   bridge.blur();
-  expect(floatState().mode).toBe("pill");
+  expect(floatState().mode).toBe("");
+  bridge.show("panel");
   floatState().setPinned(true);
   bridge.blur();
   expect([floatState().mode, floatState().pinned]).toEqual(["panel", true]);

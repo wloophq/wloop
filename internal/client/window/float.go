@@ -7,8 +7,19 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 )
 
-// FloatRoute is the cockpit route the floating widget loads.
-const FloatRoute = "/float"
+// The cockpit routes the floating widget's two windows load: the tab, which
+// carries the counts, and the panel beside it, which shows the queue or a
+// peek.
+const (
+	FloatTabRoute   = "/float/tab"
+	FloatPanelRoute = "/float/panel"
+)
+
+// The windows of the floating widget, as a FloatMessage names its sender.
+const (
+	FloatTab   = "tab"
+	FloatPanel = "panel"
+)
 
 // Rect is a frame in points, its origin at the top left of the main screen
 // and Y growing down.
@@ -21,19 +32,19 @@ func (r Rect) bottom() float64 { return r.Y + r.H }
 // the Dock.
 type Screen struct{ Frame, Visible Rect }
 
-// FloatPlace is what the float's page needs of its placement: the edge it
-// is docked on, whether its anchor is in the lower half of its screen, so
-// the panel opens upward, whether it is in the right half, so the panel
-// opens leftward, and the room from its anchor to the far side of its
-// screen's visible frame, which bounds what the page draws.
-type FloatPlace struct {
-	Edge       string
-	Up         bool
-	Leftward   bool
-	MaxW, MaxH float64
+// FloatPlace is what the tab's page needs of its placement: the edge it is
+// docked on, which stands it upright, "" when free.
+type FloatPlace struct{ Edge string }
+
+// PanelPlace is what the panel's page is told to show: its Mode, "" to
+// close, the Item to open on or peek at by its key ("" keeps the current
+// one), the Side of the tab it sits on, and the room it may fill there.
+type PanelPlace struct {
+	Mode, Item, Side string
+	MaxW, MaxH       float64
 }
 
-// FloatBridge is the page's global the host calls setMode on.
+// FloatBridge is the global each float page exposes for the host to call.
 var FloatBridge = brand.Command + "Float"
 
 // overlap is the area r and o share.
@@ -46,7 +57,7 @@ func (r Rect) overlap(o Rect) float64 {
 	return w * h
 }
 
-// The edges a float docks on, and the corners it grows away from.
+// The edges the tab docks on, and the corners it is anchored at.
 const (
 	EdgeLeft          = "left"
 	EdgeRight         = "right"
@@ -125,29 +136,9 @@ func ClampToScreens(p FloatPlacement, screens []Screen) Rect {
 	return r
 }
 
-// RoomOf is how wide and tall the float at p may grow: from its anchor
-// corner to the far side of its screen's visible frame, so a frame within it
-// never needs the clamp to move the anchor, and the pill stays put as the
-// panel opens.
-func RoomOf(p FloatPlacement, screens []Screen) (w, h float64) {
-	if len(screens) == 0 {
-		return p.W, p.H
-	}
-	s := screenOf(p.frame(), screens)
-	x, y := max(min(p.X, s.right()), s.X), max(min(p.Y, s.bottom()), s.Y)
-	w, h = s.right()-x, s.bottom()-y
-	if strings.HasSuffix(p.Corner, "r") {
-		w = x - s.X
-	}
-	if strings.HasPrefix(p.Corner, "b") {
-		h = y - s.Y
-	}
-	return w, h
-}
-
 // PlacementOf is the placement of a frame the person dropped: docked on the
 // edge it was dropped near, anchored at the corner of its screen's quarter,
-// so a panel opening from it grows toward the screen's middle.
+// so the tab grows toward the screen's middle as its counts widen it.
 func PlacementOf(frame Rect, screens []Screen) FloatPlacement {
 	p := FloatPlacement{W: frame.W, H: frame.H}
 	if len(screens) == 0 {
@@ -183,6 +174,75 @@ func PlacementOf(frame Rect, screens []Screen) FloatPlacement {
 		p.X = s.right()
 	}
 	return p
+}
+
+// The sides of the tab the panel goes on.
+const (
+	SideLeft  = "left"
+	SideRight = "right"
+	SideAbove = "above"
+	SideBelow = "below"
+)
+
+// PanelRoom is the side of the tab the panel goes on and the part of the
+// tab's screen's visible frame it may fill there: away from a docked edge,
+// or below or above a free tab, whichever has more room. It depends on the
+// tab alone, so the panel's page can be bounded by it before it draws.
+func PanelRoom(tab Rect, edge string, screens []Screen) (side string, room Rect) {
+	s := tab
+	if len(screens) > 0 {
+		s = screenOf(tab, screens)
+	}
+	room = s
+	switch {
+	case edge == EdgeLeft:
+		side, room.X = SideRight, tab.right()
+		room.W = s.right() - room.X
+	case edge == EdgeRight:
+		side, room.W = SideLeft, tab.X-s.X
+	case s.bottom()-tab.bottom() >= tab.Y-s.Y:
+		side, room.Y = SideBelow, tab.bottom()
+		room.H = s.bottom() - room.Y
+	default:
+		side, room.H = SideAbove, tab.Y-s.Y
+	}
+	room.W, room.H = max(room.W, 0), max(room.H, 0)
+	return side, room
+}
+
+// PanelFrame is where a panel w by h goes beside tab: in PanelRoom, against
+// the tab, lined up with the tab's side nearer the screen's middle, and no
+// larger than the room.
+func PanelFrame(tab Rect, edge string, w, h float64, screens []Screen) Rect {
+	side, room := PanelRoom(tab, edge, screens)
+	s := room
+	if len(screens) > 0 {
+		s = screenOf(tab, screens)
+	}
+	r := Rect{W: min(w, room.W), H: min(h, room.H)}
+	switch side {
+	case SideLeft, SideRight:
+		r.X = room.X
+		if side == SideLeft {
+			r.X = room.right() - r.W
+		}
+		r.Y = tab.Y
+		if tab.Y+tab.H/2 >= s.Y+s.H/2 {
+			r.Y = tab.bottom() - r.H
+		}
+	default:
+		r.Y = room.Y
+		if side == SideAbove {
+			r.Y = room.bottom() - r.H
+		}
+		r.X = tab.X
+		if tab.X+tab.W/2 >= s.X+s.W/2 {
+			r.X = tab.right() - r.W
+		}
+	}
+	r.X = max(min(r.X, room.right()-r.W), room.X)
+	r.Y = max(min(r.Y, room.bottom()-r.H), room.Y)
+	return r
 }
 
 // The frame's size before the page sends its own.
@@ -224,65 +284,79 @@ func LoadPlacement(d Defaults) (FloatPlacement, bool) {
 	return p, true
 }
 
-// The messages the float's page sends the host, and the modes it draws in.
+// The messages the float's pages send the host, and the modes the panel
+// draws in. The tab sends its size (float:size), asks for the panel
+// (float:panel, toggling it on a click) and for a peek at an item that
+// arrived (float:peek); the panel sends its size and mode (float:size) and
+// that it closed (float:close), as it does once as it loads. Either opens a
+// route in the main window (float:open) or hides the widget (float:hide).
 const (
-	FloatSize = "float:size"
-	FloatOpen = "float:open"
-	FloatHide = "float:hide"
-	ModePill  = "pill"
-	ModePanel = "panel"
-	ModePeek  = "peek"
+	FloatSize      = "float:size"
+	FloatOpen      = "float:open"
+	FloatHide      = "float:hide"
+	FloatOpenPanel = "float:panel"
+	FloatPeek      = "float:peek"
+	FloatClose     = "float:close"
+	ModePanel      = "panel"
+	ModePeek       = "peek"
 )
 
-// FloatMessage is a message of the float's page: the size it draws at and
-// the mode it draws in, a route to open in the main window, or a way to
-// hide.
+// FloatMessage is a message of one of the float's pages, the Window the
+// host read it from.
 type FloatMessage struct {
-	Kind  string
-	W, H  float64
-	Mode  string
-	Route string
+	Window string
+	Kind   string
+	W, H   float64
+	Mode   string
+	Route  string
+	Item   string
+	Toggle bool
 }
 
 // ParseFloatMessage reads raw, a JSON object naming its message in "type";
 // false for any other message.
 func ParseFloatMessage(raw string) (FloatMessage, bool) {
 	var body struct {
-		Type  string
-		W, H  float64
-		Mode  string
-		Route string
+		Type   string
+		W, H   float64
+		Mode   string
+		Route  string
+		Item   string
+		Toggle bool
 	}
 	if json.Unmarshal([]byte(raw), &body) != nil {
 		return FloatMessage{}, false
 	}
-	m := FloatMessage{Kind: body.Type, W: body.W, H: body.H, Mode: body.Mode, Route: body.Route}
+	m := FloatMessage{Kind: body.Type, W: body.W, H: body.H, Mode: body.Mode, Route: body.Route, Item: body.Item, Toggle: body.Toggle}
+	ok := false
 	switch m.Kind {
 	case FloatSize:
-		if m.W <= 0 || m.H <= 0 {
-			return FloatMessage{}, false
-		}
-		return m, true
-	case FloatOpen, FloatHide:
-		return m, true
+		ok = m.W > 0 && m.H > 0
+	case FloatPeek:
+		ok = m.Item != ""
+	case FloatOpen, FloatHide, FloatOpenPanel, FloatClose:
+		ok = true
 	}
-	return FloatMessage{}, false
+	if !ok {
+		return FloatMessage{}, false
+	}
+	return m, true
 }
 
-// FloatKeyable says whether the float may take the keyboard in mode: only
-// the open panel does, so hovering or dragging the pill never takes it from
-// the app the person types in.
+// FloatKeyable says whether the panel may take the keyboard in mode: only
+// the full panel does, so a peek never takes it from the app the person
+// types in. The tab never does.
 func FloatKeyable(mode string) bool { return mode == ModePanel }
 
-// ShowFloat shows the floating widget where the person left it, loading its
-// page unless the page loaded at the same URL has reported in. When the
-// daemon cannot serve the page yet the float stays wanted, and Run shows it
-// once the daemon's events answer.
+// ShowFloat shows the floating widget's tab where the person left it,
+// loading its page unless the page loaded at the same URL has reported in.
+// When the daemon cannot serve the page yet the float stays wanted, and Run
+// shows it once the daemon's events answer.
 func (c *Controller) ShowFloat() error {
 	c.mu.Lock()
 	c.floatWanted = true
 	c.mu.Unlock()
-	u, err := c.url(FloatRoute)
+	u, err := c.url(FloatTabRoute)
 	if err != nil {
 		return err
 	}
@@ -303,10 +377,14 @@ func (c *Controller) ShowFloat() error {
 
 // refloat shows the wanted float again as the daemon's events answer: after
 // they were lost, or while its page has not reported in, so a page the daemon
-// refused or could not serve loads anew.
+// refused or could not serve loads anew. A panel page that never reported in
+// loads anew on its next open.
 func (c *Controller) refloat(back bool) {
 	c.mu.Lock()
 	again := c.floatWanted && (back || !c.pageReady)
+	if !c.panel.ready {
+		c.panel.url, c.panel.pending = "", nil
+	}
 	c.mu.Unlock()
 	if !again {
 		return
@@ -316,23 +394,24 @@ func (c *Controller) refloat(back bool) {
 	}
 }
 
-// HideFloat hides the floating widget.
+// HideFloat hides the floating widget, its panel included.
 func (c *Controller) HideFloat() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.closePanel()
 	c.floatWanted, c.floatShown = false, false
 	c.cfg.Host.HideFloat()
 }
 
-// FloatReady says whether the float shows a page that has reported in since
-// it last loaded, so it carries what waits on the user.
+// FloatReady says whether the float shows a tab whose page has reported in
+// since it last loaded, so it carries what waits on the user.
 func (c *Controller) FloatReady() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.floatShown && c.pageReady
 }
 
-// OnFloatReady sets what runs when the float's page first reports in after a
+// OnFloatReady sets what runs when the tab's page first reports in after a
 // load; until set, nothing.
 func (c *Controller) OnFloatReady(fn func()) {
 	c.mu.Lock()
@@ -340,7 +419,7 @@ func (c *Controller) OnFloatReady(fn func()) {
 	c.floatReady = fn
 }
 
-// OnFloatHide sets what a hide the float's page asks for does; until set,
+// OnFloatHide sets what a hide the float's pages ask for does; until set,
 // nothing.
 func (c *Controller) OnFloatHide(fn func(mode string)) {
 	c.mu.Lock()
@@ -364,9 +443,9 @@ func (c *Controller) pressFloatHotkey() {
 	}
 }
 
-// placeFloat moves a shown float to its placement on the known screens,
-// unless the person is dragging it, then tells a loaded page where it sits
-// when its placement was set anew; it runs under c.mu.
+// placeFloat moves a shown tab to its placement on the known screens, unless
+// the person is dragging it, then tells a loaded page where it sits when its
+// placement was set anew; it runs under c.mu.
 func (c *Controller) placeFloat() {
 	if !c.floatShown || len(c.screens) == 0 || c.dragging {
 		return
@@ -378,17 +457,19 @@ func (c *Controller) placeFloat() {
 			c.placement.W, c.placement.H = size.W, size.H
 		}
 	}
-	frame := ClampToScreens(c.placement, c.screens)
-	c.cfg.Host.SetFloatFrame(frame)
+	c.tabFrame = ClampToScreens(c.placement, c.screens)
+	c.cfg.Host.SetFloatFrame(c.tabFrame)
 	if c.tellPlace && c.pageReady {
-		w, h := RoomOf(c.placement, c.screens)
-		c.cfg.Host.PlaceFloat(FloatPlace{Edge: c.placement.Edge, Up: strings.HasPrefix(c.placement.Corner, "b"),
-			Leftward: strings.HasSuffix(c.placement.Corner, "r"), MaxW: w, MaxH: h})
+		c.cfg.Host.PlaceFloat(FloatPlace{Edge: c.placement.Edge})
 		c.tellPlace = false
 	}
 }
 
 func (c *Controller) floatMessage(m FloatMessage) {
+	if m.Window == FloatPanel {
+		c.panelMessage(m)
+		return
+	}
 	c.mu.Lock()
 	ready := c.floatReady
 	if c.pageReady || !c.floatShown {
@@ -403,8 +484,35 @@ func (c *Controller) floatMessage(m FloatMessage) {
 	case FloatSize:
 		c.mu.Lock()
 		defer c.mu.Unlock()
+		if m.W == c.placement.W && m.H == c.placement.H && !c.tellPlace {
+			return
+		}
 		c.placement.W, c.placement.H = m.W, m.H
 		c.placeFloat()
+		c.placePanel()
+	case FloatOpenPanel:
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		if m.Toggle && c.panel.want == ModePanel {
+			c.closePanel()
+			return
+		}
+		c.openPanel(PanelPlace{Mode: ModePanel})
+	case FloatPeek:
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		if c.panel.want != ModePanel {
+			c.openPanel(PanelPlace{Mode: ModePeek, Item: m.Item})
+		}
+	default:
+		c.shared(m)
+	}
+}
+
+// shared handles what either page may ask: a route in the main window, or a
+// hide.
+func (c *Controller) shared(m FloatMessage) {
+	switch m.Kind {
 	case FloatOpen:
 		_ = c.Show(m.Route)
 	case FloatHide:
@@ -417,13 +525,117 @@ func (c *Controller) floatMessage(m FloatMessage) {
 	}
 }
 
+// floatPanel is the panel window as the controller knows it: the URL its
+// page was loaded at, whether that page has reported in since, the mode it
+// shows or was asked to show ("" while closed), the request its page has not
+// been told yet, the size it last drew at for that mode (0 until it drew)
+// and the room it was last told.
+type floatPanel struct {
+	url     string
+	ready   bool
+	want    string
+	pending *PanelPlace
+	w, h    float64
+	side    string
+	room    Rect
+}
+
+// openPanel asks the panel window to show p beside the shown tab, loading
+// its page on the first open, or anew at a new address; the page is told
+// once it has reported in, and the window shows at the size it then sends.
+// It runs under c.mu.
+func (c *Controller) openPanel(p PanelPlace) {
+	if !c.floatShown || len(c.screens) == 0 || c.dragging {
+		return
+	}
+	u, err := c.url(FloatPanelRoute)
+	if err != nil {
+		return
+	}
+	if u != c.panel.url || !c.panel.ready && c.panel.pending == nil {
+		c.panel.url, c.panel.ready = u, false
+		c.cfg.Host.LoadFloatPanel(u)
+	}
+	p.Side, c.panel.room = PanelRoom(c.tabFrame, c.placement.Edge, c.screens)
+	p.MaxW, p.MaxH, c.panel.side = c.panel.room.W, c.panel.room.H, p.Side
+	if p.Mode != c.panel.want {
+		c.panel.w, c.panel.h = 0, 0
+	}
+	c.panel.want, c.panel.pending = p.Mode, &p
+	c.tellPanel()
+}
+
+func (c *Controller) tellPanel() {
+	if c.panel.ready && c.panel.pending != nil {
+		c.cfg.Host.TellFloatPanel(*c.panel.pending)
+		c.panel.pending = nil
+	}
+}
+
+// closePanel hides a panel that was asked to show and tells its page; it
+// runs under c.mu.
+func (c *Controller) closePanel() {
+	if c.panel.want == "" {
+		return
+	}
+	c.panel.want, c.panel.pending, c.panel.w, c.panel.h = "", nil, 0, 0
+	c.cfg.Host.HideFloatPanel()
+	if c.panel.ready {
+		c.cfg.Host.TellFloatPanel(PanelPlace{})
+	}
+}
+
+// placePanel moves a shown panel beside the tab's frame at the size its page
+// last sent, telling the page a room that changed; it runs under c.mu.
+func (c *Controller) placePanel() {
+	if c.panel.want == "" || c.panel.w == 0 || len(c.screens) == 0 {
+		return
+	}
+	side, room := PanelRoom(c.tabFrame, c.placement.Edge, c.screens)
+	if side != c.panel.side || room != c.panel.room {
+		c.panel.side, c.panel.room = side, room
+		c.panel.pending = &PanelPlace{Mode: c.panel.want, Side: side, MaxW: room.W, MaxH: room.H}
+		c.tellPanel()
+	}
+	c.cfg.Host.ShowFloatPanel(PanelFrame(c.tabFrame, c.placement.Edge, c.panel.w, c.panel.h, c.screens), c.panel.want)
+}
+
+// panelMessage follows the panel's page: its first message says it loaded,
+// a size shows the window it asked for beside the tab, and a close hides it.
+func (c *Controller) panelMessage(m FloatMessage) {
+	c.mu.Lock()
+	loaded := !c.panel.ready
+	c.panel.ready = true
+	switch m.Kind {
+	case FloatSize:
+		defer c.mu.Unlock()
+		if c.panel.want == "" || !c.floatShown || m.Mode != ModePeek && m.Mode != ModePanel {
+			return
+		}
+		c.panel.want, c.panel.w, c.panel.h = m.Mode, m.W, m.H
+		c.placePanel()
+		return
+	case FloatClose:
+		defer c.mu.Unlock()
+		if loaded {
+			c.tellPanel()
+			return
+		}
+		c.closePanel()
+		return
+	}
+	c.mu.Unlock()
+	c.shared(m)
+}
+
 func (c *Controller) floatMoving() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.dragging = true
+	c.closePanel()
 }
 
-// floatDropped keeps where the person dropped the float and snaps it there,
+// floatDropped keeps where the person dropped the tab and snaps it there,
 // at the size the page last sent.
 func (c *Controller) floatDropped(frame Rect) {
 	c.mu.Lock()
@@ -448,4 +660,5 @@ func (c *Controller) setScreens(screens []Screen) {
 	defer c.mu.Unlock()
 	c.screens, c.tellPlace = screens, true
 	c.placeFloat()
+	c.placePanel()
 }

@@ -124,8 +124,12 @@ export function readRoute(hash: string): Route {
 // "" when it names none.
 export const routeItem = (r: Route): string => (r.task ? "task:" + r.task : r.unit ? "unit:" + r.unit : "");
 
-// FLOAT_ROUTE is the floating widget's page, which a native panel hosts beside the cockpit.
-export const FLOAT_ROUTE = "/float";
+// FLOAT_ROUTES are the floating widget's two pages, each in a native panel of its own beside the cockpit: the tab,
+// and the panel the host places beside it.
+export const FLOAT_ROUTES = { tab: "/float/tab", panel: "/float/panel" } as const;
 
-// isFloatRoute says whether hash opens the floating widget.
-export const isFloatRoute = (hash: string): boolean => String(hash || "").replace(/^#/, "").split(/[?&]/)[0] === FLOAT_ROUTE;
+// floatRole is which of the floating widget's pages hash opens, "" for none.
+export function floatRole(hash: string): "tab" | "panel" | "" {
+  const route = String(hash || "").replace(/^#/, "").split(/[?&]/)[0];
+  return route === FLOAT_ROUTES.tab ? "tab" : route === FLOAT_ROUTES.panel ? "panel" : "";
+}

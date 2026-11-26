@@ -51,11 +51,17 @@ func (h *fakeHost) ShowFloat(url string, reload bool) {
 	}
 	h.record("float " + url)
 }
-func (h *fakeHost) HideFloat()           { h.record("hide-float") }
-func (h *fakeHost) SetFloatFrame(r Rect) { h.record(fmt.Sprint("float-frame ", r)) }
-func (h *fakeHost) PlaceFloat(p FloatPlace) {
-	h.record(fmt.Sprintf("float-place %q %v %v %vx%v", p.Edge, p.Up, p.Leftward, p.MaxW, p.MaxH))
+func (h *fakeHost) HideFloat()                { h.record("hide-float") }
+func (h *fakeHost) SetFloatFrame(r Rect)      { h.record(fmt.Sprint("float-frame ", r)) }
+func (h *fakeHost) PlaceFloat(p FloatPlace)   { h.record(fmt.Sprintf("float-place %q", p.Edge)) }
+func (h *fakeHost) LoadFloatPanel(url string) { h.record("fpanel-load " + url) }
+func (h *fakeHost) TellFloatPanel(p PanelPlace) {
+	h.record(fmt.Sprintf("fpanel-tell %q %q %q %vx%v", p.Mode, p.Item, p.Side, p.MaxW, p.MaxH))
 }
+func (h *fakeHost) ShowFloatPanel(r Rect, mode string) {
+	h.record(fmt.Sprint("fpanel-show ", r, " ", mode))
+}
+func (h *fakeHost) HideFloatPanel() { h.record("fpanel-hide") }
 func (h *fakeHost) Listen(hs Handlers) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()

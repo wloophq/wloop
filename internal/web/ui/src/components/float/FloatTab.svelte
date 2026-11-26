@@ -1,0 +1,46 @@
+<script lang="ts">
+  import { onMount } from "svelte";
+  import { FLOAT_HOVER_OPEN_MS, floatState } from "../../state/float.svelte";
+  import { floatSize } from "./float";
+  import Pill from "./Pill.svelte";
+
+  // The floating widget's tab page: the pill alone, upright on a docked edge. It reports its size, which depends on
+  // where it is docked and on its counts only, and asks the host for the panel, which opens in a window of its own.
+  const f = floatState();
+
+  let root: HTMLElement | undefined = $state();
+  let hover: ReturnType<typeof setTimeout> | undefined;
+
+  const report = (force = false) => floatSize(root, "", force);
+
+  $effect(() => {
+    void [f.items.length, f.read, f.place.edge, f.turns, f.loaded];
+    queueMicrotask(() => report());
+  });
+
+  function enter(): void {
+    clearTimeout(hover);
+    hover = setTimeout(() => f.askPanel(), FLOAT_HOVER_OPEN_MS);
+  }
+
+  function toggle(): void {
+    clearTimeout(hover);
+    f.askPanel(true);
+  }
+
+  onMount(() => {
+    document.documentElement.classList.add("float-page");
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => report());
+    if (ro && root) ro.observe(root);
+    report();
+    return () => {
+      if (ro) ro.disconnect();
+      clearTimeout(hover);
+      document.documentElement.classList.remove("float-page");
+    };
+  });
+</script>
+
+<div class="fl" data-edge={f.place.edge || undefined} bind:this={root} role="presentation">
+  <Pill {f} onenter={enter} onleave={() => clearTimeout(hover)} ontoggle={toggle} ondrop={() => report(true)} />
+</div>

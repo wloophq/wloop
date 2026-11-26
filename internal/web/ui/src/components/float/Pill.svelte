@@ -2,23 +2,20 @@
   import { fmtNumber, t, tn } from "../../lib/i18n.svelte";
   import { age } from "../../lib/lens";
   import { clock } from "../../state/clock.svelte";
-  import type { J } from "../../lib/util";
   import type { FloatState } from "../../state/float.svelte";
   import { floatDrag, LATE_MS, oldest, progress } from "./float";
-  import Peek from "./Peek.svelte";
   import Ring from "./Ring.svelte";
 
-  // The collapsed widget: how many decisions wait on the user, how many turns run, how old the oldest decision is
-  // and, while a peek shows on a pill that is not docked, what just arrived; a dot when nothing waits and nothing runs. A drag moves the window,
-  // a click toggles the panel, an Option-click hides the widget until something new.
+  // The tab: how many decisions wait on the user, how many turns run and how old the oldest decision is; a dot when
+  // nothing waits and nothing runs. A drag moves the window, a click toggles the panel, an Option-click hides the
+  // widget until something new.
   let {
     f,
-    peek,
-    leaving,
     onenter,
+    onleave,
     ontoggle,
     ondrop,
-  }: { f: FloatState; peek: J; leaving: boolean; onenter: () => void; ontoggle: () => void; ondrop: () => void } = $props();
+  }: { f: FloatState; onenter: () => void; onleave: () => void; ontoggle: () => void; ondrop: () => void } = $props();
 
   // DRAG_PX is how far the pointer moves before a press is a drag.
   const DRAG_PX = 4;
@@ -32,7 +29,7 @@
     const fr = running.map((r: { intent: string; started: string }) => progress(clock.now - Date.parse(r.started), usual[r.intent] || 0));
     return fr.length ? Math.max(...fr) : 0;
   });
-  const idle = $derived(f.online && f.loaded && !n && !running.length && f.mode !== "panel");
+  const idle = $derived(f.online && f.loaded && !n && !running.length);
 
   let press: { x: number; y: number } | null = null;
 
@@ -43,7 +40,7 @@
   function moved(e: PointerEvent): void {
     if (!press || Math.hypot(e.clientX - press.x, e.clientY - press.y) <= DRAG_PX) return;
     press = null;
-    f.setMode("pill");
+    onleave();
     floatDrag(ondrop);
   }
 
@@ -51,29 +48,20 @@
     if (!press) return;
     press = null;
     if (e.altKey) f.hide("quiet");
-    else if (peek) f.setMode("panel");
     else ontoggle();
-  }
-
-  function key(e: KeyboardEvent): void {
-    if (e.key !== "Enter" && e.key !== " ") return;
-    e.preventDefault();
-    e.stopPropagation();
-    ontoggle();
   }
 </script>
 
 <div
-  class={["fl-pill", idle && "dot", peek && "peeking", !f.online && "offline"]}
+  class={["fl-pill", idle && "dot", !f.online && "offline"]}
   role="button"
-  tabindex="0"
-  aria-expanded={f.mode === "panel" ? "true" : "false"}
+  tabindex="-1"
   aria-label={f.read === "offline" ? t("Offline") : f.read === "failed" ? t("Could not read the queue.") : tn("{n} wait on you", n)}
   onpointerenter={onenter}
+  onpointerleave={onleave}
   onpointerdown={down}
   onpointermove={moved}
   onpointerup={up}
-  onkeydown={key}
 >
   {#if idle}
     <i class="fl-dot tone-muted" aria-hidden="true"></i>
@@ -88,9 +76,6 @@
       {#if running.length}<span class="fl-running"><Ring value={ring} />{fmtNumber(running.length)}</span>{/if}
       {#if n && !Number.isNaN(first)}
         <span class={["fl-age", late && "late"]}>{age(new Date(first).toISOString(), clock.now)}</span>
-      {/if}
-      {#if peek && !f.place.edge}
-        <span class="fl-peek" data-state={leaving ? "leaving" : "shown"}><Peek item={peek} /></span>
       {/if}
     {/if}
   {/if}

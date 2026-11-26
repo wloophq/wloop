@@ -129,6 +129,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `app` | ✅ | the name the app subscribes to the daemon's events as |
 | `apply` | ✅ | a plan action's handler |
 | `blocked` | ✅ | a plan decision the API serves |
+| `blur` | ✅ | a method of the floating widget's page bridge the host calls |
 | `capture` | ✅ | a command's action id |
 | `detached ` | ✅ | a native window's internal name prefix, never shown |
 | `detail` | ✅ | a command's action id |
@@ -138,6 +139,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `filter` | ✅ | a core action's id |
 | `guide` | ✅ | a plan action's handler |
 | `help` | ✅ | a core action's id |
+| `leave` | ✅ | a method of the floating widget's page bridge the host calls |
 | `main` | ✅ | a native window's internal name, never shown |
 | `makeKeyWindow` | ✅ | an AppKit selector |
 | `match` | ✅ | a command's action id |
@@ -148,6 +150,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `palette` | ✅ | a core action's id |
 | `panel` | ✅ | a native window's internal name, never shown |
 | `pending` | ✅ | a plan decision the API serves |
+| `place` | ✅ | a method of the floating widget's page bridge the host calls |
 | `plan` | ✅ | the plan tab's key |
 | `quit` | ✅ | a core action's id |
 | `retry` | ✅ | a draft verb's handler |
@@ -156,6 +159,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `running` | ✅ | an app state the status API takes |
 | `sequential` | ✅ | a project verb's handler |
 | `session` | ✅ | the delegate prompt's mode |
+| `show` | ✅ | a method of the floating widget's page bridge the host calls |
 | `sweep` | ✅ | a job the daemon triggers |
 | `true` | ✅ | a flag's value an action takes |
 | `tui` | ✅ | the terminal client's name as an events subscriber and a surface |
