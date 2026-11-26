@@ -55,14 +55,18 @@ func withLens(d coretasks.Deps, loaded func() *intentload.Loaded, facts func(con
 
 // lensFacts are the task subject's facts over db, as serve reads them for a view, under the profile loaded reads.
 func lensFacts(db *sqlite.DB, loaded func() *intentload.Loaded, now time.Time) func(context.Context, task.Task) (workflow.Facts, error) {
-	return countedLensFacts(db, loaded, now, &atomic.Int32{}, nil, nil)
+	return countedLensFacts(db, loaded, now, &atomic.Int32{}, nil, nil, nil)
 }
 
 // countedLensFacts are lensFacts counting into reads each time a task's facts are computed, reading the link
-// state of a unit from links, nil none, and the drafts the open messages pin from pinned, nil none.
+// state of a unit from links, nil none, the drafts the open messages pin from pinned, nil none, and the gates
+// through gs, nil the store's.
 func countedLensFacts(db *sqlite.DB, loaded func() *intentload.Loaded, now time.Time, reads *atomic.Int32,
-	links func(context.Context, unit.Unit) (facttask.Link, error), pinned func(context.Context) (map[int64]int64, error)) func(context.Context, task.Task) (workflow.Facts, error) {
-	p := facttask.New(facttask.Deps{Pinned: pinned, Tasks: db.Tasks(), Items: db.Items(), Drafts: db.Drafts(), Gates: db.Gates(func() time.Time { return now }), Wakes: db.Wakes(), Links: links,
+	links func(context.Context, unit.Unit) (facttask.Link, error), pinned func(context.Context) (map[int64]int64, error), gs facttask.Gates) func(context.Context, task.Task) (workflow.Facts, error) {
+	if gs == nil {
+		gs = db.Gates(func() time.Time { return now })
+	}
+	p := facttask.New(facttask.Deps{Pinned: pinned, Tasks: db.Tasks(), Items: db.Items(), Drafts: db.Drafts(), Gates: gs, Wakes: db.Wakes(), Links: links,
 		Clock: fixedClock(now), Me: func() task.Me { return meID }, OwedBy: catalog.OwedByOf(loaded),
 		Props:      func(t task.Task) workflow.Facts { return catalog.PropFacts(t, loaded().Tasks) },
 		Extraction: psource.NewSnapshots(db.Snapshots()).Unextracted,
