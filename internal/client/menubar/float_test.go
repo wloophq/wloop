@@ -869,3 +869,35 @@ func TestAQueueItemsKeyNamesItsDecisionNotItsWords(t *testing.T) {
 		t.Fatalf("two units of one task in one situation share the key %q", queueKey(stuck))
 	}
 }
+
+// A relaunch whose first queue read fails learns nothing: the saved queue
+// stays what the next read that answers compares with, so what the user saw
+// is no arrival.
+func TestAFailedFirstQueueReadInQuietChangesNothing(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDefaults{}
+		r, _ := floatRig(t, d)
+		r.d.events = make(chan api.Change)
+		r.d.queue = queueOf(1)
+		stop := run(t, r)
+		synctest.Wait()
+		r.c.FloatHide(HideQuiet)
+		synctest.Wait()
+		stop()
+
+		r2, h2 := floatRig(t, d)
+		r2.d.events = make(chan api.Change)
+		r2.d.queue = queueOf(1)
+		r2.d.queueErr = errors.New("the queue failed")
+		stop2 := run(t, r2)
+		defer stop2()
+		synctest.Wait()
+		r2.d.mu.Lock()
+		r2.d.queueErr = nil
+		r2.d.mu.Unlock()
+		r2.change(queueOf(1))
+		if shows, _ := h2.counts(); shows != 0 || r2.mode() != VisibilityQuiet {
+			t.Fatalf("shown %d, mode %q; want quiet: nothing arrived", shows, r2.mode())
+		}
+	})
+}

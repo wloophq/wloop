@@ -16,7 +16,8 @@ import (
 // pullTasks reads the catalog, each view the profile's badge names, whole, whose tasks notify, and the queue
 // of every decision kind, which the menu lists first. A task's attention also moves with its row's notice and
 // its proposed draft, which no task write marks, so a delta would miss it. The counters come with the first
-// view's page, or on their own when no view is badged.
+// view's page, or on their own when no view is badged. A queue that fails to read keeps the last one read, so
+// the menu and the banners do not hang on it.
 func (c *Controller) pullTasks(ctx context.Context) error {
 	cat, err := c.cfg.Daemon.Views(ctx)
 	if err != nil {
@@ -52,10 +53,15 @@ func (c *Controller) pullTasks(ctx context.Context) error {
 		c.counters = &counters
 	}
 	needs, err := c.cfg.Daemon.QueueAll(ctx, "")
-	if err != nil {
-		return err
+	c.queueRead = err == nil
+	switch {
+	case err == nil:
+		c.needs, c.queueErr = needs, ""
+	case err.Error() != c.queueErr:
+		c.queueErr = err.Error()
+		c.cfg.Log("reading the queue: %v", err)
 	}
-	c.taskViews, c.tasks, c.tasksLoading, c.needs = views, tasks, loading, needs
+	c.taskViews, c.tasks, c.tasksLoading = views, tasks, loading
 	c.mu.Lock()
 	c.cat = cat
 	c.mu.Unlock()

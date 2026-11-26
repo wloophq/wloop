@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
@@ -18,6 +19,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
+	dmessage "github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -98,7 +100,7 @@ func (s *Server) queueKeep(ctx context.Context, g *coretasks.Service, r *http.Re
 	return nil
 }
 
-// queueItems are its as a queue serves them.
+// queueItems are its as a queue serves them, but the items whose gate's subject cannot be read (servable).
 func (s *Server) queueItems(ctx context.Context, g *coretasks.Service, its []home.Item) ([]api.QueueItem, error) {
 	l := s.loaded()
 	tasks := make([]task.Task, len(its))
@@ -108,44 +110,162 @@ func (s *Server) queueItems(ctx context.Context, g *coretasks.Service, its []hom
 	vs := s.taskViews(ctx, g, false)
 	vs.readRows(ctx, tasks)
 	byUnit := map[unit.Unit][]items.Item{}
-	var pinned map[int64]int64
-	if svc := s.deps.Gates; svc != nil {
-		var err error
-		if pinned, err = svc.Pinned(ctx); err != nil {
-			return nil, err
-		}
+	pinned, err := s.queuePins(ctx)
+	if err != nil {
+		return nil, err
 	}
 	out := []api.QueueItem{}
 	for _, it := range its {
-		v, err := vs.view(ctx, it.Task)
+		r, err := s.readQueueItem(ctx, it, pinned)
+		if !s.servedOrDropped(it, err) {
+			continue
+		}
+		qi, err := s.queueItem(ctx, vs, l, it, r, byUnit)
 		if err != nil {
 			return nil, err
-		}
-		qi := api.QueueItem{Kind: string(it.Found.Kind), Word: it.Word, Tone: it.Tone, Since: it.Found.Since, Task: v, Primary: api.QueueAction{Kind: it.Primary.Kind, ID: it.Primary.ID, Label: primaryLabel(l, it)}}
-		if it.Primary.Kind == home.ActionRetry {
-			if qi.Primary, err = s.retryAction(ctx, *it.Found.Gate); err != nil {
-				return nil, err
-			}
-		}
-		if g := it.Found.Gate; g != nil {
-			gv := s.gateView(ctx, *g, byUnit)
-			qi.Gate = &gv
-			if qi.Options, err = s.questionOptions(ctx, *g, pinned, byUnit); err != nil {
-				return nil, err
-			}
-		} else {
-			qi.Situation = &api.QueueSituation{Provider: string(it.Found.Unit.Provider), Kind: it.Found.Situation, Label: it.Situation, Unit: it.Found.Unit.String()}
 		}
 		out = append(out, qi)
 	}
 	return out, nil
 }
 
-// questionOptions are the choices of question gate q when its message pins drafts (pinned, by draft, the message
-// that pins each), each with its draft's gate: an option's, or a confirm's yes and no. Nil when the message pins
-// none. The pinned drafts' own gates make no item, so a message that cannot be read is an error, not a question
-// without its drafts.
-func (s *Server) questionOptions(ctx context.Context, q gate.Gate, pinned map[int64]int64, byUnit map[unit.Unit][]items.Item) ([]api.QueueOption, error) {
+// queuePins are the drafts the open questions pin, by draft, with the message that pins each; nil without gates.
+func (s *Server) queuePins(ctx context.Context) (map[int64]int64, error) {
+	if svc := s.deps.Gates; svc != nil {
+		return svc.Pinned(ctx)
+	}
+	return nil, nil
+}
+
+// queueItem is it as the queue serves it, with r, what its gate names.
+func (s *Server) queueItem(ctx context.Context, vs *taskViewer, l *intentload.Loaded, it home.Item, r queueReads, byUnit map[unit.Unit][]items.Item) (api.QueueItem, error) {
+	v, err := vs.view(ctx, it.Task)
+	if err != nil {
+		return api.QueueItem{}, err
+	}
+	qi := api.QueueItem{Kind: string(it.Found.Kind), Word: it.Word, Tone: it.Tone, Since: it.Found.Since, Task: v, Primary: api.QueueAction{Kind: it.Primary.Kind, ID: it.Primary.ID, Label: primaryLabel(l, it)}}
+	if r.retry != nil {
+		qi.Primary = s.retryAction(*it.Found.Gate, *r.retry)
+	}
+	if g := it.Found.Gate; g != nil {
+		gv := s.gateView(ctx, *g, byUnit)
+		qi.Gate = &gv
+		if r.message != nil {
+			qi.Options = s.questionOptions(ctx, *r.message, r.drafts, byUnit)
+		}
+	} else {
+		qi.Situation = &api.QueueSituation{Provider: string(it.Found.Unit.Provider), Kind: it.Found.Situation, Label: it.Situation, Unit: it.Found.Unit.String()}
+	}
+	return qi, nil
+}
+
+// queueReads are what an item's gate names that its card shows: the message of a question that pins drafts with
+// the newest gate of each draft it pins, by draft, and the draft whose failed delivery it retries.
+type queueReads struct {
+	message *dmessage.Message
+	drafts  map[int64]gate.Gate
+	retry   *draft.Draft
+}
+
+// readQueueItem reads what it's gate names; an error says the item cannot be served.
+func (s *Server) readQueueItem(ctx context.Context, it home.Item, pinned map[int64]int64) (queueReads, error) {
+	var r queueReads
+	g := it.Found.Gate
+	if g == nil {
+		return r, nil
+	}
+	if it.Primary.Kind == home.ActionRetry {
+		d, err := s.retryDraft(ctx, *g)
+		if err != nil {
+			return r, err
+		}
+		r.retry = &d
+	}
+	m, err := s.pinningMessage(ctx, *g, pinned)
+	if err != nil || m == nil {
+		return r, err
+	}
+	r.message = m
+	r.drafts, err = s.pinnedDraftGates(ctx, *m, pinned)
+	return r, err
+}
+
+// pinnedDraftGates are the newest gates of the drafts message m pins (pinned, by draft, the message that pins
+// each), by draft.
+func (s *Server) pinnedDraftGates(ctx context.Context, m dmessage.Message, pinned map[int64]int64) (map[int64]gate.Gate, error) {
+	refs := []*record.DraftRef{m.Draft}
+	for _, o := range m.Options {
+		refs = append(refs, o.Draft)
+	}
+	out := map[int64]gate.Gate{}
+	for _, ref := range refs {
+		if ref == nil || pinned[ref.ID] != m.ID {
+			continue
+		}
+		gs, err := s.deps.GateReader.Where(ctx, gates.Query{Kind: gate.KindDraft, Subjects: []string{strconv.FormatInt(ref.ID, 10)}})
+		if err != nil {
+			return nil, fmt.Errorf("the gate of draft %d, which message %d pins: %w", ref.ID, m.ID, err)
+		}
+		if len(gs) > 0 {
+			out[ref.ID] = gs[len(gs)-1]
+		}
+	}
+	return out, nil
+}
+
+// servable are its but the items queueItems drops, so a count of the queue counts what it serves.
+func (s *Server) servable(ctx context.Context, its []home.Item) ([]home.Item, error) {
+	pinned, err := s.queuePins(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := its[:0:0]
+	for _, it := range its {
+		if _, err := s.readQueueItem(ctx, it, pinned); s.servedOrDropped(it, err) {
+			out = append(out, it)
+		}
+	}
+	return out, nil
+}
+
+// servedOrDropped says whether it is served, err nil; else it logs why it is dropped, once while the reason
+// stays the same.
+func (s *Server) servedOrDropped(it home.Item, err error) bool {
+	key := "task " + string(it.Task.ID) + " " + string(it.Found.Kind)
+	if g := it.Found.Gate; g != nil {
+		key = "gate " + strconv.FormatInt(g.ID, 10)
+	}
+	if err == nil {
+		s.queueDrops.Delete(key)
+		return true
+	}
+	now := time.Now()
+	if was, ok := s.queueDrops.Swap(key, queueDrop{err.Error(), now}); !ok || was.(queueDrop).why != err.Error() {
+		s.logf("queue: dropping the item of %s on task %s: %v", key, it.Task.ID, err)
+	}
+	s.queueDrops.Range(func(k, v any) bool {
+		if now.Sub(v.(queueDrop).at) >= queueDropKept {
+			s.queueDrops.Delete(k)
+		}
+		return true
+	})
+	return false
+}
+
+// queueDrop is why an item was last dropped, and when.
+type queueDrop struct {
+	why string
+	at  time.Time
+}
+
+// queueDropKept is how long a dropped item's reason is kept unlogged; one dropped again after it is logged again,
+// so items that left the queue while dropped are let go.
+const queueDropKept = time.Hour
+
+// pinningMessage is the message of question gate q when it pins drafts (pinned, by draft, the message that pins
+// each); nil when it pins none. The pinned drafts' own gates make no item, so a message that cannot be read is an
+// error, not a question without its drafts.
+func (s *Server) pinningMessage(ctx context.Context, q gate.Gate, pinned map[int64]int64) (*dmessage.Message, error) {
 	id, err := strconv.ParseInt(q.Subject, 10, 64)
 	if q.Kind != gate.KindQuestion || err != nil || !pinsAny(pinned, id) {
 		return nil, nil
@@ -160,39 +280,37 @@ func (s *Server) questionOptions(ctx context.Context, q gate.Gate, pinned map[in
 	case !ok:
 		return nil, fmt.Errorf("the message of question gate %d, which pins drafts, is gone", q.ID)
 	}
-	draftGate := func(ref *record.DraftRef) (*api.GateView, error) {
-		if ref == nil || pinned[ref.ID] != m.ID {
-			return nil, nil
+	return &m, nil
+}
+
+// questionOptions are the choices of message m, each with the gate of the draft picking it approves (drafts, by
+// draft, the newest gate of each draft m pins): an option's, or a confirm's yes and no.
+func (s *Server) questionOptions(ctx context.Context, m dmessage.Message, drafts map[int64]gate.Gate, byUnit map[unit.Unit][]items.Item) []api.QueueOption {
+	draftGate := func(ref *record.DraftRef) *api.GateView {
+		if ref == nil {
+			return nil
 		}
-		gs, err := s.deps.GateReader.Where(ctx, gates.Query{Kind: gate.KindDraft, Subjects: []string{strconv.FormatInt(ref.ID, 10)}})
-		if err != nil || len(gs) == 0 {
-			return nil, err
+		g, ok := drafts[ref.ID]
+		if !ok {
+			return nil
 		}
-		v := s.gateView(ctx, gs[len(gs)-1], byUnit)
-		return &v, nil
+		v := s.gateView(ctx, g, byUnit)
+		return &v
 	}
 	var out []api.QueueOption
 	if m.Confirm {
-		yes, err := draftGate(m.Draft)
-		if err != nil {
-			return nil, err
-		}
 		out = []api.QueueOption{
-			{ID: "yes", Label: s.notice(builtin.NoticeNotifyYes, nil), Recommended: m.Recommend == "yes", Draft: yes},
+			{ID: "yes", Label: s.notice(builtin.NoticeNotifyYes, nil), Recommended: m.Recommend == "yes", Draft: draftGate(m.Draft)},
 			{ID: "no", Label: s.notice(builtin.NoticeNotifyNo, nil), Recommended: m.Recommend == "no"},
 		}
 	}
 	for _, o := range m.Options {
-		d, err := draftGate(o.Draft)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, api.QueueOption{ID: o.ID, Label: o.Label, Recommended: o.ID == m.Recommend, Draft: d})
+		out = append(out, api.QueueOption{ID: o.ID, Label: o.Label, Recommended: o.ID == m.Recommend, Draft: draftGate(o.Draft)})
 	}
 	for i := range out {
 		out[i].Primary = s.word(api.QueueOptionPrimary, map[string]any{"option": optionWord(out[i])})
 	}
-	return out, nil
+	return out
 }
 
 // optionWord is what o's button names: its draft's verdict, else its label.
@@ -206,22 +324,27 @@ func optionWord(o api.QueueOption) string {
 	return o.Label
 }
 
-// retryAction retries the delivery of the draft of approved draft gate g: the verb whose handler retries, on the
-// draft's own task, at the draft's rev, worded as the profile words that verb.
-func (s *Server) retryAction(ctx context.Context, g gate.Gate) (api.QueueAction, error) {
+// retryDraft is the draft of approved draft gate g, whose delivery failed.
+func (s *Server) retryDraft(ctx context.Context, g gate.Gate) (draft.Draft, error) {
 	if s.deps.Outbox == nil {
-		return api.QueueAction{}, fmt.Errorf("draft gate %d failed to deliver, and the daemon serves no Outbox", g.ID)
+		return draft.Draft{}, fmt.Errorf("draft gate %d failed to deliver, and the daemon serves no Outbox", g.ID)
 	}
 	id, err := strconv.ParseInt(g.Subject, 10, 64)
 	if err != nil {
-		return api.QueueAction{}, fmt.Errorf("draft gate %d names no draft: %w", g.ID, err)
+		return draft.Draft{}, fmt.Errorf("draft gate %d names no draft: %w", g.ID, err)
 	}
 	d, err := s.deps.Outbox.Store.Get(ctx, draft.ID(id))
 	if err != nil {
-		return api.QueueAction{}, fmt.Errorf("the draft of gate %d: %w", g.ID, err)
+		return draft.Draft{}, fmt.Errorf("the draft of gate %d: %w", g.ID, err)
 	}
+	return d, nil
+}
+
+// retryAction retries the delivery of draft d of approved draft gate g: the verb whose handler retries, on the
+// draft's own task, at the draft's rev, worded as the profile words that verb.
+func (s *Server) retryAction(g gate.Gate, d draft.Draft) api.QueueAction {
 	verb, label := s.handlerVerb(handlerRetry)
-	return api.QueueAction{Kind: queueVerb, ID: string(verb), Task: draftPrefix + g.Subject, Args: map[string]string{"rev": strconv.FormatInt(d.Rev, 10)}, Label: label}, nil
+	return api.QueueAction{Kind: queueVerb, ID: string(verb), Task: draftPrefix + g.Subject, Args: map[string]string{"rev": strconv.FormatInt(d.Rev, 10)}, Label: label}
 }
 
 // queueVerb is the kind of a QueueAction that runs a task verb.

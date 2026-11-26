@@ -24,6 +24,7 @@ import (
 	"github.com/wloophq/wloop/internal/client/menubar"
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/messages"
+	"github.com/wloophq/wloop/internal/core/outbox"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/decision"
 	"github.com/wloophq/wloop/internal/domain/draft"
@@ -305,16 +306,31 @@ func (failingMessages) Message(context.Context, int64) (dmessage.Message, bool, 
 	return dmessage.Message{}, false, errors.New("the store is locked")
 }
 
-func TestQueueAllFailsWhenAPinningQuestionCannotBeRead(t *testing.T) {
+// A question whose pinning message cannot be read leaves the queue, logged once, and every other item, and the
+// queue view's count, are served as if it were not there.
+func TestQueueAllDropsAPinningQuestionItCannotRead(t *testing.T) {
 	t.Parallel()
 	q := newQueueRig(t, nil)
-	q.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "answer the vendor"})
-	q.pinnedQuestion(t, "t-0000000000000001")
+	log := &lineLog{}
+	q.s.deps.Log = log.logf
+	q.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "answer the vendor"},
+		task.Task{ID: "t-0000000000000002", State: "next", Category: task.CategoryReady, Title: "call Ada"})
+	question, _, _ := q.pinnedQuestion(t, "t-0000000000000001")
+	other := q.open(t, "t-0000000000000002", gate.KindQuestion, "8", time.Hour)
 	q.s.deps.Messages = &messages.Service{Store: failingMessages{}, Books: noBooks{}}
-	rec := httptest.NewRecorder()
-	q.s.Handler().ServeHTTP(rec, apiRequest("GET", api.QueueAllPath, nil))
-	if rec.Code != 500 || !strings.Contains(rec.Body.String(), "locked") {
-		t.Fatalf("%d %s, want the read's failure, not a question without its drafts", rec.Code, rec.Body)
+	for range 2 {
+		got := q.all(t)
+		if got.Total != 1 || len(got.Items) != 1 || got.Items[0].Gate == nil || got.Items[0].Gate.ID != other.ID {
+			t.Fatalf("items %+v, want only the question that reads", got.Items)
+		}
+	}
+	var c api.Counters
+	get(t, q.s, api.CountersPath, &c)
+	if view := q.s.loaded().Views.QueueView(); c.Views[view] != 1 {
+		t.Fatalf("the queue view counts %d, want the 1 item its queue serves", c.Views[view])
+	}
+	if n := log.count(fmt.Sprintf("gate %d", question.ID)); n != 1 {
+		t.Fatalf("logged the dropped question %d times, want once: %q", n, log.lines)
 	}
 }
 
@@ -435,6 +451,66 @@ func TestFailedDeliveryIsAQueueItem(t *testing.T) {
 	}
 	if rec := post(t, r.s, api.TaskPath("draft:"+strconv.FormatInt(int64(d.ID), 10), "retry"), `{"args":{"rev":"`+strconv.FormatInt(d.Rev, 10)+`"},"source":"cockpit"}`); rec.Code != 200 {
 		t.Fatalf("the primary's request answered %d %s", rec.Code, rec.Body)
+	}
+}
+
+// failingDraftGates fail every read of a draft's gates by subject.
+type failingDraftGates struct{ gates.Reader }
+
+func (f failingDraftGates) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {
+	if q.Kind == gate.KindDraft && len(q.Subjects) > 0 && len(q.Statuses) == 0 {
+		return nil, errors.New("the store is locked")
+	}
+	return f.Reader.Where(ctx, q)
+}
+
+// A question whose pinned drafts' gates cannot be read leaves the queue, and
+// its count, alike.
+func TestAQuestionWhosePinnedDraftsCannotBeReadLeavesTheQueueAndItsCount(t *testing.T) {
+	t.Parallel()
+	q := newQueueRig(t, nil)
+	q.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "answer the vendor"},
+		task.Task{ID: "t-0000000000000002", State: "next", Category: task.CategoryReady, Title: "call Ada"})
+	q.pinnedQuestion(t, "t-0000000000000001")
+	q.open(t, "t-0000000000000002", gate.KindQuestion, "8", time.Hour)
+	q.s.deps.GateReader = failingDraftGates{q.s.deps.GateReader}
+	got := q.all(t)
+	var c api.Counters
+	get(t, q.s, api.CountersPath, &c)
+	if view := q.s.loaded().Views.QueueView(); got.Total != 1 || c.Views[view] != 1 {
+		t.Fatalf("queue %d items, counted %d; want the 1 question that reads, both", got.Total, c.Views[view])
+	}
+}
+
+// unreadableDraft fails every read of draft id.
+type unreadableDraft struct {
+	outbox.Store
+	id draft.ID
+}
+
+func (u unreadableDraft) Get(ctx context.Context, id draft.ID) (draft.Draft, error) {
+	if id == u.id {
+		return draft.Draft{}, errors.New("the store is locked")
+	}
+	return u.Store.Get(ctx, id)
+}
+
+// A failed delivery whose draft cannot be read leaves the queue, and the queue still serves.
+func TestQueueAllDropsAFailedDeliveryWhoseDraftCannotBeRead(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	r.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "thank the reviewer"})
+	d, _ := r.failedOn(t, "t-0000000000000001", "Thanks for the review.")
+	if _, err := r.s.deps.Gates.Open(context.Background(), gate.Gate{Unit: task.UnitOf("t-0000000000000001"), Kind: gate.KindQuestion, Subject: "8"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	r.o.Store = unreadableDraft{r.o.Store, d.ID}
+	var q api.Queue
+	if code := get(t, r.s, api.QueueAllPath, &q); code != 200 {
+		t.Fatalf("GET %s: %d, want the queue without the unreadable item", api.QueueAllPath, code)
+	}
+	if q.Total != 1 || len(q.Items) != 1 || q.Items[0].Kind != "answer" {
+		t.Fatalf("items %+v, want the question alone", q.Items)
 	}
 }
 
