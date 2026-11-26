@@ -821,6 +821,43 @@ func TestAPeekThePageOpenedIntoThePanelClosesOnAToggle(t *testing.T) {
 	})
 }
 
+// A peek's size that lands after the full panel was asked is late: the
+// window stays hidden and unkeyable until the page draws the full panel, and
+// a click on the tab still closes it.
+func TestALatePeekSizeNeverTurnsAnAskedPanelBackIntoAPeek(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := dockedRig(t)
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatPeek, Item: "gate:7"})
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatClose}))
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatOpenPanel})
+		r.host.taken()
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatSize, W: 356, H: 60, Mode: ModePeek}))
+		want(t, r.host.taken())
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatSize, W: 476, H: 600, Mode: ModePanel}))
+		want(t, r.host.taken(), "fpanel-show {1002 260.75 476 600} panel")
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatOpenPanel, Toggle: true})
+		want(t, r.host.taken(), "fpanel-hide", `fpanel-tell "" "" "" 0x0`)
+	})
+}
+
+// A full panel's size from before a close that lands after a new peek was
+// asked is late too: only a page that drew the peek turns it into the panel.
+func TestALatePanelSizeNeverShowsAPeekAsThePanel(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := dockedRig(t)
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatOpenPanel})
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatClose}))
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatSize, W: 476, H: 600, Mode: ModePanel}))
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatOpenPanel, Toggle: true})
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatPeek, Item: "gate:7"})
+		r.host.taken()
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatSize, W: 476, H: 600, Mode: ModePanel}))
+		want(t, r.host.taken())
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatSize, W: 356, H: 60, Mode: ModePeek}))
+		want(t, r.host.taken(), "fpanel-show {1122 260.75 356 60} peek")
+	})
+}
+
 // The window shows only at a size the page sent for what it was asked to
 // show: a size from an earlier open never shows it, even as the tab moves.
 func TestThePanelNeverShowsAtTheSizeOfAnEarlierOpen(t *testing.T) {

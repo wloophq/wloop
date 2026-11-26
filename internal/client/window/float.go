@@ -645,7 +645,11 @@ func (c *Controller) placePanel() {
 }
 
 // panelMessage follows the panel's page: its first message says it loaded,
-// a size shows the window it asked for beside the tab, and a close hides it.
+// a size shows the window beside the tab in the mode the page draws, and a
+// close hides it. The page may turn a peek it drew into the full panel on its
+// own, never the full panel into a peek, so a peek's size while the full
+// panel was asked, and the full panel's before the page drew the peek asked,
+// are late ones, which show nothing.
 func (c *Controller) panelMessage(m FloatMessage) {
 	c.mu.Lock()
 	loaded := !c.panel.ready
@@ -653,7 +657,7 @@ func (c *Controller) panelMessage(m FloatMessage) {
 	switch m.Kind {
 	case FloatSize:
 		defer c.mu.Unlock()
-		if c.panel.want == "" || !c.floatShown || m.Mode != ModePeek && m.Mode != ModePanel {
+		if c.panel.want == "" || !c.floatShown || m.Mode != ModePeek && m.Mode != ModePanel || c.panel.want == ModePanel && m.Mode == ModePeek || c.panel.want == ModePeek && m.Mode == ModePanel && c.panel.w == 0 {
 			return
 		}
 		c.panel.want, c.panel.w, c.panel.h = m.Mode, m.W, m.H
