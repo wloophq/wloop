@@ -264,10 +264,25 @@ func (h *host) start() {
 	h.running.Go(h.work)
 }
 
-// stop ends the worker and every release poll, and waits for them.
+// quitGrace is how long quitting waits for the worker: work that waits on the
+// main thread, whose loop app.Run has ended, never returns.
+const quitGrace = 2 * time.Second
+
+// stop ends the worker and every release poll, and waits for them, at most
+// quitGrace.
 func (h *host) stop() {
 	close(h.done)
-	h.running.Wait()
+	stopped := make(chan struct{})
+	go func() {
+		h.running.Wait()
+		close(stopped)
+	}()
+	t := time.NewTimer(quitGrace)
+	defer t.Stop()
+	select {
+	case <-stopped:
+	case <-t.C:
+	}
 }
 
 // launched restores the main window's frame and readies the float's tab for
