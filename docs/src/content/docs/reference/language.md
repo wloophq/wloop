@@ -360,8 +360,14 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `views.<name>.opens.view` (string): The view it opens, such as needs-you.
 - `views.<name>.opens.kind` (string): The decision kind of decisions.toml that narrows the view it opens, such as send-draft; none shows it whole.
 - `views.<name>.rail` (bool, default `true`): The rail lists the view; false keeps it for the home, a queue or search.
+- `views.<name>.section` (string, localized): The rail section the view sits in, by the title the rail heads it with, such as "What's on you"; the sections follow in the order the views first name them, after Home and the views with none, which sit untitled at the top, and before each plugin's section.
+- `views.<name>.counted` (bool, default `true`): The rail draws the view's number; false draws none, and the daemon counts the view only when the badge or a review step names it.
 - `views.<name>.remove_clean` (bool, default `false`): The view offers to remove at once the workspaces its tasks' links hold whose checkouts hold nothing that is not published, as each link's remove action does; the rest are kept, with why.
 - `views.<name>.layout` (one of `list`, `board`, `outbox`, `queue`, default `list`): How the cockpit draws the view: list, its rows; board, a lane per group, which a person may switch back to the list; outbox, the Outbox's drafts, which the lens filters, groups and sorts over the `draft_facets` and the view's own `group` and `sort` (draft facts), read from the Outbox's own route whatever the view lists; queue, what waits on you one decision at a time, the queue of every decision kind in decisions.toml's order, read from its own route whatever the view lists, which the home's section and counter of the view and the menu bar open; with no `when` of its own, such a view lists the tasks of the views decisions.toml's kinds name.
+- `rail` (table): The rail's built-in entries, which no view declares, by their route: plan and recent.
+- `rail.<name>` (table): A built-in entry of the rail: plan, the workflows' plan, or recent, the newest events.
+- `rail.<name>.section` (string, localized): The rail section the entry sits in, as a view's section names it; it comes after the section's views. None keeps it in the untitled top block.
+- `rail.<name>.counted` (bool, default `true`): The rail draws the entry's number, such as the plan's steps; false draws none.
 - `badge` (table): The views whose tasks the menu bar notifies, the daily digest counts and `status` prints; the menu bar's title counts Needs you, the queue of every decision kind, instead.
 - `badge.views` (list of strings): Those views, each a view of views: the tasks of the ones on the rail post the menu bar's banners, the digest counts what moved in them and `status` prints their tasks.
 - `review` (table): The review's steps, in the order the review walks them.

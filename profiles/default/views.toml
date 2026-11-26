@@ -381,6 +381,7 @@ key           = "g q"
 sort          = "task.decision_since"
 layout        = "queue"
 hide_disabled = true
+section       = "What's on you"
 
 [views.next]
 label         = "Next actions"
@@ -390,6 +391,7 @@ key           = "g x"
 when          = "task.owed_by == 'me' && task.category in ['ready', 'active', 'waiting'] && task.gates_open == 0"
 sort          = "-task.sequential_next"
 hide_disabled = true
+section       = "What's on you"
 
 [views.inbox]
 label         = "Inbox"
@@ -398,6 +400,7 @@ empty         = "Inbox zero: everything is clarified."
 key           = "g i"
 when          = "task.category == 'inbox'"
 hide_disabled = true
+section       = "What's on you"
 
 [views.focus]
 label         = "Focus"
@@ -406,6 +409,7 @@ empty         = "Nothing in focus: mark a task to focus on it."
 key           = "g f"
 when          = "task.prop.focus == 'on' && !(task.category in ['done', 'dropped'])"
 hide_disabled = true
+section       = "What's on you"
 
 [views.fits-now]
 label         = "Fits now"
@@ -415,6 +419,7 @@ key           = "g n"
 when          = "task.owed_by == 'me' && task.category in ['ready', 'active'] && task.prop.size > duration('0s') && task.prop.size <= duration('30m')"
 sort          = "task.prop.size"
 hide_disabled = true
+section       = "What's on you"
 
 [views.waiting]
 label         = "Waiting"
@@ -423,6 +428,7 @@ empty         = "Nobody owes you anything."
 key           = "g w"
 when          = "task.category in ['ready', 'active', 'waiting'] && task.owed_by != 'me' && (task.owed_by != '' || task.turns_running == 0)"
 group         = "task.owed_by"
+section       = "With other people"
 
 [views.chase]
 label         = "Chase"
@@ -432,6 +438,7 @@ key           = "g c"
 when          = "task.category in ['ready', 'active', 'waiting'] && task.owed_by != 'me' && task.owed_by != '' && !('stalled' in task.link_signals) && task.check_on > timestamp(0) && task.check_on < now && now - task.since_movement < task.check_on"
 group         = "task.owed_by"
 hide_disabled = true
+section       = "With other people"
 
 [views.stalled]
 label         = "Stalled"
@@ -440,6 +447,7 @@ empty         = "Nothing is stalled."
 key           = "g t"
 when          = "task.link_signal.stalled || (!('stalled' in task.link_signals) && task.owed_by != 'me' && task.check_on > timestamp(0) && task.check_on < now && now - task.since_movement < task.check_on)"
 hide_disabled = true
+section       = "With other people"
 
 [views.in-loop]
 label         = "In the loop"
@@ -448,6 +456,7 @@ empty         = "No agent is working on anything."
 key           = "g u"
 when          = "task.link_signal.in_loop || task.turns_running > 0"
 hide_disabled = true
+section       = "With the loop"
 
 [views.approved]
 label         = "Approved"
@@ -456,6 +465,7 @@ key           = "g a"
 when          = "task.link_signal.ready"
 hide_disabled = true
 remove_clean  = true
+section       = "With the loop"
 
 [views.projects]
 label         = "Projects"
@@ -464,6 +474,7 @@ empty         = "No open projects."
 key           = "g p"
 when          = "task.prop.kind == 'project' && !(task.category in ['done', 'dropped'])"
 hide_disabled = true
+section       = "Later"
 
 [views.review-projects]
 label         = "Projects to review"
@@ -471,6 +482,7 @@ summary       = "Projects past their review, or with no next action of yours and
 empty         = "Every project has a next action and is reviewed."
 when          = "task.prop.kind == 'project' && !(task.category in ['done', 'dropped']) && (task.review_due || (!task.children_mine && task.state != 'someday'))"
 hide_disabled = true
+section       = "Later"
 
 
 [views.snoozed]
@@ -480,12 +492,14 @@ empty         = "Nothing is snoozed."
 key           = "g z"
 when          = "task.wake_until > timestamp(0) || task.wake_when != '' || task.state == 'scheduled'"
 hide_disabled = true
+section       = "Later"
 
 [views.someday]
 label         = "Someday"
 summary       = "Tasks you might do some day, out of the way until then."
 when          = "task.state == 'someday'"
 hide_disabled = true
+section       = "Later"
 
 [views.done]
 label         = "Done"
@@ -495,6 +509,8 @@ key           = "g d"
 when          = "task.category == 'done' && task.link_signal.workspace"
 hide_disabled = true
 remove_clean  = true
+section       = "Archive"
+counted       = false
 
 [views.logbook]
 label         = "Logbook"
@@ -502,6 +518,8 @@ summary       = "What you finished, the latest first."
 empty         = "Nothing finished yet."
 when          = "task.category == 'done'"
 sort          = "task.since_movement"
+section       = "Archive"
+counted       = false
 
 [views.outbox]
 label         = "Outbox"
@@ -515,12 +533,16 @@ layout        = "outbox"
 opens         = { view = "needs-you", kind = "send-draft" }
 group         = "draft.proposer"
 sort          = "draft.created_at"
+section       = "Archive"
+counted       = false
 
 # The review lists nothing itself: the clients walk its steps.
 [views.review]
 label         = "Review"
 summary       = "The weekly review: walk each step until the lists are clean."
 key           = "g r"
+section       = "Archive"
+counted       = false
 
 # The home's section and each decision kind's view, which Needs you
 # walks one kind after another. The rail leaves them out;
@@ -588,6 +610,15 @@ when          = "'act' in task.decisions"
 sort          = "task.decision_since"
 rail          = false
 hide_disabled = true
+
+# The rail's own entries, which no view declares.
+[rail.plan]
+section = "Archive"
+counted = false
+
+[rail.recent]
+section = "Archive"
+counted = false
 
 [review.inbox]
 label = "Inbox to zero"

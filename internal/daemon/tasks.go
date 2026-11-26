@@ -169,6 +169,12 @@ func (s *Server) buildViewsCatalog(l *intentload.Loaded) api.ViewsCatalog {
 			To: t.To})
 	}
 	cat.Facets, cat.DefaultSort, cat.Lens = catalog.TaskFacets(l.Views.Facets, l.Tasks, cat.Contexts), l.Views.DefaultSort, catalog.LensWords(l.Views.Lens)
+	for id, e := range l.Views.Rail {
+		if cat.Rail == nil {
+			cat.Rail = map[string]api.RailEntrySpec{}
+		}
+		cat.Rail[id] = api.RailEntrySpec{Section: e.Section, Uncounted: !e.Counted}
+	}
 	cat.DetailVerbs, cat.Effects = nonNil(slices.Clone(l.Tasks.DetailVerbs)), maps.Clone(l.Gates.Effects)
 	if cat.Effects == nil {
 		cat.Effects = map[string]string{}
@@ -186,7 +192,7 @@ func (s *Server) servedViews() []api.TaskViewSpec {
 	out := []api.TaskViewSpec{}
 	for _, v := range def.Views {
 		out = append(out, api.TaskViewSpec{ID: v.ID, Label: v.Label, Summary: v.Summary, Empty: v.Empty, When: v.WhenText, Sort: v.SortText, Over: v.Over, Group: v.Group, Key: v.Key, Badge: def.Badged(v.ID), HideDisabled: v.HideDisabled,
-			RemoveClean: v.RemoveClean, Rail: v.Rail, Layout: v.Layout, Opens: opens(v)})
+			RemoveClean: v.RemoveClean, Rail: v.Rail, Layout: v.Layout, Opens: opens(v), Section: v.Section, Uncounted: !v.Counted})
 	}
 	return out
 }

@@ -34,3 +34,34 @@ func TestATaskWithAnOpenGateIsInNeedsYouAndOneWithoutIsANextAction(t *testing.T)
 		t.Errorf("digest counts %v, want the badge's Next actions and Needs you to count one each", d.Counts.Views)
 	}
 }
+
+// The catalog serves each view's rail section and whether it is counted, and the sections of the rail's own
+// entries; the counters leave out a view that is not counted.
+func TestTheCatalogServesTheRailSectionsAndTheCountersSkipUncountedViews(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	r.put(t, task.Task{ID: "t-done", State: "done", Category: task.CategoryDone})
+	var cat api.ViewsCatalog
+	get(t, r.s, api.ViewsPath, &cat)
+	byID := map[string]api.TaskViewSpec{}
+	for _, v := range cat.Views {
+		byID[v.ID] = v
+	}
+	if v := byID["next"]; v.Section != "What's on you" || v.Uncounted {
+		t.Errorf("next %+v, want in What's on you, counted", v)
+	}
+	if v := byID["logbook"]; v.Section != "Archive" || !v.Uncounted {
+		t.Errorf("logbook %+v, want in the archive, uncounted", v)
+	}
+	if cat.Rail["plan"] != (api.RailEntrySpec{Section: "Archive", Uncounted: true}) || cat.Rail["recent"] != (api.RailEntrySpec{Section: "Archive", Uncounted: true}) {
+		t.Errorf("rail %+v, want plan and recent in the archive, uncounted", cat.Rail)
+	}
+	var c api.Counters
+	get(t, r.s, api.CountersPath, &c)
+	if _, ok := c.Views["logbook"]; ok {
+		t.Errorf("counters %v count the uncounted logbook", c.Views)
+	}
+	if _, ok := c.Views["next"]; !ok {
+		t.Errorf("counters %v leave out next", c.Views)
+	}
+}

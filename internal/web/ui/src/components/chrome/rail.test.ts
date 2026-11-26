@@ -91,6 +91,15 @@ describe("the rail", () => {
     expect(links().slice(-3)).toEqual(["Needs me", "All", "Conversations"]);
   });
 
+  test("heads each core section and keeps its links in rail order, the section's own entries after its views", () => {
+    tasksState.catalog = railCat((vs) => vs.forEach((v) => (v.section = ({ inbox: "On you", focus: "On you", logbook: "Archive" } as Record<string, string>)[v.id] || "")));
+    tasksState.catalog.rail = { plan: { section: "Archive" }, recent: { section: "Archive" } };
+    tasksState.counters = { views: Object.fromEntries(coreViewIDs.map((id) => [id, 1])) };
+    const { links, container } = show("inbox");
+    expect([...container.querySelectorAll("#views .rail-head")].map((x) => x.textContent)).toEqual(["On you", "Archive"]);
+    expect(links()).toEqual(["Home", "Outbox", "Fits now", "Waiting", "Projects", "Someday", "Focus", "Inbox", "Logbook", "Plan", "Recent"]);
+  });
+
   test("counts again in place: a new counter rewords the link it had", () => {
     tasksState.catalog = railCat();
     tasksState.counters = { views: { inbox: 3 } };
@@ -190,5 +199,32 @@ describe("the rail's entries", () => {
     expect(railCount(recent, lensOf(readHash()))).toBe("");
     expect(railSections(all, (p) => p).find((s) => s.views.some((v) => v.id === "recent"))!.title).toBe("");
     expect(catalog.views.some((v) => v.id === "recent")).toBe(false);
+  });
+
+  test("split the core views by section, in the order the views first name them, the untitled block first and the plugins after", () => {
+    const cat = railCat((vs) => vs.forEach((v) => (v.section = ({ inbox: "On you", focus: "On you", waiting: "Others", someday: "Archive", logbook: "Archive" } as Record<string, string>)[v.id] || "")));
+    cat.rail = { plan: { section: "Archive", uncounted: true }, recent: { section: "Archive", uncounted: true } };
+    const servedViews = [{ id: "pulls", label: "Pulls", provider: "github" }];
+    const secs = railSections(viewNav(cat, servedViews, [], null), (p) => p).map((s) => ({ title: s.title, views: s.views.map((v) => v.id) }));
+    expect(secs).toEqual([
+      { title: "", views: ["outbox", "fits-now", "projects"] },
+      { title: "On you", views: ["focus", "inbox"] },
+      { title: "Others", views: ["waiting"] },
+      { title: "Archive", views: ["someday", "logbook", "plan", "recent"] },
+      { title: "github", views: ["pulls"] },
+    ]);
+  });
+
+  test("draw no number for a view or an entry the profile does not count", () => {
+    const cat = railCat((vs) => vs.forEach((v) => (v.uncounted = v.id === "logbook")));
+    cat.rail = { plan: { uncounted: true } };
+    state.plan.items = [{ decision: "pending" }];
+    state.plan.loaded = true;
+    tasksState.catalog = cat;
+    const all = viewNav(cat, [], [], { views: { inbox: 4, logbook: 9 } });
+    const count = (id: string) => railCount(all.find((v) => v.id === id)!, lensOf(readHash()));
+    expect(count("inbox")).toBe(4);
+    expect(count("logbook")).toBe("");
+    expect(count("plan")).toBe("");
   });
 });

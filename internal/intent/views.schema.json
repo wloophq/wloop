@@ -712,6 +712,26 @@
       ],
       "type": "object"
     },
+    "rail": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "A built-in entry of the rail: plan, the workflows' plan, or recent, the newest events.",
+        "properties": {
+          "counted": {
+            "default": true,
+            "description": "The rail draws the entry's number, such as the plan's steps; false draws none.",
+            "type": "boolean"
+          },
+          "section": {
+            "description": "The rail section the entry sits in, as a view's section names it; it comes after the section's views. None keeps it in the untitled top block.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "description": "The rail's built-in entries, which no view declares, by their route: plan and recent.",
+      "type": "object"
+    },
     "review": {
       "additionalProperties": {
         "additionalProperties": false,
@@ -732,6 +752,11 @@
         "additionalProperties": false,
         "description": "A view, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.",
         "properties": {
+          "counted": {
+            "default": true,
+            "description": "The rail draws the view's number; false draws none, and the daemon counts the view only when the badge or a review step names it.",
+            "type": "boolean"
+          },
           "empty": {
             "description": "What the view shows when it lists nothing; the top-level empty when absent. A filter that matches nothing says so in its own words.",
             "type": "string"
@@ -797,6 +822,10 @@
             "default": false,
             "description": "The view offers to remove at once the workspaces its tasks' links hold whose checkouts hold nothing that is not published, as each link's remove action does; the rest are kept, with why.",
             "type": "boolean"
+          },
+          "section": {
+            "description": "The rail section the view sits in, by the title the rail heads it with, such as \"What's on you\"; the sections follow in the order the views first name them, after Home and the views with none, which sit untitled at the top, and before each plugin's section.",
+            "type": "string"
           },
           "sort": {
             "description": "The facts the view sorts by, comma-separated; a leading - sorts one descending. A view's tasks start oldest first, a parent's children in their sibling order.",

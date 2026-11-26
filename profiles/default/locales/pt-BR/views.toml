@@ -226,88 +226,106 @@ label = "Escrito"
 label = "Precisa de você"
 summary = "O que espera por você, uma decisão de cada vez: perguntas primeiro, depois rascunhos a enviar, planos, passos e o resto."
 empty = "Nada precisa de você."
+section = "Com você"
 
 [views.inbox]
 label = "Inbox"
 summary = "O que ninguém esclareceu ainda; depois de esclarecida, a tarefa sai de vez."
 empty = "Inbox zerada: tudo está esclarecido."
+section = "Com você"
 
 [views.next]
 label = "Próximas ações"
 summary = "Suas tarefas cujo próximo passo é seu, sem nada esperando uma decisão."
 empty = "Nenhuma próxima ação sua."
+section = "Com você"
 
 [views.waiting]
 label = "Aguardando"
 summary = "Tarefas cujo próximo passo é de outra pessoa, agrupadas por quem deve."
 empty = "Ninguém deve nada a você."
+section = "Com outras pessoas"
 
 [views.chase]
 label = "Cobrar"
 summary = "Tarefas que outra pessoa deve e cuja data de checagem passou sem nada andar: hora de cutucar."
 empty = "Nada a cobrar: ninguém está atrasado."
+section = "Com outras pessoas"
 
 [views.fits-now]
 label = "Cabe agora"
 summary = "Seus próximos passos que levam meia hora ou menos."
 empty = "Nada seu cabe em meia hora."
+section = "Com você"
 
 [views.stalled]
 label = "Paradas"
 summary = "Tarefas esperando demais: uma origem diz que pararam, ou a data de checagem passou sem nada andar."
 empty = "Nada está parado."
+section = "Com outras pessoas"
 
 [views.in-loop]
 label = "No loop"
 summary = "Tarefas em que um agente está trabalhando agora."
 empty = "Nenhum agente está trabalhando em nada."
+section = "Com o loop"
 
 [views.approved]
 label = "Aprovadas"
 summary = "Trabalho que uma origem diz estar aprovado e pronto para entrar."
+section = "Com o loop"
 
 [views.snoozed]
 label = "Adiadas"
 summary = "Tarefas dormindo até uma data, um evento ou uma condição."
 empty = "Nada está adiado."
+section = "Para depois"
 
 [views.focus]
 label = "Foco"
 summary = "As tarefas que você marcou para focar."
 empty = "Nada em foco: marque uma tarefa para focar nela."
+section = "Com você"
 
 [views.projects]
 label = "Projetos"
 summary = "Seus projetos abertos."
 empty = "Nenhum projeto aberto."
+section = "Para depois"
 
 [views.someday]
 label = "Algum dia"
 summary = "Tarefas que você talvez faça algum dia, fora do caminho até lá."
+section = "Para depois"
 
 [views.logbook]
 label = "Histórico"
 summary = "O que você terminou, o mais recente primeiro."
 empty = "Nada terminado ainda."
+section = "Arquivo"
 
 [views.done]
 label = "Concluídas"
 summary = "Tarefas terminadas que ainda têm um workspace em disco, para remover."
 empty = "Nenhuma tarefa terminada tem workspace."
+section = "Arquivo"
 
 [views.outbox]
 label = "Outbox"
 summary = "Rascunhos esperando sua aprovação, e os aprovados que ainda estão sendo enviados ou que falharam no envio."
 empty = "Nenhum rascunho espera por você."
+section = "Arquivo"
 
 [views.review-projects]
 label = "Projetos a revisar"
 summary = "Projetos com a revisão vencida, ou sem próxima ação sua e fora de Algum dia."
 empty = "Todo projeto tem uma próxima ação e está revisado."
+section = "Para depois"
 
 [views.review]
 label = "Revisão"
 summary = "A revisão semanal: percorra cada passo até as listas ficarem limpas."
+section = "Arquivo"
 
 # The home's sections and the decision queues.
 [views.home-stalled]
@@ -341,6 +359,12 @@ summary = "Suas tarefas que esperam você escolher quem segue com elas."
 [views.decide-act]
 label = "Para agir"
 summary = "Tarefas com uma proposta ou um pedido que espera uma ação sua."
+
+[rail.plan]
+section = "Arquivo"
+
+[rail.recent]
+section = "Arquivo"
 
 [review.inbox]
 label = "Zerar a Inbox"

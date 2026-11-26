@@ -835,3 +835,62 @@ func TestAViewOpensTheViewItNames(t *testing.T) {
 		}
 	}
 }
+
+// A view names the rail section it sits in and whether the rail counts it; the rail's built-in entries name
+// theirs in the rail table.
+func TestAViewNamesItsRailSectionAndWhetherItIsCounted(t *testing.T) {
+	user := "[views.later]\nlabel = \"Later\"\nsummary = \"s\"\nwhen = \"true\"\nsection = \"Someday\"\ncounted = false\n\n" +
+		"[views.inbox]\nsection = \"Clarify\"\n\n[rail.plan]\nsection = \"Someday\"\ncounted = true\n"
+	texts, problems := loadListsWith(t, string(defaultLists()), user)
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	if later, _ := texts.View("later"); later.Section != "Someday" || later.Counted {
+		t.Errorf("later %+v, want section Someday, uncounted", later)
+	}
+	if inbox, _ := texts.View("inbox"); inbox.Section != "Clarify" || !inbox.Counted {
+		t.Errorf("inbox %+v, want section Clarify, counted", inbox)
+	}
+	if got := texts.Rail[PlanView]; got != (RailEntryDef{Section: "Someday", Counted: true}) {
+		t.Errorf("plan %+v, want in Someday and counted", got)
+	}
+	if got := texts.Rail[RecentView]; got != (RailEntryDef{Section: "Archive"}) {
+		t.Errorf("recent %+v, want the bundled Archive, uncounted", got)
+	}
+	_, problems = loadListsWith(t, string(defaultLists()), "[rail.logbook]\nsection = \"x\"\n")
+	if !strings.Contains(problems, "rail.logbook: names no built-in entry of the rail; the entries are plan, recent") {
+		t.Errorf("a rail entry that is no built-in loads: %s", problems)
+	}
+}
+
+// The bundled rail groups its views by what they ask of the user, the archive last and uncounted.
+func TestTheBundledRailIsSectionedByQuestion(t *testing.T) {
+	v := mustBundledViews(t)
+	var order []string
+	sections := map[string][]string{}
+	for _, def := range v.Views {
+		if !def.Rail {
+			continue
+		}
+		if _, ok := sections[def.Section]; !ok {
+			order = append(order, def.Section)
+		}
+		sections[def.Section] = append(sections[def.Section], def.ID)
+	}
+	if want := []string{"What's on you", "With other people", "With the loop", "Later", "Archive"}; !slices.Equal(order, want) {
+		t.Errorf("sections %v, want %v", order, want)
+	}
+	if want := []string{"needs-you", "next", "inbox", "focus", "fits-now"}; !slices.Equal(sections["What's on you"], want) {
+		t.Errorf("What's on you %v, want %v", sections["What's on you"], want)
+	}
+	for _, id := range sections["Archive"] {
+		if def, _ := v.View(id); def.Counted {
+			t.Errorf("%s in the archive is counted", id)
+		}
+	}
+	for _, id := range []string{PlanView, RecentView} {
+		if v.Rail[id] != (RailEntryDef{Section: "Archive"}) {
+			t.Errorf("%s %+v, want in the archive, uncounted", id, v.Rail[id])
+		}
+	}
+}

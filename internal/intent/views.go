@@ -44,6 +44,9 @@ type ViewsDef struct {
 	Facets []FacetDef
 	// DraftFacets are the draft facets, over draft facts, in their declared order.
 	DraftFacets []FacetDef
+	// Rail are the rail's built-in entries (PlanView, RecentView) a layer placed, by entry; an entry absent sits
+	// in the untitled top block, counted.
+	Rail map[string]RailEntryDef
 }
 
 // FacetDef is a task facet: the fact (or the "<record>.<field>" of a
@@ -111,6 +114,10 @@ type ViewDef struct {
 	Layout string
 	// Opens is what a page of the view opens instead of its own; zero for its own.
 	Opens ViewOpens
+	// Section is the rail section the view sits in, "" for the untitled top block; Counted says whether the
+	// rail draws its number and the daemon counts it.
+	Section string
+	Counted bool
 }
 
 // ViewOpens is a view another view's page opens, narrowed to a decision kind when Kind is set.
@@ -182,6 +189,19 @@ type mViews struct {
 	Views       map[string]mView       `toml:"views"`
 	Review      map[string]mReviewStep `toml:"review"`
 	Badge       *mBadge                `toml:"badge"`
+	Rail        map[string]mRailEntry  `toml:"rail"`
+}
+
+type mRailEntry struct {
+	Section *string `toml:"section"`
+	Counted *bool   `toml:"counted"`
+}
+
+// RailEntryDef is where the rail places one of its built-in entries: its Section, "" for the untitled top
+// block, and whether the rail draws its number.
+type RailEntryDef struct {
+	Section string
+	Counted bool
 }
 
 type mView struct {
@@ -197,6 +217,8 @@ type mView struct {
 	RemoveClean  *bool   `toml:"remove_clean"`
 	Rail         *bool   `toml:"rail"`
 	Layout       *string `toml:"layout"`
+	Section      *string `toml:"section"`
+	Counted      *bool   `toml:"counted"`
 	Opens        *struct {
 		View string `toml:"view"`
 		Kind string `toml:"kind"`
@@ -382,6 +404,7 @@ func (l *viewsLoad) merge(file string, src []byte) Problems {
 	l.mergeFacets(s, draftFacetsTable, m.DraftFacets, &l.def.DraftFacets)
 	l.mergeViews(s, m.Views)
 	l.mergeReview(s, m.Review)
+	l.mergeRail(s, m.Rail)
 	if m.Badge != nil && m.Badge.Views != nil {
 		maps.DeleteFunc(l.refs, func(at string, _ ref) bool { return strings.HasPrefix(at, "badge.") })
 		l.def.Badge = slices.Clone(m.Badge.Views)
@@ -508,7 +531,7 @@ func (l *viewsLoad) mergeViews(s *sheet, views map[string]mView) {
 			continue
 		}
 		i := slices.IndexFunc(l.def.Views, func(v ViewDef) bool { return v.ID == id })
-		v := ViewDef{ID: id, Over: task.OverTasks, Rail: true, Layout: builtin.ViewLayoutList}
+		v := ViewDef{ID: id, Over: task.OverTasks, Rail: true, Counted: true, Layout: builtin.ViewLayoutList}
 		if i >= 0 {
 			v = l.def.Views[i]
 		}
@@ -564,6 +587,12 @@ func (l *viewsLoad) mergeViews(s *sheet, views map[string]mView) {
 		if m.Rail != nil {
 			v.Rail = *m.Rail
 		}
+		if m.Section != nil {
+			v.Section = strings.TrimSpace(*m.Section)
+		}
+		if m.Counted != nil {
+			v.Counted = *m.Counted
+		}
 		if m.Layout != nil {
 			s.oneOf(path+".layout", *m.Layout, builtin.ValuesOf(builtin.SurfaceViews, "views.*.layout"))
 			v.Layout = *m.Layout
@@ -582,6 +611,32 @@ func (l *viewsLoad) mergeViews(s *sheet, views map[string]mView) {
 		default:
 			l.def.Views[i] = v
 		}
+	}
+}
+
+// mergeRail lays the sections of the rail's built-in entries over the definition so far.
+func (l *viewsLoad) mergeRail(s *sheet, rail map[string]mRailEntry) {
+	entries := slices.Sorted(maps.Keys(coreRoutes))
+	for _, id := range declared(s, "rail", rail) {
+		path := "rail." + id
+		if _, ok := coreRoutes[id]; !ok {
+			s.add(path, "names no built-in entry of the rail; the entries are %s", strings.Join(entries, ", "))
+			continue
+		}
+		e, ok := l.def.Rail[id]
+		if !ok {
+			e.Counted = true
+		}
+		if m := rail[id]; m.Section != nil {
+			e.Section = strings.TrimSpace(*m.Section)
+		}
+		if m := rail[id]; m.Counted != nil {
+			e.Counted = *m.Counted
+		}
+		if l.def.Rail == nil {
+			l.def.Rail = map[string]RailEntryDef{}
+		}
+		l.def.Rail[id] = e
 	}
 }
 

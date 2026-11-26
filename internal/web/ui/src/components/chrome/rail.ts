@@ -16,17 +16,22 @@ export interface NavEntry {
   count: number | "";
   core: boolean;
   offRail?: boolean;
+  // section is the rail section a core entry sits in, "" for the untitled top block; counted false draws no number.
+  section?: string;
+  counted?: boolean;
 }
 
 // viewNav is the rail: the core views with their counters, the plan and Recent, then each plugin view (count left
-// to the caller).
+// to the caller); a core entry carries the section the profile places it in.
 export function viewNav(cat: J, served: J[], plugin: string[], counters: J): NavEntry[] {
   const views = (counters && counters.views) || {};
   const out: NavEntry[] = coreViews(cat).map((v: J) => ({
-    id: v.id, label: v.label, summary: v.summary || "", count: views[v.id] === undefined ? "" : views[v.id], core: true, offRail: v.rail === false,
+    id: v.id, label: v.label, summary: v.summary || "", count: v.uncounted || views[v.id] === undefined ? "" : views[v.id], core: true, offRail: v.rail === false,
+    section: v.section || "", counted: !v.uncounted,
   }));
-  out.push({ id: PLAN, label: t("Plan"), summary: t("What the workflows will do, and what waits for you to apply it"), count: "", core: true });
-  out.push({ id: RECENT, label: t("Recent"), summary: t("The newest events of every unit the loop follows"), count: "", core: true });
+  const own = (id: string) => ({ section: ((cat && cat.rail) || {})[id]?.section || "", counted: !((cat && cat.rail) || {})[id]?.uncounted });
+  out.push({ id: PLAN, label: t("Plan"), summary: t("What the workflows will do, and what waits for you to apply it"), count: "", core: true, ...own(PLAN) });
+  out.push({ id: RECENT, label: t("Recent"), summary: t("The newest events of every unit the loop follows"), count: "", core: true, ...own(RECENT) });
   const taken = new Set(out.map((v) => v.id));
   for (const v of served) {
     if (taken.has(v.id)) continue;
@@ -44,10 +49,21 @@ export interface RailSection {
   views: NavEntry[];
 }
 
-// railSections splits viewNav's list: the core views untitled, then one section per provider, titled by
-// name(provider), in the order they first appear.
+// railSections splits viewNav's list: the core entries of no section untitled, then the core entries by their
+// section in the order the entries first name it, then one section per provider, titled by name(provider), in
+// the order they first appear.
 export function railSections(nav: NavEntry[], name: (provider: string) => string): RailSection[] {
-  const out: RailSection[] = [{ title: "", views: nav.filter((v) => v.core) }];
+  const out: RailSection[] = [{ title: "", views: [] }];
+  const core = new Map<string, RailSection>([["", out[0]]]);
+  for (const v of nav.filter((x) => x.core)) {
+    const title = v.section || "";
+    if (!core.has(title)) {
+      const sec = { title, views: [] as NavEntry[] };
+      core.set(title, sec);
+      out.push(sec);
+    }
+    (core.get(title) as RailSection).views.push(v);
+  }
   const by = new Map<string, RailSection>();
   for (const v of nav.filter((x) => !x.core)) {
     const p = v.provider || "";
@@ -70,6 +86,7 @@ export function lensHash(change: Partial<Hash>, route: Hash = readHash()): strin
 // railCount is what the rail counts of the entry v under lens: a core view's counter, the plan's steps, the rows
 // of a row view the lens keeps; "" for a view it does not count.
 export function railCount(v: NavEntry, lens: Lens): number | "" {
+  if (v.counted === false) return "";
   if (v.id === PLAN) return planCount();
   if (v.core) return v.count;
   const rows = catalog.views.some((c) => c.id === v.id) && v.id !== EXPLORE;
