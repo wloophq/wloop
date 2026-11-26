@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { cleanup, fireEvent, render } from "@testing-library/svelte";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { J } from "../../lib/util";
@@ -141,4 +142,21 @@ test("an arrival asks the host for a peek at it, and the tab only counts it", as
   await settle();
   expect(posted.filter((m) => m.type === "float:peek")).toEqual([{ type: "float:peek", item: "t-2" }]);
   expect(pill(c).querySelector(".fl-count")!.textContent).toBe("2");
+});
+
+test("the tab shows the count and the running turns alone: no mark, no dot beside the count, no age", async () => {
+  await floatLoad();
+  const c = render(FloatTab).container;
+  await settle();
+  expect(pill(c).querySelector(".fl-count")!.textContent).toBe("1");
+  expect(pill(c).querySelector(".fl-mark")).toBeNull();
+  expect(pill(c).querySelector(".fl-dot")).toBeNull();
+  expect(pill(c).querySelector(".fl-age")).toBeNull();
+});
+
+test("the tab draws no outline of its own around its fill", () => {
+  const css = readFileSync("../static/app.css", "utf8");
+  const pillRule = (css.match(/\n\.fl-pill\s*\{[^}]*\}/) || [""])[0];
+  expect(pillRule).toContain("background:");
+  expect(pillRule).not.toMatch(/(^|[;\s])border:\s*(?!0)/);
 });
