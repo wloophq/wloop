@@ -275,8 +275,12 @@ type racingGates struct {
 	serviceGates
 	armed      *atomic.Bool
 	superseded chan struct{}
+	once       *sync.Once
 	closing    func()
 }
+
+// supersededNow releases the pass the close holds back, once.
+func (g racingGates) supersededNow() { g.once.Do(func() { close(g.superseded) }) }
 
 func (g racingGates) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {
 	if q.Kind == gate.KindQuestion && q.Unit.IsZero() && g.armed.CompareAndSwap(true, false) {
@@ -288,7 +292,7 @@ func (g racingGates) Where(ctx context.Context, q gates.Query) ([]gate.Gate, err
 
 func (g racingGates) SupersedeQuestion(ctx context.Context, id int64, settle func(context.Context) (bool, error)) (bool, error) {
 	closed, err := g.serviceGates.SupersedeQuestion(ctx, id, settle)
-	close(g.superseded)
+	g.supersededNow()
 	return closed, err
 }
 
@@ -301,9 +305,10 @@ func TestAPassDuringTheCloseOpensNoGate(t *testing.T) {
 	od.leave(42, draft.Dropped, "user", gate.Rejected)
 	od.leave(43, draft.Dropped, "user", gate.Rejected)
 	closed := make(chan struct{})
-	g := racingGates{serviceGates: serviceGates{r.gates, r.gateStore}, armed: &atomic.Bool{}, superseded: make(chan struct{})}
+	g := racingGates{serviceGates: serviceGates{r.gates, r.gateStore}, armed: &atomic.Bool{}, superseded: make(chan struct{}), once: &sync.Once{}}
 	g.closing = func() {
 		defer close(closed)
+		defer g.supersededNow()
 		if err := r.svc.CloseLeftQuestions(ctx); err != nil {
 			t.Errorf("the close: %v", err)
 		}
@@ -311,6 +316,9 @@ func TestAPassDuringTheCloseOpensNoGate(t *testing.T) {
 	r.svc.Gates = g
 	g.armed.Store(true)
 	err := r.svc.Reconcile(ctx, r7)
+	if g.armed.Load() {
+		t.Fatal("the pass never swept the missing gates, where the close is started: the seam no longer holds")
+	}
 	<-closed
 	if err != nil {
 		t.Fatal(err)
