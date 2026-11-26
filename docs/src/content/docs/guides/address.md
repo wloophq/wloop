@@ -45,7 +45,7 @@ From a session in the workspace: `/{{name}}-address <url>`. The reviews so far c
 
 ## A pull request with no workspace
 
-Failing checks or a conflict alone never start a round without a workspace. Without a workspace, the daemon only records that it would start a round (`would_address`), and the cockpit lists the pull request in Needs me as "review to address, no workspace". To let it create the workspace and run the round:
+Failing checks or a conflict alone never start a round without a workspace. Without a workspace, the daemon only records that it would start a round (`would_address`), and the cockpit lists the pull request in Next actions as "review to address, no workspace". To let it create the workspace and run the round:
 
 ```toml
 [plugins.github]

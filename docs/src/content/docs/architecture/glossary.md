@@ -152,7 +152,7 @@ description: The words the code, the configuration, the facts and these pages us
 - **Cockpit**: the web page the daemon serves on `127.0.0.1` behind a token, opened with `{{command}} open`. See [The cockpit](/concepts/surfaces/#the-cockpit).
 - **Terminal client**: `{{command}} tui`, the same views and actions in a terminal. See [The terminal client](/concepts/surfaces/#the-terminal-client).
 - **Menu bar**: `{{command}} app` on macOS, which counts and lists Needs you, what waits on you, and posts the banners of the tasks of the views `[badge]` names. See [The menu bar](/concepts/surfaces/#the-menu-bar-macos).
-- **View**: a filtered list a surface shows, such as Needs me, Stalled, Inbox or Waiting. Every client shows the views the daemon computes.
+- **View**: a filtered list a surface shows, such as Next actions, Stalled, Inbox or Waiting. Every client shows the views the daemon computes.
 - **Row**: one unit in a view, with the actions the daemon computes for it. A client renders them and decides nothing.
 - **Action catalog**: the actions the daemon offers on a row: the built-in ones, such as Run now, Skip and Take over, and each intent's `[action]`. Each says what it does in its `summary`; the built-in ones' words are the profile's `actions.toml`. See [the intent manifest](/reference/intent-manifest/).
 - **Card**: what a plugin shows of one unit, in a row or a task's detail. In Orca it is also the unit's workspace on the board.

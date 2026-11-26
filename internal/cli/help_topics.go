@@ -110,7 +110,7 @@ func helpGroups(manager string) []helpGroup {
 				Names:   []string{"status"},
 				Summary: "What needs you, by view, and the tracked pull requests",
 				Usage:   []string{"status [--color auto|always|never]"},
-				About: "List the tasks of the views the badge names, such as Inbox and Needs me, then the pull requests you track. " +
+				About: "List the tasks of the views the badge names, such as Needs you, Next actions and Inbox, then the pull requests you track. " +
 					"Piped, it prints one tab-separated line per task or pull request and view.",
 				Flags:    []helpFlag{colorFlag},
 				Examples: []string{"status", "status | grep next"},

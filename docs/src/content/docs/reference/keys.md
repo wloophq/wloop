@@ -35,7 +35,7 @@ The same keys work in the web cockpit and the terminal client, on the selected t
 
 | Key | Action |
 |---|---|
-| `g i`, `g m`, `g w`, `g c`, `g n`, `g b`, `g t`, `g u`, `g a`, `g z`, `g f`, `g p`, `g d`, `g r` | Inbox, Needs me, Waiting, Chase, Fits now, Blocked by me, Stalled, In loop, Approved, Snoozed, Focus, Projects, Done, Review: each view's `key` in `views.toml`, and a view of yours adds its own (`g`, a space and a key no core key uses) |
+| `g q`, `g x`, `g i`, `g f`, `g n`, `g w`, `g c`, `g t`, `g u`, `g a`, `g p`, `g z`, `g d`, `g r` | Needs you, Next actions, Inbox, Focus, Fits now, Waiting, Chase, Stalled, In the loop, Approved, Projects, Snoozed, Done, Review: each view's `key` in `views.toml`, and a view of yours adds its own (`g`, a space and a key no core key uses) |
 | `g g` | the GitHub views: a plugin's own chord, which its UI declares (`key`), served while the plugin is enabled; a view's key in `views.toml` takes it first |
 | `Shift+1`..`9` | switch area |
 | `/` | filter |

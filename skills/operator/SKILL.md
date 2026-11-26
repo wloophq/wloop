@@ -72,11 +72,11 @@ they want it, ask them here first.
 
 Piped, as you run it, it prints one tab-separated line per task and view,
 then one per tracked pull request: `view, who it waits on, age, owner/repo#n,
-title, reason`. The views are those the profile's `[badge]` counts, `inbox` and
-`needs-me` by default; a `tracked` line is a pull request the user follows.
+title, reason`. The views are those the profile's `[badge]` counts, `needs-you`,
+`next` and `inbox` by default; a `tracked` line is a pull request the user follows.
 With no line of those views, nothing waits on the user.
 
-Lead with `needs-me`, then `inbox`. Link every PR as a markdown link.
+Lead with `needs-you`, then `next`, then `inbox`. For what waits on a decision, `{{command}} needs` lists the queue item by item. Link every PR as a markdown link.
 
 The views are the profile's (`views.toml`), which the cockpit, `{{command}} tui`
 and the menu bar list; among the bundled ones:
@@ -84,7 +84,8 @@ and the menu bar list; among the bundled ones:
 | View | Meaning |
 |---|---|
 | `inbox` | tasks nobody has clarified yet; once clarified a task never returns |
-| `needs-me` | the next step is the user's: an open gate (a question, a draft, a round), or their own action |
+| `needs-you` | a decision waits on the user: an open gate (a question, a draft, a plan, a step), a failed delivery, a source's situation |
+| `next` | the user's own next action, with no open gate |
 | `waiting` | the next step is someone else's, grouped by who owes it |
 | `stalled` | waiting too long: a source says a link stalled, or the check date of a task someone else owes passed with nothing moving |
 | `in-loop` | an agent works on it: a source's loop holds a link, or a run is live |
@@ -93,7 +94,7 @@ and the menu bar list; among the bundled ones:
 | `snoozed` | asleep until a date, an event or a condition |
 
 The profile's `[badge]` names the views whose tasks the menu bar notifies,
-the daily digest counts and `status` lists, Inbox and Needs me by default;
+the daily digest counts and `status` lists, Needs you, Next actions and Inbox by default;
 the menu bar's title counts Needs you. A user's `views.toml` changes the bundled views or adds its own.
 
 ## Diagnosing

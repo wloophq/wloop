@@ -50,7 +50,7 @@ It runs a round in a throwaway worktree with every GitHub write refused, and pri
 
 ## When it asks
 
-The card moves to `needs-me`, the pull request shows in Needs me, and on macOS a notification offers the answers. Answer in the cockpit's detail, the notification, or the terminal client (`W`). Continue (`C`) sends the agent back without an answer; Dismiss (`X`) closes the question and the pull request goes back to whoever it waits on.
+The card moves to `needs-me`, the question shows in Needs you, and on macOS a notification offers the answers. Answer in the cockpit's detail, the notification, or the terminal client (`W`). Continue (`C`) sends the agent back without an answer; Dismiss (`X`) closes the question and the pull request goes back to whoever it waits on.
 
 Once your answer reaches the agent, the question leaves the card and the row shows the loop working. When the agent is busy, the card says your answer is queued until its session is free; a new answer sent then replaces it.
 
