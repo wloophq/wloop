@@ -200,6 +200,12 @@ type pageKey struct{}
 // for the page.
 func WithPage(ctx context.Context) context.Context { return context.WithValue(ctx, pageKey{}, &Pass{}) }
 
+// InPage says whether ctx serves a page of a read route.
+func InPage(ctx context.Context) bool {
+	_, ok := ctx.Value(pageKey{}).(*Pass)
+	return ok
+}
+
 // PageOnce is the value of key, loaded once for the page ctx serves; outside a page, load reads it each time.
 func PageOnce[T any](ctx context.Context, key string, load func() (T, error)) (T, error) {
 	p, ok := ctx.Value(pageKey{}).(*Pass)
@@ -212,7 +218,7 @@ func PageOnce[T any](ctx context.Context, key string, load func() (T, error)) (T
 // PageTask is task id as the pass of the page ctx serves holds it; false outside a page or a pass, or when the
 // pass does not hold it, as for an alias of a merged task.
 func PageTask(ctx context.Context, id task.ID) (task.Task, bool) {
-	if _, page := ctx.Value(pageKey{}).(*Pass); !page {
+	if !InPage(ctx) {
 		return task.Task{}, false
 	}
 	pass, ok := PassOf(ctx)
@@ -225,7 +231,7 @@ func PageTask(ctx context.Context, id task.ID) (task.Task, bool) {
 // PageTasksOf are the tasks of the pass of the page ctx serves that hold u or one of its items, held or resolved;
 // false outside a page or a pass.
 func PageTasksOf(ctx context.Context, u unit.Unit) ([]task.Task, bool) {
-	if _, page := ctx.Value(pageKey{}).(*Pass); !page {
+	if !InPage(ctx) {
 		return nil, false
 	}
 	pass, ok := PassOf(ctx)

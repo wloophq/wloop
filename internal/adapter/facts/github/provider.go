@@ -151,22 +151,30 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 	return v.facts(ref, p.now()), nil
 }
 
-// passView is the view every unit's facts read in the pass ctx carries, with the events and reports of each pull
-// request its tasks link read at once; outside a pass, the cached view.
+// passView is the view every unit's facts read in the page ctx serves, with the events and reports of each pull
+// request its pass's open tasks link read at once; outside a page, such as in the sweep's pass, whose List renews
+// the view between reads, the view each call finds current.
 func (p *Provider) passView(ctx context.Context) (*view, error) {
 	pass, ok := coretasks.PassOf(ctx)
-	if !ok {
+	if !ok || !coretasks.InPage(ctx) {
 		return p.fresh(ctx, false)
 	}
-	return coretasks.Once(ctx, sharedViewKey, func() (*view, error) {
+	return coretasks.PageOnce(ctx, sharedViewKey, func() (*view, error) {
 		v, err := p.fresh(ctx, false)
 		if err != nil {
 			return nil, err
 		}
 		var prs []unit.Unit
-		for _, u := range pass.Units() {
-			if u.Provider == unit.GitHub {
-				prs = append(prs, u)
+		seen := map[unit.Unit]bool{}
+		for _, e := range pass.Tasks {
+			if !e.Open() {
+				continue
+			}
+			for _, u := range e.LinkedUnits() {
+				if u.Provider == unit.GitHub && !seen[u] {
+					seen[u] = true
+					prs = append(prs, u)
+				}
 			}
 		}
 		if err := v.loadEvents(ctx, prs); err != nil {
