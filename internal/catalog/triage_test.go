@@ -109,7 +109,7 @@ func TestAnAskThatWaitsOnMeIsANextActionGroupedByWhoAsked(t *testing.T) {
 	}
 }
 
-// A task of yours with a decision and no open gate, a failed delivery or a source's situation, waits in Needs you
+// A task of yours with a decision and no open gate, a failed delivery or a source's situation or link signal, waits in Needs you
 // alone, as a gated one does: Next actions lists only what waits on no decision.
 func TestADecisionWithoutAGateKeepsATaskOutOfNextActions(t *testing.T) {
 	l := bundled(t)

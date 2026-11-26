@@ -215,7 +215,7 @@ A view is a list of the profile's `views.toml`: a `when`, a condition over a tas
 
 | View | Lists |
 |---|---|
-| Needs you | drawn as the queue of every decision kind (`layout = "queue"`): a task with an open gate, a draft whose delivery failed, or a source's situation that waits on your decision, one item per decision |
+| Needs you | drawn as the queue of every decision kind (`layout = "queue"`): a task with an open gate, a draft whose delivery failed, or a source's situation or link signal that waits on your decision, one item per decision |
 | Next actions | your own task whose next step is yours with no decision waiting on you (`task.owed_by == 'me'`, `size(task.decisions) == 0`), so a task is in it or in Needs you, never both; a sequential project's next action first (`-task.sequential_next`); group it by Asked by (`asked-by`) to see who asked |
 | Inbox | what nobody has clarified (`task.category == 'inbox'`) |
 | Waiting | a task someone else owes, grouped by `task.owed_by`; one nobody owes while an agent works on it is In the loop's |
