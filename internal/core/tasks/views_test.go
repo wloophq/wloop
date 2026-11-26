@@ -228,3 +228,28 @@ func TestAKindsOwnDismissAndDoneBindByHandler(t *testing.T) {
 		t.Fatalf("ran %v, want %v", ran, want)
 	}
 }
+
+// A sweep's pass holds only the open tasks, so a Snapshot taken under it reads every stored task anew, done ones
+// included, as it promises.
+func TestASnapshotUnderAPartialPassHoldsTheDoneTasks(t *testing.T) {
+	r := newRig()
+	r.put(t, task.Task{ID: "a", State: "inbox", Category: task.CategoryInbox})
+	r.put(t, task.Task{ID: "d", State: "done", Category: task.CategoryDone})
+	open, err := r.store.Tasks(context.Background(), task.Query{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := coretasks.WithPass(context.Background(), &coretasks.Pass{Tasks: open})
+	snap, err := r.svc.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pass, _ := coretasks.PassOf(snap.Within(context.Background()))
+	if _, ok := pass.Task("d"); !ok {
+		t.Fatalf("the snapshot holds %v, want the done task too", pageIDs(pass.Tasks))
+	}
+	stored, err := r.svc.Stored(ctx, []task.ID{"a", "d"})
+	if err != nil || len(stored) != 2 {
+		t.Fatalf("stored %v, %v; want the done task too", stored, err)
+	}
+}
