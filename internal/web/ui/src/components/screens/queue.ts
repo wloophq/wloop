@@ -74,9 +74,29 @@ export function queueDraftAction(item: J, key: string): DraftAction | null {
   return draftActions(item.task, queueDraftOf(item.gate)).find((a) => a.key === key) || null;
 }
 
+// QueueRefused is a primary the item's card turns off, as its card offers it.
+export class QueueRefused extends Error {
+  constructor(public action: DraftAction) {
+    super(t("{action}: {reason}", { action: action.label, reason: action.reason || action.title || "" }));
+  }
+}
+
 // queueRefused says why the card refuses action a.
 function queueRefused(a: DraftAction): void {
-  setNotice(t("{action}: {reason}", { action: a.label, reason: a.reason || a.title || "" }), true);
+  setNotice(new QueueRefused(a).message, true);
+}
+
+// queueResolve resolves item's gate with intent as its card does: a draft's primary through the card's own action,
+// refusing one the card turns off (a stale draft) with QueueRefused, any other intent of a draft's at the rev it
+// shows, and any other gate's with option.
+export async function queueResolve(item: J, intent: string, option?: string): Promise<unknown> {
+  const g = item.gate;
+  const p = item.primary || {};
+  if (!queueDraft(g)) return resolveGate(item.task, g, intent, option);
+  const card = intent === p.id ? queueDraftAction(item, "queue:primary") : null;
+  if (card && !card.enabled) throw new QueueRefused(card);
+  if (card) return card.run();
+  return resolveDraft(queueDraftOf(g), intent, p.label || intent, {});
 }
 
 // queueAct runs item's primary: its gate's intent as the card does, its unit's catalog action, its unit's source,
@@ -88,12 +108,7 @@ export async function queueAct(item: J): Promise<void> {
   queueState.busy = true;
   queueState.error = "";
   try {
-    const g = item.gate;
-    const card = p.kind === "gate" && queueDraft(g) ? queueDraftAction(item, "queue:primary") : null;
-    if (card && !card.enabled) return queueRefused(card);
-    if (card) await card.run();
-    else if (p.kind === "gate" && queueDraft(g)) await resolveDraft(queueDraftOf(g), p.id, p.label || p.id, {});
-    else if (p.kind === "gate") await resolveGate(item.task, g, p.id);
+    if (p.kind === "gate") await queueResolve(item, p.id);
     else if (p.kind === "action") {
       const u = queueUnit(item);
       if (u && (await queueDeps.act(u, p.id)) === false) throw new Error(t("{action} failed", { action: p.id }));
@@ -101,6 +116,7 @@ export async function queueAct(item: J): Promise<void> {
     else if (p.kind === "task") writeHash({ task: item.task.id, pr: "" });
     else if (p.kind === "verb") await queueVerb(item);
   } catch (err) {
+    if (err instanceof QueueRefused) return queueRefused(err.action);
     queueState.error = t("{action} failed: {error}", { action: p.label || p.id, error: (err as Error).message });
   } finally {
     queueState.busy = false;

@@ -5,7 +5,7 @@ import { FakeDaemon } from "../testing/fakedaemon";
 import { resetStore } from "../testing/reset.svelte";
 import { Reply } from "../testing/fakedaemon";
 import { state } from "./store.svelte";
-import { FLOAT_PEEK_MS, FLOAT_QUIET_MS, FLOAT_RETRY_MS, floatChange, itemKey, floatDeps, floatFollow, floatLoad, floatState, resetFloat } from "./float.svelte";
+import { FLOAT_ARM_MS, FLOAT_PEEK_MS, FLOAT_QUIET_MS, FLOAT_RETRY_MS, floatChange, itemKey, floatDeps, floatFollow, floatLoad, floatState, resetFloat } from "./float.svelte";
 import { connect, DEBOUNCE_MS, stream, type EventSourceLike } from "./sync.svelte";
 
 function gateItem(id: number, title: string): J {
@@ -291,4 +291,50 @@ test("an item is known by its gate, else its task, kind and situation's provider
   expect(itemKey({ ...stuck, situation: { ...stuck.situation, label: "As verificações falharam" } })).toBe("task:t-1:fix-checks:github:checks-failed:github:acme/api#1");
   expect(itemKey({ ...stuck, situation: { ...stuck.situation, unit: "github:acme/api#2" } })).not.toBe(itemKey(stuck));
   expect(itemKey({ kind: "send-draft", task: { id: "t-1" }, gate: { id: 41 } })).toBe("gate:41");
+});
+
+test("act runs the item its card drew, and nothing once a read took that item away", async () => {
+  await floatLoad();
+  const f = floatState();
+  f.move(1);
+  const drawn = itemKey(f.items[f.current]);
+  served = queue(gateItem(1, "Ana's retry change"), gateItem(3, "Cy's docs pass"));
+  await floatLoad();
+  await f.act(drawn);
+  expect(posts()).toEqual([]);
+  await f.act(itemKey(f.items[f.current]));
+  expect(posts()).toEqual(["/api/gates/3/approve"]);
+});
+
+test("a panel shown less than FLOAT_ARM_MS ago runs no primary unless its window has the keyboard", async () => {
+  await floatLoad();
+  const f = floatState();
+  let focused = false;
+  floatDeps.focused = () => focused;
+  f.show("panel");
+  await f.act();
+  expect(posts()).toEqual([]);
+  focused = true;
+  await f.act();
+  expect(posts()).toEqual(["/api/gates/1/approve"]);
+  focused = false;
+  f.close();
+  f.show("panel");
+  await vi.advanceTimersByTimeAsync(FLOAT_ARM_MS - 1);
+  await f.act();
+  expect(posts()).toEqual(["/api/gates/1/approve"]);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(f.armed).toBe(true);
+});
+
+test("a stale draft's primary is refused as the cockpit's card refuses it, and nothing posts", async () => {
+  const d = { id: 4, gate: 7, rev: 3, text: "Thanks, merged.", delivery: "reply", unit: "alpha:acme/api#1", intents: { approved: "approve" }, state: "held", stale: true,
+    notes: ["The thread moved since the draft was written."] };
+  served = queue({ kind: "send-draft", task: { id: "t-1", title: "ship", units: [] }, gate: { id: 7, kind: "draft", delivery: "held", subject: d, intents: [{ id: "approve", label: "Send" }] },
+    primary: { kind: "gate", id: "approve", label: "Send" } });
+  await floatLoad();
+  const f = floatState();
+  await f.act();
+  expect(posts()).toEqual([]);
+  expect(f.failed).toContain("The thread moved since the draft was written.");
 });

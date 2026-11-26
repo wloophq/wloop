@@ -3,8 +3,7 @@ import { conventionalLabel, tally, type Label, type LabelCount } from "../../lib
 import { t } from "../../lib/i18n.svelte";
 import { isSet, safeURL, type J } from "../../lib/util";
 import { floatDeps, floatState, itemKey, openRoute, taskRoute, type FloatMode, type FloatPlace, type PanelPlace } from "../../state/float.svelte";
-import { resolveDraft, resolveGate } from "../gates/gates";
-import { queueDeps, queueDraft, queueDraftOf, queueUnit, queueVerb, unitLink } from "../screens/queue";
+import { queueDeps, queueResolve, queueUnit, queueVerb, unitLink } from "../screens/queue";
 
 // The floating widget's ends: resolving an item through the gates endpoint, and the bridge to the window that
 // hosts each of its two pages. The host calls window[FLOAT_BRIDGE]: the tab's place, and the panel's show, leave as
@@ -147,17 +146,14 @@ export function installFloat(win: J, role: FloatRole): TabBridge | PanelBridge {
   floatDeps.run = floatRun;
   floatDeps.openUnit = floatOpenUnit;
   floatDeps.post = (m) => floatPost(m, win);
+  floatDeps.focused = () => !!win.document && win.document.hasFocus();
   if (role === "tab") floatDeps.peek = (item) => floatDeps.post({ type: "float:peek", item: itemKey(item) });
   return bridge;
 }
 
-// floatResolve resolves item's gate with intent through the gates endpoint: a draft's at the rev it shows, a
-// question's with option when it offers options.
+// floatResolve resolves item's gate with intent as the cockpit's queue does (queueResolve).
 export async function floatResolve(item: J, intent: string, option?: string): Promise<unknown> {
-  const g = item.gate;
-  if (!g) return null;
-  if (queueDraft(g)) return resolveDraft(queueDraftOf(g), intent, (item.primary && item.primary.label) || intent, {});
-  return resolveGate(item.task, g, intent, option);
+  return item.gate ? queueResolve(item, intent, option) : null;
 }
 
 // floatRun runs a primary that is no gate's: a unit's catalog action, a task verb (a failed delivery's retry),

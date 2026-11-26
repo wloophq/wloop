@@ -1,7 +1,7 @@
 <script lang="ts">
   import { t } from "../../lib/i18n.svelte";
   import type { J } from "../../lib/util";
-  import type { FloatState } from "../../state/float.svelte";
+  import { itemKey, type FloatState } from "../../state/float.svelte";
   import DraftCard from "../gates/DraftCard.svelte";
   import GateCard from "../gates/GateCard.svelte";
   import { queueDraft, queueDraftOf } from "../screens/queue";
@@ -37,7 +37,7 @@
   {:else}
     {#if item.situation && item.situation.label}<p class="fl-text">{item.situation.label}</p>{/if}
     <div class="fl-acts">
-      {#if p.kind}<button type="button" class="act primary" disabled={f.busy || undefined} onclick={() => f.act()}><kbd>↵</kbd> {p.label || p.id}</button>{/if}
+      {#if p.kind}<button type="button" class="act primary" disabled={f.busy || undefined} onclick={() => f.act(itemKey(item))}><kbd>↵</kbd> {p.label || p.id}</button>{/if}
       <button type="button" class="act" onclick={() => f.open()}>{t("Open in the cockpit")}</button>
     </div>
   {/if}
