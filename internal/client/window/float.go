@@ -3,6 +3,7 @@ package window
 import (
 	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/wloophq/wloop/internal/brand"
 )
@@ -380,6 +381,7 @@ func (c *Controller) ShowFloat() error {
 		c.floatURL, c.pageReady, c.pageRead = u, false, ""
 	}
 	c.floatShown, c.tellPlace = true, true
+	c.unsaid = c.settle()
 	c.placeFloat()
 	c.cfg.Host.ShowFloat(u, reload)
 	return nil
@@ -402,6 +404,13 @@ func (c *Controller) refloat(back bool) {
 	if err := c.ShowFloat(); err != nil {
 		c.cfg.Log("float: %v", err)
 	}
+	c.mu.Lock()
+	ready := c.unsaid
+	c.unsaid = nil
+	c.mu.Unlock()
+	if ready != nil {
+		ready()
+	}
 }
 
 // HideFloat hides the floating widget, its panel included.
@@ -410,23 +419,70 @@ func (c *Controller) HideFloat() {
 	defer c.mu.Unlock()
 	c.closePanel()
 	c.floatWanted, c.floatShown = false, false
+	c.unsaid = c.settle()
 	c.cfg.Host.HideFloat()
 }
 
-// FloatReady says whether the float shows a tab whose page has reported in
-// since it last loaded and has not said the daemon refused its read of the
-// queue, so it carries what waits on the user. A page that says the daemon is
-// offline still counts: the menu bar reads the same daemon, and a stream that
-// drops must not post every banner the float carries.
+// FloatDownAfter is how long the tab's page may say its read of the queue
+// failed, or the daemon is offline, and still carry the queue: a read the
+// next retry answers posts no banner.
+const FloatDownAfter = 10 * time.Second
+
+// FloatSilentAfter is how long after the tab's page last said how its read
+// went it stops carrying the queue, as when its script hangs. The page says
+// so every FLOAT_STATE_EVERY_MS, well within it.
+const FloatSilentAfter = 15 * time.Second
+
+// FloatReady says whether the float shows a tab that carries what waits on
+// the user: its page has said how its read of the queue went since it last
+// loaded, within FloatSilentAfter, and that read answered, or failed less
+// than FloatDownAfter ago.
 func (c *Controller) FloatReady() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.carries()
+	return c.carries(time.Now())
 }
 
-// carries is FloatReady under c.mu.
-func (c *Controller) carries() bool {
-	return c.floatShown && c.pageReady && c.pageRead != ReadFailed
+// carries is FloatReady at now under c.mu.
+func (c *Controller) carries(now time.Time) bool {
+	if !c.floatShown || c.pageRead == "" || now.Sub(c.stateAt) >= FloatSilentAfter {
+		return false
+	}
+	return c.pageRead == ReadOK || now.Sub(c.downSince) < FloatDownAfter
+}
+
+// settle notes whether the float carries the queue now, and arms a check for
+// when it would stop unless Run returned; it returns the hook to run, outside
+// c.mu, when that changed, else nil. It runs under c.mu.
+func (c *Controller) settle() func() {
+	now := time.Now()
+	carries := c.carries(now)
+	if c.recheck != nil {
+		c.recheck.Stop()
+		c.recheck = nil
+	}
+	if carries && !c.ended {
+		next := c.stateAt.Add(FloatSilentAfter)
+		if down := c.downSince.Add(FloatDownAfter); c.pageRead != ReadOK && down.Before(next) {
+			next = down
+		}
+		c.recheck = time.AfterFunc(next.Sub(now), c.recheckFloat)
+	}
+	if carries == c.carried {
+		return nil
+	}
+	c.carried = carries
+	return c.floatReady
+}
+
+// recheckFloat settles the float as a check armed by settle comes due.
+func (c *Controller) recheckFloat() {
+	c.mu.Lock()
+	ready := c.settle()
+	c.mu.Unlock()
+	if ready != nil {
+		ready()
+	}
 }
 
 // OnFloatReady sets what runs when the tab's page or its web content process
@@ -489,15 +545,14 @@ func (c *Controller) floatMessage(m FloatMessage) {
 		return
 	}
 	c.mu.Lock()
-	was := c.carries()
 	c.pageReady = true
 	if m.Kind == FloatState {
-		c.pageRead = m.Read
+		if m.Read != ReadOK && (c.pageRead == ReadOK || c.pageRead == "") {
+			c.downSince = time.Now()
+		}
+		c.pageRead, c.stateAt = m.Read, time.Now()
 	}
-	ready := c.floatReady
-	if c.carries() == was {
-		ready = nil
-	}
+	ready := c.settle()
 	c.mu.Unlock()
 	if ready != nil {
 		ready()
@@ -542,11 +597,8 @@ func (c *Controller) floatGone(win string) {
 		c.mu.Unlock()
 		return
 	}
-	ready := c.floatReady
-	if !c.carries() {
-		ready = nil
-	}
 	c.pageReady, c.pageRead = false, ""
+	ready := c.settle()
 	c.mu.Unlock()
 	if ready != nil {
 		ready()

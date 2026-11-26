@@ -19,6 +19,9 @@ export const FLOAT_QUIET_MS = 10000;
 // FLOAT_RETRY_MS is the first wait before a failed read is retried, doubling up to FLOAT_RETRY_MAX_MS.
 export const FLOAT_RETRY_MS = 2000;
 export const FLOAT_RETRY_MAX_MS = 60000;
+// FLOAT_STATE_EVERY_MS is how often the tab tells the host how its read went, well within the host's
+// FloatSilentAfter, past which a quiet tab no longer stands in for the menu bar's banners.
+export const FLOAT_STATE_EVERY_MS = 5000;
 // FLOAT_HOVER_OPEN_MS is how long the pointer rests on the tab before it asks for the panel; the host closes it.
 export const FLOAT_HOVER_OPEN_MS = 120;
 // FLOAT_ARM_MS is how long the panel shows before its actions take a click: a panel the pointer opened by resting

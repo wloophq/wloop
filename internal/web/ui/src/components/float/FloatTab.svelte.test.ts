@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { cleanup, fireEvent, render } from "@testing-library/svelte";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { J } from "../../lib/util";
-import { FLOAT_HOVER_OPEN_MS, floatDeps, floatLoad, floatState, resetFloat } from "../../state/float.svelte";
+import { FLOAT_HOVER_OPEN_MS, FLOAT_STATE_EVERY_MS, floatDeps, floatLoad, floatState, resetFloat } from "../../state/float.svelte";
 import { FakeDaemon, Reply } from "../../testing/fakedaemon";
 import { resetStore } from "../../testing/reset.svelte";
 import { settle } from "../../testing/settle";
@@ -199,4 +199,21 @@ test("the tab tells the host how its read of the queue went, as it changes, so b
   await floatLoad();
   await settle();
   expect(states()).toEqual(["ok", "failed", "ok"]);
+});
+
+test("the tab says how its read went again every FLOAT_STATE_EVERY_MS, so the host hears a page whose script hangs go quiet", async () => {
+  const states = () => posted.filter((m) => m.type === "float:state").map((m) => m.read);
+  vi.useFakeTimers();
+  render(FloatTab);
+  vi.advanceTimersByTime(FLOAT_STATE_EVERY_MS);
+  expect(states()).toEqual([]);
+  await floatLoad();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(states()).toEqual(["ok"]);
+  vi.advanceTimersByTime(FLOAT_STATE_EVERY_MS - 1);
+  expect(states()).toEqual(["ok"]);
+  vi.advanceTimersByTime(1);
+  expect(states()).toEqual(["ok", "ok"]);
+  vi.advanceTimersByTime(FLOAT_STATE_EVERY_MS);
+  expect(states()).toEqual(["ok", "ok", "ok"]);
 });

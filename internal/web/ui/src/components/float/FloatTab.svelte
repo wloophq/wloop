@@ -1,12 +1,13 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { FLOAT_HOVER_OPEN_MS, floatDeps, floatState } from "../../state/float.svelte";
+  import { FLOAT_HOVER_OPEN_MS, FLOAT_STATE_EVERY_MS, floatDeps, floatState } from "../../state/float.svelte";
   import { floatSize } from "./float";
   import Pill from "./Pill.svelte";
 
   // The floating widget's tab page: the pill alone, upright on a docked edge. It reports its size, which depends on
   // where it is docked and on its counts only, asks the host for the panel, which opens in a window of its own, and
-  // tells it how its last read of the queue went, which decides whether the menu bar's banners stand in for it.
+  // tells it how its last read of the queue went, as it changes and every FLOAT_STATE_EVERY_MS, which decides
+  // whether the menu bar's banners stand in for it.
   const f = floatState();
 
   let root: HTMLElement | undefined = $state();
@@ -42,7 +43,11 @@
     const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => report());
     if (ro && root) ro.observe(root);
     report();
+    const beat = setInterval(() => {
+      if (told) floatDeps.post({ type: "float:state", read: told });
+    }, FLOAT_STATE_EVERY_MS);
     return () => {
+      clearInterval(beat);
       if (ro) ro.disconnect();
       clearTimeout(hover);
       document.documentElement.classList.remove("float-page");

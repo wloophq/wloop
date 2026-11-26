@@ -143,8 +143,18 @@ type Controller struct {
 	// (pageReady: it sent a message since its last load) and the frame is set.
 	dragging, tellPlace, pageReady bool
 	// pageRead is how the tab's page last said its read of the queue went, ""
-	// until it said.
-	pageRead string
+	// until it said, at stateAt; downSince is when it last stopped saying ok.
+	pageRead           string
+	stateAt, downSince time.Time
+	// carried is whether the float carried the queue when last settled;
+	// recheck settles it again as that would change with no message.
+	carried bool
+	recheck *time.Timer
+	// unsaid is the hook a ShowFloat or HideFloat the menu bar called under its
+	// own lock did not run; refloat runs the one its ShowFloat left.
+	unsaid func()
+	// ended says Run returned, so no check is armed any more.
+	ended bool
 }
 
 // New returns a controller of cfg.Host.
@@ -195,9 +205,21 @@ func (c *Controller) Run(ctx context.Context) error {
 		back = true
 		select {
 		case <-ctx.Done():
+			c.end()
 			return nil
 		case <-c.cfg.After(reconnectAfter):
 		}
+	}
+}
+
+// end stops the check settle armed, and arms none again.
+func (c *Controller) end() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.ended = true
+	if c.recheck != nil {
+		c.recheck.Stop()
+		c.recheck = nil
 	}
 }
 
