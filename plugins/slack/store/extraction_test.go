@@ -18,7 +18,7 @@ func init() {
 				Hints: map[unit.Unit]map[string]ExtractionHint{u: {"e1": {Mode: "none"}}}})
 		}, touches: true, units: []unit.Unit{u}},
 		writeCase{method: "ExtractionStore.MarkClosed", call: func(ctx context.Context, e *noteEnv) error {
-			return e.db.Extraction().MarkClosed(ctx, u, noteAt)
+			return e.db.Extraction().MarkClosed(ctx, u, noteAt, "")
 		}, touches: true, units: []unit.Unit{u}},
 		writeCase{method: "ExtractionStore.SetWatched", call: func(ctx context.Context, e *noteEnv) error {
 			return e.db.Extraction().SetWatched(ctx, u, true, noteAt)
@@ -154,5 +154,41 @@ func TestTheExtractionKeepsTheBriefItLastWrote(t *testing.T) {
 		if err != nil || got[u].Brief != c.want {
 			t.Fatalf("after save %d the brief is %q, want %q (%v)", i, got[u].Brief, c.want, err)
 		}
+	}
+}
+
+func TestMarkClosedKeepsTheNewestMessageItSaw(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db := openExtraction(t)
+	u := unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/1.1"}
+	if err := db.Extraction().MarkClosed(ctx, u, noteAt, "1700000003.000100"); err != nil {
+		t.Fatal(err)
+	}
+	st, err := db.Extraction().States(ctx, []unit.Unit{u})
+	if err != nil || !st[u].ClosureMarked || st[u].ClosedTS != "1700000003.000100" {
+		t.Fatalf("state %+v %v", st[u], err)
+	}
+}
+
+func TestClosedTSBackfillsAMarkedClosureFromItsLastExtractedMessage(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db := openExtraction(t)
+	marked, open := unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/1.1"}, unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/2.1"}
+	_, err := db.Write(ctx, func(tx *Tx) error {
+		_, err := tx.ExecContext(ctx, `INSERT INTO extraction_cursors (provider, unit_key, last_ts, closure_marked, at) VALUES
+			('slack', ?, '1700000003.000100', 1, ''), ('slack', ?, '1700000004.000100', 0, '')`, marked.Key, open.Key)
+		if err != nil {
+			return err
+		}
+		return backfillClosedTS(ctx, tx.Tx)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, err := db.Extraction().States(ctx, []unit.Unit{marked, open})
+	if err != nil || st[marked].ClosedTS != "1700000003.000100" || st[open].ClosedTS != "" {
+		t.Fatalf("states %+v %v", st, err)
 	}
 }

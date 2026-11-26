@@ -291,7 +291,7 @@ func (in *Input) Messages() []store.MessageRow { return in.msgs }
 func (in *Input) State() (store.ExtractionState, bool) { return in.state, in.hasState }
 
 // Closed says a closure ended the unit: the extraction read one posted, or a unit.closed marked it and nobody
-// but the viewer posted since.
+// but the viewer posted after the newest message it saw.
 func (in *Input) Closed() bool {
 	if in.state.ClosurePosted {
 		return true
@@ -299,12 +299,12 @@ func (in *Input) Closed() bool {
 	if !in.state.ClosureMarked {
 		return false
 	}
-	if in.state.ClosedAt.IsZero() {
+	if in.state.ClosedTS == "" {
 		return true
 	}
 	for _, m := range slices.Backward(in.msgs) {
 		if m.User != in.viewer || in.viewer == "" {
-			return !dslack.TSTime(m.TS).After(in.state.ClosedAt)
+			return !dslack.TSTime(m.TS).After(dslack.TSTime(in.state.ClosedTS))
 		}
 	}
 	return true

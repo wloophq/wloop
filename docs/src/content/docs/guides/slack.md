@@ -93,7 +93,7 @@ Write one, approve one with `a`, or from a terminal:
 {{command}} outbox approve <id>
 ```
 
-**Close.** **Close** on a conversation's row, in the Slack view, closes it without a message and without asking: the tasks that hold it end and, while none of its items is open, it leaves the Slack view until someone else writes there or an item opens. A conversation no item came from closes on its own once it has been quiet for `plugins.slack.ended_after` (7 days), unless an open task of yours holds it, through the `slack-ended-empty` workflow; turn it off with `[workflows.slack-ended-empty] enabled = false`. When it stops being watched is in [Closing a conversation](/concepts/slack/#closing-a-conversation).
+**Close.** **Close** on a conversation's row, in the Slack view, closes it without a message and without asking: the tasks that hold it end and, while none of its items is open, it leaves the Slack view until a message someone else writes there comes in, or an item opens. A conversation no item came from closes on its own once it has been quiet for `plugins.slack.ended_after` (7 days), unless an open task of yours holds it, through the `slack-ended-empty` workflow; turn it off with `[workflows.slack-ended-empty] enabled = false`. When it stops being watched is in [Closing a conversation](/concepts/slack/#closing-a-conversation).
 
 `slack send` posts as you after a confirmation, through the running daemon. To a message ref or permalink it replies in the thread through the Outbox, as a draft of yours approved once you say yes (or at once with `--yes`), so the reply counts for the thread's items and shows in the Logbook; `--broadcast` asks that draft to also post to the conversation. To a channel, a person, or with `--thread=false`, it posts directly:
 

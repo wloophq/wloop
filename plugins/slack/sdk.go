@@ -403,7 +403,11 @@ func (s *Plugin) ApplyEffect(ctx context.Context, req src.EffectRequest) error {
 		at = p.now()
 	}
 	u := unit.Of(req.Unit)
-	if err := p.db.Extraction().MarkClosed(ctx, u, at); err != nil {
+	newest, err := p.newestTS(ctx, u)
+	if err != nil {
+		return err
+	}
+	if err := p.db.Extraction().MarkClosed(ctx, u, at, newest); err != nil {
 		return err
 	}
 	if p.job == nil {
@@ -463,4 +467,18 @@ func (s *Plugin) Within(ctx context.Context, u sdk.Unit, target string) (bool, e
 	}
 	got, ok, err := p.resolve(ctx, target)
 	return ok && got == unit.Of(u), err
+}
+
+// newestTS is the ts of u's newest stored message, "" when it has none.
+func (p *plugin) newestTS(ctx context.Context, u unit.Unit) (string, error) {
+	ins, err := p.rowsSource().Load(ctx, []unit.Unit{u})
+	if err != nil {
+		return "", err
+	}
+	in, ok := ins[u]
+	if !ok || len(in.Messages()) == 0 {
+		return "", nil
+	}
+	msgs := in.Messages()
+	return msgs[len(msgs)-1].TS, nil
 }

@@ -16,8 +16,8 @@ type ExtractionStore struct{ db *DB }
 func (db *DB) Extraction() *ExtractionStore { return &ExtractionStore{db} }
 
 // ExtractionState is one unit's row. Watched is written only by SetWatched;
-// ClosureMarked and ClosedAt, a unit.closed and when it applied, zero for one
-// marked before that was kept, never by Save.
+// ClosureMarked and ClosedTS, a unit.closed and the ts of the newest message
+// the unit had then, never by Save.
 //
 // Brief is the JSON of the brief the extraction last wrote of the unit; an
 // empty Brief in a Save keeps the one stored.
@@ -27,7 +27,8 @@ type ExtractionState struct {
 	Brief, Verdict, VerdictWhy, ViewerRole, Topic string
 	StartedByViewer, ClosurePosted, Watched       bool
 	ClosureMarked                                 bool
-	ClosedAt, At                                  time.Time
+	ClosedTS                                      string
+	At                                            time.Time
 }
 
 type ExtractionHint struct{ Mode, Context, Why string }
@@ -51,7 +52,7 @@ type ExtractionSave struct {
 
 const (
 	extractionStateColumns = `provider, unit_key, last_ts, last_seq,
-		verdict, verdict_why, viewer_role, topic, started_by_viewer, closure_posted, watched, closure_marked, closed_at, at, brief`
+		verdict, verdict_why, viewer_role, topic, started_by_viewer, closure_posted, watched, closure_marked, closed_ts, at, brief`
 	extractionStatesSQL = `SELECT ` + extractionStateColumns + ` FROM extraction_cursors
 		WHERE (provider, unit_key) IN (SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]') FROM json_each(?))`
 	extractionWatchedSQL  = `SELECT ` + extractionStateColumns + ` FROM extraction_cursors WHERE provider = ? AND watched = 1`
@@ -82,13 +83,13 @@ func scanExtractionStates(rows *sql.Rows, err error) (map[unit.Unit]ExtractionSt
 	defer rows.Close()
 	out := map[unit.Unit]ExtractionState{}
 	for rows.Next() {
-		var provider, key, closedAt, at string
+		var provider, key, at string
 		var s ExtractionState
 		if err := rows.Scan(&provider, &key, &s.LastTS, &s.LastSeq, &s.Verdict, &s.VerdictWhy, &s.ViewerRole, &s.Topic,
-			&s.StartedByViewer, &s.ClosurePosted, &s.Watched, &s.ClosureMarked, &closedAt, &at, &s.Brief); err != nil {
+			&s.StartedByViewer, &s.ClosurePosted, &s.Watched, &s.ClosureMarked, &s.ClosedTS, &at, &s.Brief); err != nil {
 			return nil, err
 		}
-		s.At, s.ClosedAt = parseTime(at), parseTime(closedAt)
+		s.At = parseTime(at)
 		out[unit.Unit{Provider: unit.ProviderID(provider), Key: key}] = s
 	}
 	return out, rows.Err()

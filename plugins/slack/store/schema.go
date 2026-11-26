@@ -35,9 +35,18 @@ var migrations = []store.Migration{
 		return err
 	}},
 	{Version: 5, Up: func(ctx context.Context, tx *sql.Tx) error {
-		_, err := tx.ExecContext(ctx, `ALTER TABLE extraction_cursors ADD COLUMN closed_at TEXT NOT NULL DEFAULT ''`)
-		return err
+		if _, err := tx.ExecContext(ctx, `ALTER TABLE extraction_cursors ADD COLUMN closed_ts TEXT NOT NULL DEFAULT ''`); err != nil {
+			return err
+		}
+		return backfillClosedTS(ctx, tx)
 	}},
+}
+
+// backfillClosedTS gives each closure marked before closed_ts was kept the newest message the extraction had
+// read, the nearest to what that closure saw.
+func backfillClosedTS(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, `UPDATE extraction_cursors SET closed_ts = last_ts WHERE closure_marked = 1 AND closed_ts = ''`)
+	return err
 }
 
 var tableRE = regexp.MustCompile(`CREATE TABLE (\w+) \(`)

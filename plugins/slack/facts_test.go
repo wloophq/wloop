@@ -201,7 +201,7 @@ func TestSlackFactsReadTheExtractionTheConversationAndTheItems(t *testing.T) {
 	if g["slack.closure_posted"] != true || g["slack.live_task"] != false || g["slack.items_unowned_age_days"] != 0 {
 		t.Errorf("other: closure_posted %v, live_task %v, age %v", g["slack.closure_posted"], g["slack.live_task"], g["slack.items_unowned_age_days"])
 	}
-	if err := f.db.Extraction().MarkClosed(ctx, factsThread, monday); err != nil {
+	if err := f.db.Extraction().MarkClosed(ctx, factsThread, monday, ""); err != nil {
 		t.Fatal(err)
 	}
 	if got, _ := f.facts(t, factsThread); got["slack.closure_posted"] != true {

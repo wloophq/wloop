@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"testing"
+	"time"
 
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	dslack "github.com/wloophq/wloop/plugins/slack/domain"
@@ -32,7 +33,7 @@ func TestAClosedConversationLeavesTheViewUntilAnItemOpens(t *testing.T) {
 	if !f.inSlackView(t, u) {
 		t.Fatal("the thread is not in the Slack view")
 	}
-	if err := f.db.Extraction().MarkClosed(context.Background(), u, f.now); err != nil {
+	if err := f.db.Extraction().MarkClosed(context.Background(), u, f.now, ""); err != nil {
 		t.Fatal(err)
 	}
 	if f.inSlackView(t, u) {
@@ -76,15 +77,17 @@ func (f *fixture) reply(t *testing.T, user string, n int) {
 }
 
 // TestSomeoneElsesMessageAfterTheClosureReopensTheConversation: a marked closure holds until someone else posts
-// after it, which brings the conversation back to the Slack view and its closure fact back to false; your own
+// after the newest message it saw, whatever the clock said when it applied, which brings the conversation back to the Slack view and its closure fact back to false; your own
 // message after it does not.
 func TestSomeoneElsesMessageAfterTheClosureReopensTheConversation(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t)
+	f.now = tsAt(4)
 	f.login(t)
 	f.people(t)
 	u := f.thread(t)
-	if err := f.db.Extraction().MarkClosed(context.Background(), u, tsAt(5)); err != nil {
+	farAhead := src.Draft{Evidence: src.Evidence{At: tsAt(3).Add(365 * 24 * time.Hour)}}
+	if err := (&Plugin{p: f.p}).ApplyEffect(context.Background(), src.EffectRequest{Effect: EffectUnitClosed, Unit: u.Wire(), Draft: &farAhead}); err != nil {
 		t.Fatal(err)
 	}
 	f.reply(t, me, 6)
