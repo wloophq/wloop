@@ -67,6 +67,14 @@
     f.hide(mode);
   }
 
+  // unarmed drops a click on an action of a panel that is not armed for a click yet (FloatState.clickArmed).
+  function unarmed(e: MouseEvent): void {
+    const t = e.target as Element | null;
+    if (f.clickArmed || !t || !t.closest || !t.closest(".act")) return;
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
   function keydown(e: KeyboardEvent): void {
     if (e.key === "Escape") {
       e.preventDefault();
@@ -118,7 +126,7 @@
     <button type="button" class="fl-flyout" data-state={leaving ? "leaving" : "shown"} use:hovered onpointerenter={() => f.holdPeek()} onpointerleave={() => f.releasePeek()} onclick={() => f.openPanel(f.peekKey)}><span class="fl-flyout-text"><Peek item={peeked} /></span></button>
   {/if}
   {#if open}
-    <section class="fl-panel" aria-label={f.title || undefined}>
+    <section class="fl-panel" aria-label={f.title || undefined} onclickcapture={unarmed}>
       <header class="fl-head">
         <i class="fl-mark" aria-hidden="true"></i>
         <h2>{n ? tn("{n} wait on you", n) : t("Nothing waits on you")}</h2>

@@ -167,7 +167,28 @@ func TestAListPageReadsTheOpenGatesOnce(t *testing.T) {
 			t.Fatalf("%s: gates %+v, want its open question", v.ID, v.Gates)
 		}
 	}
-	if of, where := counted.ofTask.Load(), counted.where.Load(); of != 0 || where != 1 {
-		t.Fatalf("%d reads of a task's gates and %d of the open gates for a page of %d tasks, want 0 and 1", of, where, n)
+	if of, where := counted.ofTask.Load(), counted.where.Load(); of != 0 || where > 1 {
+		t.Fatalf("%d reads of a task's gates and %d of the open gates for a page of %d tasks, want none per task and the open gates at most once: the page's task facts may have read them for the pass", of, where, n)
+	}
+}
+
+// The home reads what the tasks wait on once for the page, never per task.
+func TestTheHomeReadsTheGatesOnceForThePage(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	const n = 10
+	for i := range n {
+		id := task.ID(fmt.Sprintf("t-%016x", i+1))
+		r.put(t, task.Task{ID: id, State: "inbox", Category: task.CategoryInbox, Title: "answer " + strconv.Itoa(i+1)})
+		r.withGates(t, id)
+	}
+	counted := &countedGates{Reader: r.s.deps.GateReader}
+	r.s.deps.GateReader = counted
+	var h api.Home
+	if code := get(t, r.s, api.HomePath, &h); code != 200 {
+		t.Fatalf("%d", code)
+	}
+	if of, where := counted.ofTask.Load(), counted.where.Load(); of != 0 || where > 2 {
+		t.Fatalf("%d reads of a task's gates and %d of the gates for a home of %d tasks, want none per task", of, where, n)
 	}
 }

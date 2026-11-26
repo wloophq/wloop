@@ -76,8 +76,11 @@ type Handlers struct {
 	OnPanelHidden func()
 	// OnOpenURL runs for each deep link the system hands the app.
 	OnOpenURL func(link string)
-	// OnFloat runs for each message the float's pages send.
-	OnFloat func(m FloatMessage)
+	// OnFloat runs for each message the float's pages send, and OnFloatGone
+	// when the web content process of the float's window named window
+	// (FloatTab or FloatPanel) ends.
+	OnFloat     func(m FloatMessage)
+	OnFloatGone func(window string)
 	// OnFloatMoving runs when the person starts moving the float, and
 	// OnFloatDropped with its frame once they let go.
 	OnFloatMoving  func()
@@ -139,6 +142,9 @@ type Controller struct {
 	// says the page is due its place, which it gets once it has loaded
 	// (pageReady: it sent a message since its last load) and the frame is set.
 	dragging, tellPlace, pageReady bool
+	// pageRead is how the tab's page last said its read of the queue went, ""
+	// until it said.
+	pageRead string
 }
 
 // New returns a controller of cfg.Host.
@@ -168,6 +174,7 @@ func (c *Controller) Run(ctx context.Context) error {
 		OnPanelHidden:  func() { c.setPanel(false) },
 		OnOpenURL:      c.OpenLink,
 		OnFloat:        c.floatMessage,
+		OnFloatGone:    c.floatGone,
 		OnFloatMoving:  c.floatMoving,
 		OnFloatDropped: c.floatDropped,
 		OnScreens:      c.setScreens,

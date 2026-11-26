@@ -6,12 +6,10 @@ import (
 	"slices"
 
 	"github.com/wloophq/wloop/internal/api"
-	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/home"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/decision"
-	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/i18n"
@@ -25,7 +23,10 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	ctx := r.Context()
+	ctx, ok := s.queuePass(r.Context(), w, g)
+	if !ok {
+		return
+	}
 	h, err := s.home(g).Home(ctx)
 	if err != nil {
 		writeTasksError(w, err)
@@ -83,11 +84,22 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 // home is the home service over g and the loaded profile.
 func (s *Server) home(g *coretasks.Service) home.Service {
 	l := s.loaded()
-	d := &taskDecisions{s: s, m: l.Decisions.Map}
-	if s.deps.GateReader != nil {
-		d.gates = s.deps.GateReader
+	return home.Service{Lists: g, Words: homeWords{l}, Decisions: &taskDecisions{s: s, m: l.Decisions.Map}}
+}
+
+// waiting is what the gates and the drafts make the tasks wait on; in a pass, read once.
+func (s *Server) waiting(ctx context.Context) (outbox.Waiting, error) {
+	var r outbox.WaitingReads
+	if rd := s.deps.GateReader; rd != nil {
+		r.Where = rd.Where
+		if svc := s.deps.Gates; svc != nil {
+			r.Pinned = svc.Pinned
+		}
+		if o := s.deps.Outbox; o != nil {
+			r.Drafts = o
+		}
 	}
-	return home.Service{Lists: g, Words: homeWords{l}, Decisions: d}
+	return outbox.ReadWaiting(ctx, r)
 }
 
 // captureKey is the key the cockpit's capture action runs on; "" when none.
@@ -136,57 +148,17 @@ func (w homeWords) Plugin(p unit.ProviderID) home.PluginWords {
 
 func (w homeWords) Form(n int) string { return i18n.Form(w.l.Locale, float64(n)) }
 
-// taskDecisions are the decisions a task waits on: its open gates but the draft gates an open message pins, and
-// the approved gates of its drafts whose delivery failed, read once for every task, and, while it is open, its units' situations and signals as the read model holds
-// them.
+// taskDecisions are the decisions a task waits on: what its gates and drafts make it wait on (outbox.Waiting),
+// read once per pass, and, while it is open, its units' situations and signals as the read model holds them.
 type taskDecisions struct {
-	s     *Server
-	m     decision.Map
-	gates gates.Reader
-	open  map[task.ID][]gate.Gate
-	// undelivered are the approved draft gates whose drafts failed to deliver, by task.
-	undelivered map[task.ID][]gate.Gate
+	s *Server
+	m decision.Map
 }
-
-// readUndelivered reads the approved draft gates whose drafts failed to deliver, by task, once per pass.
-func (d *taskDecisions) readUndelivered(ctx context.Context) (map[task.ID][]gate.Gate, error) {
-	o := d.s.deps.Outbox
-	if o == nil {
-		return nil, nil
-	}
-	return coretasks.Once(ctx, passUndelivered, func() (map[task.ID][]gate.Gate, error) { return outbox.Undelivered(ctx, o, d.gates.Where) })
-}
-
-const passUndelivered = "daemon.undelivered"
 
 func (d *taskDecisions) Of(ctx context.Context, e task.Task) ([]decision.Found, error) {
-	if d.open == nil {
-		d.open = map[task.ID][]gate.Gate{}
-		if d.gates != nil {
-			open, err := d.s.openGates(ctx, d.gates)
-			if err != nil {
-				return nil, err
-			}
-			var gs []gate.Gate
-			for _, g := range open {
-				gs = append(gs, g...)
-			}
-			if svc := d.s.deps.Gates; svc != nil {
-				pinned, err := svc.Pinned(ctx)
-				if err != nil {
-					return nil, err
-				}
-				gs = gates.Unpinned(gs, pinned)
-			}
-			for _, g := range gs {
-				d.open[g.Task] = append(d.open[g.Task], g)
-			}
-			undelivered, err := d.readUndelivered(ctx)
-			if err != nil {
-				return nil, err
-			}
-			d.undelivered = undelivered
-		}
+	w, err := d.s.waiting(ctx)
+	if err != nil {
+		return nil, err
 	}
 	var sources []decision.Source
 	var units []unit.Unit
@@ -202,5 +174,5 @@ func (d *taskDecisions) Of(ctx context.Context, e task.Task) ([]decision.Found, 
 			sources = append(sources, decision.Source{Unit: u, Situation: situation, Signals: signals, Since: moved})
 		}
 	}
-	return d.m.Of(d.open[e.ID], d.undelivered[e.ID], sources), nil
+	return w.Of(d.m, e.ID, sources), nil
 }

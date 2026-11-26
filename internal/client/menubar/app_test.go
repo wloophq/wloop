@@ -79,13 +79,14 @@ type fakeDaemon struct {
 	stringsErr  error
 	stringsN    int
 	queue       *api.Queue // nil: Needs you with no item
+	queueErr    error      // QueueAll answers it
 }
 
 func (f *fakeDaemon) QueueAll(context.Context, string) (api.Queue, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if f.err != nil {
-		return api.Queue{}, f.err
+	if err := cmp.Or(f.err, f.queueErr); err != nil {
+		return api.Queue{}, err
 	}
 	if f.queue == nil {
 		return api.Queue{Title: "Needs you", View: "needs-you", Items: []api.QueueItem{}}, nil

@@ -205,6 +205,7 @@ func newHost(app *application.App, name string) *host {
 	h.makePanel = h.newFloatPanel
 	h.float.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) { e.Cancel() })
 	h.float.OnWindowEvent(events.Mac.WindowDidMove, func(*application.WindowEvent) { h.do(h.floatMoved) })
+	h.float.OnWindowEvent(events.Mac.WebViewWebContentProcessDidTerminate, func(*application.WindowEvent) { h.do(func() { h.floatGone(window.FloatTab) }) })
 	h.main.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
 		e.Cancel()
 		h.do(h.hideMain)
@@ -264,10 +265,25 @@ func (h *host) start() {
 	h.running.Go(h.work)
 }
 
-// stop ends the worker and every release poll, and waits for them.
+// quitGrace is how long quitting waits for the worker: work that waits on the
+// main thread, whose loop app.Run has ended, never returns.
+const quitGrace = 2 * time.Second
+
+// stop ends the worker and every release poll, and waits for them, at most
+// quitGrace.
 func (h *host) stop() {
 	close(h.done)
-	h.running.Wait()
+	stopped := make(chan struct{})
+	go func() {
+		h.running.Wait()
+		close(stopped)
+	}()
+	t := time.NewTimer(quitGrace)
+	defer t.Stop()
+	select {
+	case <-stopped:
+	case <-t.C:
+	}
 }
 
 // launched restores the main window's frame and readies the float's tab for
@@ -284,6 +300,7 @@ func (h *host) newFloatPanel() floatNative {
 	w := h.app.Window.NewWithOptions(floatOptions(h.name, floatPanelName))
 	w.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) { e.Cancel() })
 	w.OnWindowEvent(events.Mac.WindowDidResignKey, func(*application.WindowEvent) { h.do(h.panelResigned) })
+	w.OnWindowEvent(events.Mac.WebViewWebContentProcessDidTerminate, func(*application.WindowEvent) { h.do(func() { h.floatGone(window.FloatPanel) }) })
 	over := h.handlers().FloatOverFullScreen
 	application.InvokeSync(func() {
 		floatOnly(nsWindow(w), h.panelKeyable.Load, h.pointerIn(window.FloatPanel), h.app.Logger)
@@ -612,6 +629,14 @@ func (h *host) pageMessage(windowName, message, origin string, mainFrame bool) {
 			on(m)
 		}
 	})
+}
+
+// floatGone tells the controller the web content process of the float's
+// window win ended; it runs on the worker.
+func (h *host) floatGone(win string) {
+	if on := h.handlers().OnFloatGone; on != nil {
+		on(win)
+	}
 }
 
 // setPanelMode keeps mode; a full panel that shows with the pointer already

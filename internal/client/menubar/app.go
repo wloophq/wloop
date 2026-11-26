@@ -124,8 +124,12 @@ type Controller struct {
 	// taskViews are the views whose tasks notify: those the profile's badge names.
 	taskViews []api.TaskViewSpec
 	// needs is what waits on the user, the queue of every decision kind, which the menu lists first.
-	needs    api.Queue
-	counters *api.Counters
+	needs api.Queue
+	// queueRead says the last pullTasks read the queue; queueErr is why the last read of it failed, "" when it did
+	// not, so each reason is logged once.
+	queueRead bool
+	queueErr  string
+	counters  *api.Counters
 	// tasksLoading and rowsLoading are the plugins the last pages of tasks and of rows said are still
 	// loading.
 	tasksLoading, rowsLoading []api.Loading
@@ -394,7 +398,7 @@ func (c *Controller) refresh(ctx context.Context, health, rows bool) {
 		})
 		return
 	}
-	c.floatRefreshed(rows)
+	c.floatRefreshed(rows && c.queueRead)
 	c.cfg.Tray.SetTitle(c.title())
 	c.cfg.Tray.SetMenu(c.menu(c.health))
 	c.notify()

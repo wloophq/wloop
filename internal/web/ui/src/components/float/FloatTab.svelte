@@ -1,11 +1,12 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { FLOAT_HOVER_OPEN_MS, floatState } from "../../state/float.svelte";
+  import { FLOAT_HOVER_OPEN_MS, floatDeps, floatState } from "../../state/float.svelte";
   import { floatSize } from "./float";
   import Pill from "./Pill.svelte";
 
   // The floating widget's tab page: the pill alone, upright on a docked edge. It reports its size, which depends on
-  // where it is docked and on its counts only, and asks the host for the panel, which opens in a window of its own.
+  // where it is docked and on its counts only, asks the host for the panel, which opens in a window of its own, and
+  // tells it how its last read of the queue went, which decides whether the menu bar's banners stand in for it.
   const f = floatState();
 
   let root: HTMLElement | undefined = $state();
@@ -16,6 +17,14 @@
   $effect(() => {
     void [f.items.length, f.read, f.place.edge, f.turns, f.loaded];
     queueMicrotask(() => report());
+  });
+
+  let told = "";
+  $effect(() => {
+    const read = f.loaded || f.read !== "ok" ? f.read : "";
+    if (!read || read === told) return;
+    told = read;
+    floatDeps.post({ type: "float:state", read });
   });
 
   function enter(): void {

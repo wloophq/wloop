@@ -45,6 +45,9 @@ type ViewSort func(ctx context.Context, view string, ts []task.Task) error
 // for the pass.
 type Pass struct {
 	Tasks []task.Task
+	// all says Tasks are every stored task, as the service reads them; a pass built elsewhere, such as a sweep's
+	// over the open tasks, is not one the service reuses as all of them.
+	all bool
 
 	mu    sync.Mutex
 	facts map[task.ID]workflow.Facts
@@ -455,15 +458,13 @@ func (s *Service) hider() func(task.Task) bool {
 	}
 }
 
-// Stored are the stored tasks of ids, from the pass ctx carries, else the pass every reader shares; an id no
+// Stored are the stored tasks of ids, from the pass ctx carries when it holds every task, else the pass every
+// reader shares; an id no
 // stored task holds is left out.
 func (s *Service) Stored(ctx context.Context, ids []task.ID) (map[task.ID]task.Task, error) {
-	pass, ok := PassOf(ctx)
-	if !ok {
-		var err error
-		if pass, err = s.pass(ctx); err != nil {
-			return nil, err
-		}
+	pass, err := s.pass(ctx)
+	if err != nil {
+		return nil, err
 	}
 	out := make(map[task.ID]task.Task, len(ids))
 	for _, id := range ids {

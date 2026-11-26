@@ -21,6 +21,10 @@ export const FLOAT_RETRY_MS = 2000;
 export const FLOAT_RETRY_MAX_MS = 60000;
 // FLOAT_HOVER_OPEN_MS is how long the pointer rests on the tab before it asks for the panel; the host closes it.
 export const FLOAT_HOVER_OPEN_MS = 120;
+// FLOAT_ARM_MS is how long the panel shows before its actions take a click: a panel the pointer opened by resting
+// on the tab must not take, as a decision, a click meant for what was under it. The click itself makes the window
+// key, so having the keyboard says nothing about a click.
+export const FLOAT_ARM_MS = 600;
 
 // FloatMode is what the panel's page shows: nothing while its window is hidden, a peek, or the full panel.
 export type FloatMode = "" | "peek" | "panel";
@@ -43,14 +47,16 @@ export interface PanelPlace {
 }
 
 // floatDeps are what the widget reaches beyond its state: resolving an item's gate, running any other primary,
-// opening an item's unit at its source, posting a message to the window that hosts it, and asking for a peek at an
-// item that arrived, which only the tab's page does. The page wires them; each is inert until then.
+// opening an item's unit at its source, posting a message to the window that hosts it, asking for a peek at an
+// item that arrived, which only the tab's page does, and whether the page's window has the keyboard. The page wires
+// them; each is inert until then.
 export const floatDeps = {
   resolve: async (_item: J, _intent: string, _option?: string): Promise<unknown> => null,
   run: async (_item: J): Promise<unknown> => null,
   openUnit: (_item: J): void => {},
   post: (_message: J): void => {},
   peek: (_item: J): void => {},
+  focused: (): boolean => false,
 };
 
 // FloatRead is how the last read went: answered, the daemon unreachable, or the queue refused by a daemon that answers.
@@ -63,6 +69,7 @@ const fresh = () => ({
   empty: "",
   turns: null as J,
   mode: "" as FloatMode,
+  shownAt: 0,
   peekKey: "",
   peeking: false,
   pinned: false,
@@ -92,6 +99,8 @@ const marks = {
   timers: { peek: undefined as Timer, focus: undefined as Timer, quiet: undefined as Timer, sync: undefined as Timer, retry: undefined as Timer },
   queued: null as Reads | null,
   chain: Promise.resolve(),
+  idle: false,
+  missed: null as Reads | null,
 };
 
 // itemKey names an item across reads, as the menu bar does: its gate, else its task's decision of its kind and
@@ -188,7 +197,28 @@ function lose(read: FloatRead): void {
 function retry(): void {
   timer.clear(marks.timers.retry);
   const wait = Math.min(FLOAT_RETRY_MAX_MS, FLOAT_RETRY_MS * 2 ** marks.retries++);
-  marks.timers.retry = timer.set(() => void floatLoad(), wait);
+  marks.timers.retry = timer.set(() => (asleep() ? miss({ queue: true, turns: true }) : void floatLoad()), wait);
+}
+
+// floatIdleWhileHidden makes the page read nothing while it shows nothing, as the panel's page, whose window stays
+// hidden until it shows a peek or the panel: what the events asked for meanwhile is read as it shows.
+export function floatIdleWhileHidden(): void {
+  marks.idle = true;
+}
+
+const asleep = (): boolean => marks.idle && fl.mode === "";
+
+// miss keeps what a read asked for while the page slept.
+function miss(what: Reads): void {
+  const m = marks.missed || { queue: false, turns: false };
+  marks.missed = { queue: m.queue || what.queue, turns: m.turns || what.turns };
+}
+
+// wake reads what the page missed while it slept.
+function wake(): void {
+  const what = marks.missed;
+  marks.missed = null;
+  if (what) void floatLoad(what);
 }
 
 async function read(asked: Reads): Promise<void> {
@@ -216,6 +246,7 @@ export function floatLoad(what: Reads = { queue: true, turns: true }): Promise<v
 }
 
 function schedule(what: Reads): void {
+  if (asleep()) return miss(what);
   const q = marks.queued || { queue: false, turns: false };
   marks.queued = { queue: q.queue || what.queue, turns: q.turns || what.turns };
   timer.clear(marks.timers.sync);
@@ -273,9 +304,11 @@ function show(m: FloatMode, p?: Partial<PanelPlace> & { item?: string }): void {
   }
   const item = p && typeof p.item === "string" ? p.item : "";
   if (!FLOAT_MODES.includes(m) || (m === fl.mode && !item)) return;
-  if (m === "panel") return openPanel(item);
-  if (m === "peek") return peekAt(item);
-  shut();
+  const waking = asleep() && m !== "";
+  if (m === "panel") openPanel(item);
+  else if (m === "peek") peekAt(item);
+  else shut();
+  if (waking) wake();
 }
 
 // openPanel shows the full panel on the item keyed key, else on the one last peeked at.
@@ -284,6 +317,7 @@ function openPanel(key = ""): void {
   const i = at ? fl.items.findIndex((it) => itemKey(it) === at) : -1;
   if (i >= 0) fl.current = i;
   endPeek();
+  if (fl.mode !== "panel") fl.shownAt = Date.now();
   Object.assign(fl, { mode: "panel", peekKey: "" });
 }
 
@@ -322,14 +356,21 @@ function pick(item: J, option: string): void {
   fl.picked[itemKey(item)] = option;
 }
 
-// act runs the current item's primary: its gate's intent, with the selected option when it offers options, or any
-// other primary; then the queue reads again, so the item leaves. It waits for the reads under way, and for one an
-// event queued, first and sends nothing when the item is no longer served. A primary that fails says so in failed
-// until the item leaves or the next act.
-async function act(intent?: string): Promise<void> {
-  const at = fl.items[fl.current];
-  if (!at || fl.busy) return;
-  const key = itemKey(at);
+// clickArmed says the panel has shown FLOAT_ARM_MS, so its actions take a click.
+const clickArmed = (): boolean => Date.now() - fl.shownAt >= FLOAT_ARM_MS;
+
+// armed says the panel's actions run: it is armed for a click, or its window has the keyboard, as for a key.
+const armed = (): boolean => clickArmed() || floatDeps.focused();
+
+// act runs the primary of the item keyed key, the current one when none, as its card drew it: its gate's intent,
+// with the selected option when it offers options, or any other primary; then the queue reads again, so the item
+// leaves. It waits for the reads under way, and for one an event queued, first and sends nothing when the item is no
+// longer served, or while the panel is not armed. A primary that fails says so in failed until the item leaves or the
+// next act.
+async function act(key = "", intent?: string): Promise<void> {
+  const current = fl.items[fl.current];
+  key = key || (current ? itemKey(current) : "");
+  if (!key || fl.busy || !armed()) return;
   fl.busy = true;
   fl.failed = { key: "", text: "" };
   try {
@@ -431,6 +472,12 @@ export function floatState() {
     get busy(): boolean {
       return fl.busy;
     },
+    get armed(): boolean {
+      return armed();
+    },
+    get clickArmed(): boolean {
+      return clickArmed();
+    },
     // failed is how the last primary run from the widget failed, "" when it did not.
     get failed(): string {
       return fl.failed.text;
@@ -472,7 +519,7 @@ export type FloatState = ReturnType<typeof floatState>;
 // resetFloat puts the widget back as the page starts; tests call it between cases.
 export function resetFloat(): void {
   for (const id of Object.values(marks.timers)) timer.clear(id);
-  Object.assign(marks, { seen: new Set<string>(), focus: "", burst: false, retries: 0, queued: null, chain: Promise.resolve() });
+  Object.assign(marks, { seen: new Set<string>(), focus: "", burst: false, retries: 0, queued: null, chain: Promise.resolve(), idle: false, missed: null });
   marks.timers = { peek: undefined, focus: undefined, quiet: undefined, sync: undefined, retry: undefined };
   Object.assign(fl, fresh());
 }

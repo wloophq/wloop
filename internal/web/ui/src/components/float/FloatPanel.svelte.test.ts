@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render } from "@testing-library/svelte";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { J } from "../../lib/util";
 import { nav } from "../../state/route.svelte";
-import { FLOAT_PEEK_LINGER_MS, FLOAT_PEEK_MS, floatDeps, floatLoad, floatState, itemKey, resetFloat } from "../../state/float.svelte";
+import { FLOAT_ARM_MS, FLOAT_PEEK_LINGER_MS, FLOAT_PEEK_MS, floatDeps, floatLoad, floatState, itemKey, resetFloat } from "../../state/float.svelte";
 import { flushSync } from "svelte";
 import { notice, tasksState } from "../../state/store.svelte";
 import { draftGate, pendingDraft, reviewDraft, taskCatalog } from "../../testing/gates";
@@ -222,6 +222,7 @@ test("a retry the daemon refuses says so on the float, and the refusal goes no f
   })] };
   await floatLoad();
   const c = render(FloatPanel).container;
+  floatDeps.focused = () => true;
   floatState().setPinned(true);
   await settle();
   await expect(floatState().act()).resolves.toBeUndefined();
@@ -490,4 +491,25 @@ test("a peek at an item the page has not read yet reports no size until it has",
   await settle();
   expect(flyout(c)).not.toBeNull();
   expect(sizes().at(-1)!.mode).toBe("peek");
+});
+
+test("a click on an action of a panel the pointer just opened does nothing, until the panel has shown FLOAT_ARM_MS, though the click made its window key", async () => {
+  let now = 1_000_000;
+  vi.spyOn(Date, "now").mockImplementation(() => now);
+  floatDeps.focused = () => true;
+  const daemon = new FakeDaemon({ "/api/queue": () => served, "/api/turns/live": () => turns() });
+  daemon.fallback = () => ({});
+  const resolved = () => daemon.calls.filter((x) => x.init && x.init.method === "POST").map((x) => x.url);
+  await floatLoad();
+  const c = render(FloatPanel).container;
+  floatState().show("panel");
+  await settle();
+  const primary = () => c.querySelector<HTMLButtonElement>(".fl-panel .act.primary")!;
+  await fireEvent.click(primary());
+  await settle();
+  expect(resolved()).toEqual([]);
+  now += FLOAT_ARM_MS;
+  await fireEvent.click(primary());
+  await settle();
+  expect(resolved()).toEqual(["/api/gates/1/approve"]);
 });

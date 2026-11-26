@@ -135,6 +135,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `detail` | ✅ | a command's action id |
 | `dismiss` | ✅ | a plan action's handler |
 | `draft` | ✅ | a reply's send mode an action takes |
+| `drawsBackground` | ✅ | the key of a web view's own background in AppKit's key-value coding |
 | `edit` | ✅ | a draft verb's handler |
 | `filter` | ✅ | a core action's id |
 | `guide` | ✅ | a plan action's handler |

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { fmtNumber, t } from "../../lib/i18n.svelte";
   import type { J } from "../../lib/util";
-  import { optionOf, type FloatState } from "../../state/float.svelte";
+  import { itemKey, optionOf, type FloatState } from "../../state/float.svelte";
   import { subjectOf } from "../gates/gates";
   import { draftSummary, hovered, itemLink, itemRef, itemTitle, toneClass } from "./float";
 
@@ -81,8 +81,8 @@
     {/if}
   {/if}
   <div class="fl-acts">
-    <button type="button" class="act primary" disabled={f.busy || undefined} onclick={() => f.act()}><kbd>↵</kbd> {(option && option.primary) || p.label || p.id}</button>
+    <button type="button" class="act primary" disabled={f.busy || undefined} onclick={() => f.act(itemKey(item))}><kbd>↵</kbd> {(option && option.primary) || p.label || p.id}</button>
     <button type="button" class="act" onclick={() => f.open()}>{t("Edit")}</button>
-    {#each others as x (x.id)}<button type="button" class="act quiet" disabled={f.busy || undefined} onclick={() => f.act(x.id)}>{x.label}</button>{/each}
+    {#each others as x (x.id)}<button type="button" class="act quiet" disabled={f.busy || undefined} onclick={() => f.act(itemKey(item), x.id)}>{x.label}</button>{/each}
   </div>
 </article>

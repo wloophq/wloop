@@ -284,3 +284,22 @@ func TestNeedsYouWordsEachItemByItsKind(t *testing.T) {
 		t.Fatalf("menu %q, want each item worded by its kind", got)
 	}
 }
+
+// A queue the daemon fails to serve keeps the menu, its title and the banners
+// going on the last queue read, as the daemon's other reads do not hang on it.
+func TestAQueueReadThatFailsKeepsTheMenuAndTheBanners(t *testing.T) {
+	r := newRig(t)
+	r.d.queue = needsYou(plainTask(1))
+	r.c.Refresh(context.Background())
+	r.d.mu.Lock()
+	r.d.queueErr = errors.New("the queue failed")
+	r.d.tasks["inbox"] = []api.TaskView{pendingTask(2)}
+	r.d.mu.Unlock()
+	r.c.Refresh(context.Background())
+	if got, menu := r.title(), titles(r.tray.menu); got != brand.Name+" 1" || index(menu, "Needs you (1)") < 0 {
+		t.Fatalf("title %q, menu %q: want the last queue read's", got, menu)
+	}
+	if len(r.notes.posted) != 1 {
+		t.Fatalf("posted %+v, want the inbox task's banner", r.notes.posted)
+	}
+}

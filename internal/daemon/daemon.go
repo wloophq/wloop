@@ -459,6 +459,8 @@ type Server struct {
 	pinsAt time.Time
 	// replyBroadcasts keeps, by replyKey, the broadcast a task's reply would take and when it was asked.
 	replyBroadcasts sync.Map
+	// queueDrops keeps, by item key, why queueItems last dropped that item, so each reason is logged once.
+	queueDrops sync.Map
 	// lookupsSwept is when keepLookup last swept draftWheres and replyBroadcasts, in Unix nanoseconds.
 	lookupsSwept atomic.Int64
 	// whereLookup and wherePage override draftWhereTimeout and draftWhereBudget; zero keeps them.

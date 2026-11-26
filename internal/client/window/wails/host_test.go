@@ -485,3 +485,33 @@ func TestThePanelsStayFloatingOnceTheyBecomeKey(t *testing.T) {
 		t.Errorf("the panel does not show over a full-screen app")
 	}
 }
+
+// Quitting waits for the worker, but no longer than quitGrace: work that waits
+// on the main thread, which quitting has stopped, never returns.
+func TestQuittingWaitsForTheWorkerAtMostItsGrace(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		h := &host{}
+		h.start()
+		h.do(func() {})
+		synctest.Wait()
+		start := time.Now()
+		h.stop()
+		if took := time.Since(start); took != 0 {
+			t.Fatalf("an idle worker stopped in %v, want at once", took)
+		}
+	})
+	synctest.Test(t, func(t *testing.T) {
+		h := &host{}
+		h.start()
+		mainThread := make(chan struct{})
+		h.do(func() { <-mainThread })
+		synctest.Wait()
+		start := time.Now()
+		h.stop()
+		if took := time.Since(start); took != quitGrace {
+			t.Fatalf("a worker held on the main thread stopped the quit for %v, want %v", took, quitGrace)
+		}
+		close(mainThread)
+		h.running.Wait()
+	})
+}
