@@ -23,8 +23,8 @@ func (e *Env) serveMessages(ctx context.Context, d daemon.Deps, db *sqlite.DB, c
 	if svc == nil {
 		svc = &messages.Service{Store: inventory.NewMessages(db), Books: openPRBooks{sqlite.New(db), e.reportedPRs()}, Turns: e.Turns,
 			Ledger: ledger, Tasks: tasks, Gates: draftGates{e, db, logf}, Drafts: optionDrafts{draftGates{e, db, logf}}, Intents: registryPort{e}, Clock: clockFunc(e.Now), Log: logf,
-			ProposalText: proposalText(e.loadedIntents, logf),
-			ChatDeps:     messages.ChatDeps{Sessions: e.Turns, Log: chatLog{db}, Units: db.Tasks(), Merged: db, Intent: e.chatIntent, Memory: e.memory}}
+			ProposalText: proposalText(e.loadedIntents, logf), Ready: e.outboxBuilt,
+			ChatDeps: messages.ChatDeps{Sessions: e.Turns, Log: chatLog{db}, Units: db.Tasks(), Merged: db, Intent: e.chatIntent, Memory: e.memory}}
 		e.setInbox(svc)
 	}
 	e.Turns.Chats = svc.Chats()

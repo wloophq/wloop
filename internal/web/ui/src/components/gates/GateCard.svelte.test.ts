@@ -243,6 +243,7 @@ describe("qcard_test.go, the question's card", () => {
     expect(second.getAttribute("data-rev")).toBe("4");
     expect(texts(all(c, ".d-pin")[2], ".d-note.err")).toEqual(["Picking this option posts draft #44, which is gone."]);
     expect(texts(c, ".d-pin .pv").length).toBeGreaterThan(0);
+    expect(all(c, ".opt").map((o) => (o as HTMLButtonElement).disabled)).toEqual([false, false, true]);
   });
 });
 
@@ -309,6 +310,19 @@ describe("rf1_reattack5_test.go, a pinned recommendation", () => {
     await fireEvent.click(byFocus(c, "gate:3:answer"));
     await settle();
     expect(posts).toEqual([{ path: "/api/gates/3/answer", body: { source: "cockpit", args: { answer: "post\nand thank them", rev: "3" } } }]);
+  });
+
+  test("TestAPickWhoseDraftLeftIsNotSent: an option picked before its draft left sends no answer that would only resume the turn", async () => {
+    const posts = recordPosts();
+    const g = pinned();
+    let c = card(g);
+    await fireEvent.click(byFocus(c, "gate:3:option:post"));
+    g.subject.pinned = [];
+    c = card(g);
+    await fireEvent.click(byFocus(c, "gate:3:answer"));
+    await settle();
+    expect(posts).toEqual([]);
+    expect(gateState.picked.get("3") || "").toBe("");
   });
 
   test("TestAPickCarriesThePersonsEditOfThePinnedDraft: the pinned draft is edited on the card and the pick sends the edit", async () => {

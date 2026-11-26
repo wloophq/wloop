@@ -3,10 +3,12 @@ package messages
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strconv"
 
 	"github.com/wloophq/wloop/internal/core/gates"
+	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/message"
@@ -294,4 +296,104 @@ type forThePerson struct{}
 
 func (forThePerson) Decide(context.Context, gate.Gate) (gates.Decision, error) {
 	return gates.Decision{Mode: gate.ModeWait}, nil
+}
+
+// ReasonPinsLeft is why the turn of a question is dismissed once no draft its answers would post waits on the user.
+const ReasonPinsLeft = "pins_left"
+
+// CloseLeftQuestions closes each open question whose every answer but a refusal posts a draft (each option pins one,
+// or the confirm does) and none of whose drafts waits on the user any longer: dropped, withdrawn or sent without a
+// pick. It looks at every open question, since a draft may sit on another unit than the turn that asked about it.
+// Under the question's claim, so a pick in flight keeps it, the turn that asked it is dismissed for ReasonPinsLeft
+// before its gate is superseded, and no pass opens the message a gate until it closes, with no answer.
+func (s *Service) CloseLeftQuestions(ctx context.Context) error {
+	if s.Drafts == nil {
+		return nil
+	}
+	open, err := s.Store.Open(ctx)
+	if err != nil {
+		return err
+	}
+	var errs []error
+	for _, m := range open {
+		if m.Kind != message.Question || !postsOnly(m) {
+			continue
+		}
+		if left, err := s.pinsLeft(ctx, m); err != nil || !left {
+			errs = append(errs, err)
+			continue
+		}
+		errs = append(errs, s.closeLeft(ctx, m))
+	}
+	return errors.Join(errs...)
+}
+
+// closeLeft dismisses the turn of question m, whose pinned drafts all left, supersedes its gate and closes it, holding
+// the gating lock so a pass meanwhile does not open the still open message a new gate.
+func (s *Service) closeLeft(ctx context.Context, m message.Message) error {
+	s.gating.Lock()
+	defer s.gating.Unlock()
+	g, ok, err := s.openGate(ctx, m)
+	if err != nil || !ok {
+		return err
+	}
+	dismissed := false
+	closed, err := s.Gates.SupersedeQuestion(ctx, g.ID, func(ctx context.Context) (bool, error) {
+		if left, err := s.pinsLeft(ctx, m); err != nil || !left {
+			return false, err
+		}
+		var refused turns.Refusal
+		if err := s.Turns.DismissTurn(ctx, m.Unit, m.Origin.TurnSeq, ReasonPinsLeft); err != nil && !errors.As(err, &refused) {
+			return false, fmt.Errorf("dismissing the turn of question %d: %w", m.ID, err)
+		}
+		dismissed = true
+		return true, nil
+	})
+	if err != nil || !dismissed {
+		return err
+	}
+	if closed {
+		s.logf("messages: question %d on %s: no draft its answers post waits on the user; its turn dismissed, gate %d superseded", m.ID, m.Unit, g.ID)
+	} else {
+		s.logf("messages: question %d on %s: no draft its answers post waits on the user; its turn dismissed, gate %d closed otherwise meanwhile", m.ID, m.Unit, g.ID)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.close(ctx, m, "")
+}
+
+// postsOnly says whether every answer to question m but a refusal posts a draft: a confirm that pins one, or options
+// that each pin one. An option that posts nothing keeps the question worth answering whatever its drafts become.
+func postsOnly(m message.Message) bool {
+	if m.Confirm {
+		return m.Draft != nil
+	}
+	return len(m.Options) > 0 && !slices.ContainsFunc(m.Options, func(o record.Option) bool { return o.Draft == nil })
+}
+
+// pinsLeft says whether no draft question m pins, in its confirm or its options, is one its turn chain holds that
+// still waits on the user, and no answer to m picked one: a picked draft leaves through the pick.
+func (s *Service) pinsLeft(ctx context.Context, m message.Message) (bool, error) {
+	held := s.turnDrafts(m)
+	refs := []*record.DraftRef{m.Draft}
+	for _, o := range m.Options {
+		refs = append(refs, o.Draft)
+	}
+	for _, ref := range refs {
+		if ref == nil {
+			continue
+		}
+		d, _, ok, err := held.of(ctx, ref.ID)
+		if err != nil {
+			return false, err
+		}
+		if ok && d.State == draft.Held {
+			return false, nil
+		}
+	}
+	answered, err := s.Gates.Where(ctx, gates.Query{Kind: gate.KindQuestion, Unit: m.Unit, Statuses: []gate.Status{gate.Answered}})
+	if err != nil {
+		return false, err
+	}
+	return !slices.ContainsFunc(answered, func(g gate.Gate) bool { return g.Subject == subjectOf(m) }), nil
 }

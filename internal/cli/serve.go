@@ -391,6 +391,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	e.serveTurnLedger(db, cfg, logf)
 	links := e.linkDeps(db, cfg, logf, &sd)
 	e.serveMemory(db, cfg, logf)
+	e.outboxBuilt = make(chan struct{})
 	d = e.serveMessages(ctx, d, db, cfg, logf)
 	mods, err := buildSources(e.sourcePlugins(), cfg, sd, e.pluginUI)
 	if err != nil {
@@ -403,6 +404,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	e.serveProposals(ctx, db, cfg, mods, logf)
 	d = e.serveOutbox(d, db, cfg, mods, logf)
 	d = e.serveAgentDrafts(d, db, cfg, logf)
+	close(e.outboxBuilt)
 	e.servePlacement(mods)
 	d = links.serve(d, mods)
 	serveProjects(d.Tasks, db)

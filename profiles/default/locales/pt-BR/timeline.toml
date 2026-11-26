@@ -140,7 +140,7 @@ label = "sessão do agente unida"
 label = "o agente alcançou o loop"
 
 [events.turn_dismissed]
-label = "turno descartado por uma regra"
+label = "turno descartado pelo loop"
 
 [events.answer_refused]
 label = "resposta recusada"
