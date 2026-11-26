@@ -3,6 +3,7 @@ package window
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -160,6 +161,9 @@ func TestParseFloatMessage(t *testing.T) {
 		{`{"type":"float:state","read":"failed"}`, FloatMessage{Kind: FloatState, Read: ReadFailed}, true},
 		{`{"type":"float:state","read":"ok"}`, FloatMessage{Kind: FloatState, Read: ReadOK}, true},
 		{`{"type":"float:state","read":"later"}`, FloatMessage{}, false},
+		{`{"type":"float:filter","filter":{"q":"source:github","kinds":["answer"]}}`, FloatMessage{Kind: FloatFilterSet, Filter: FloatFilter{Q: "source:github", Kinds: []string{"answer"}}}, true},
+		{`{"type":"float:filter","filter":{}}`, FloatMessage{Kind: FloatFilterSet}, true},
+		{`{"type":"float:filter"}`, FloatMessage{}, false},
 		{`{"type":"float:size","w":0,"h":32}`, FloatMessage{}, false},
 		{`{"type":"float:move","x":1}`, FloatMessage{}, false},
 		{`float:size {"w":460,"h":600}`, FloatMessage{}, false},
@@ -168,7 +172,7 @@ func TestParseFloatMessage(t *testing.T) {
 	}
 	for _, c := range cases {
 		got, ok := ParseFloatMessage(c.raw)
-		if ok != c.ok || got != c.want {
+		if ok != c.ok || !reflect.DeepEqual(got, c.want) {
 			t.Errorf("%q: %+v %v, want %+v %v", c.raw, got, ok, c.want, c.ok)
 		}
 	}
@@ -715,7 +719,12 @@ func panelMsg(m FloatMessage) FloatMessage {
 // a quarter down.
 func dockedRig(t *testing.T) *rig {
 	t.Helper()
-	d := memDefaults{}
+	return dockedRigIn(t, memDefaults{})
+}
+
+// dockedRigIn is dockedRig keeping its state in d.
+func dockedRigIn(t *testing.T, d memDefaults) *rig {
+	t.Helper()
 	SavePlacement(d, FloatPlacement{Edge: EdgeRight, Corner: CornerTopRight, X: 1512, Y: 260.75, W: 34, H: 84})
 	r := shownRig(t, d, laptop)
 	r.host.handlers().OnFloat(size(34, 84))
@@ -1029,4 +1038,61 @@ func TestAStoppedControllerTellsItsHookNothing(t *testing.T) {
 			t.Fatalf("hook ran %d times, want once, before Run returned", n)
 		}
 	})
+}
+
+// filterMsg is the panel's page setting the filter to f.
+func filterMsg(f FloatFilter) FloatMessage {
+	return panelMsg(FloatMessage{Kind: FloatFilterSet, Filter: f})
+}
+
+// A filter the panel sets is kept for the next launch and told to the tab,
+// whose page reads the queue it narrows, and to the open panel; the menu bar
+// hears of it once per change.
+func TestTheFilterSurvivesARestartAndReachesBothPages(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := memDefaults{}
+		r := dockedRigIn(t, d)
+		heard := 0
+		r.ctl.OnFloatFilter(func() { heard++ })
+		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatOpenPanel})
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatClose}))
+		r.host.handlers().OnFloat(panelMsg(FloatMessage{Kind: FloatSize, W: 476, H: 600, Mode: ModePanel}))
+		r.host.taken()
+
+		f := FloatFilter{Q: " source:github ", Kinds: []string{"answer", "", "answer", "send-draft"}}
+		r.host.handlers().OnFloat(filterMsg(f))
+		r.host.handlers().OnFloat(filterMsg(f))
+		clean := FloatFilter{Q: "source:github", Kinds: []string{"answer", "send-draft"}}
+		want(t, r.host.taken(),
+			"float-frame {1478 260.75 34 84}", `float-place "right"`+filterOf(clean),
+			`fpanel-tell "panel" "" "left" 1478x911`+filterOf(clean))
+		if heard != 1 {
+			t.Fatalf("the menu bar heard %d changes, want 1", heard)
+		}
+		if got := r.ctl.FloatFilter(); !reflect.DeepEqual(got, clean) {
+			t.Fatalf("filter %+v, want %+v", got, clean)
+		}
+
+		again := New(Config{Host: &fakeHost{}, Daemon: r.events, CockpitURL: cockpitURL, Defaults: d, FloatFilter: "@work"})
+		if got := again.FloatFilter(); !reflect.DeepEqual(got, clean) {
+			t.Fatalf("after a restart the filter is %+v, want %+v", got, clean)
+		}
+	})
+}
+
+// window.float_filter is the filter until the person sets one; clearing it
+// is kept, so the configured default does not come back.
+func TestTheConfiguredFilterIsTheDefaultUntilOneIsSet(t *testing.T) {
+	d := memDefaults{}
+	if got := New(Config{Host: &fakeHost{}, Defaults: d, FloatFilter: " asked-by:ana "}).FloatFilter(); !reflect.DeepEqual(got, FloatFilter{Q: "asked-by:ana"}) {
+		t.Fatalf("filter %+v, want the configured one", got)
+	}
+	SaveFilter(d, FloatFilter{})
+	if got := New(Config{Host: &fakeHost{}, Defaults: d, FloatFilter: "asked-by:ana"}).FloatFilter(); got.On() {
+		t.Fatalf("filter %+v, want the cleared one kept", got)
+	}
+	d[FilterKey] = "{"
+	if got := New(Config{Host: &fakeHost{}, Defaults: d, FloatFilter: "asked-by:ana"}).FloatFilter(); got.Q != "asked-by:ana" {
+		t.Fatalf("an unreadable saved filter gave %+v, want the configured one", got)
+	}
 }

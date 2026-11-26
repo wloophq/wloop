@@ -80,18 +80,32 @@ type fakeDaemon struct {
 	stringsN    int
 	queue       *api.Queue // nil: Needs you with no item
 	queueErr    error      // QueueAll answers it
+	narrowReads int        // reads of the queue narrowed by a query or kinds
+	narrowErr   error      // a narrowed QueueAll answers it
 }
 
-func (f *fakeDaemon) QueueAll(context.Context, string) (api.Queue, error) {
+// QueueAll narrows the queue as the daemon does, reading a query as words of an item's task title.
+func (f *fakeDaemon) QueueAll(_ context.Context, query string, kinds ...string) (api.Queue, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if err := cmp.Or(f.err, f.queueErr); err != nil {
 		return api.Queue{}, err
 	}
+	if query != "" || len(kinds) > 0 {
+		f.narrowReads++
+		if f.narrowErr != nil {
+			return api.Queue{}, f.narrowErr
+		}
+	}
 	if f.queue == nil {
 		return api.Queue{Title: "Needs you", View: "needs-you", Items: []api.QueueItem{}}, nil
 	}
-	return *f.queue, nil
+	q := *f.queue
+	q.Items = slices.DeleteFunc(slices.Clone(q.Items), func(it api.QueueItem) bool {
+		return len(kinds) > 0 && !slices.Contains(kinds, it.Kind) || !strings.Contains(it.Task.Title, query)
+	})
+	q.Total = len(q.Items)
+	return q, nil
 }
 
 func (f *fakeDaemon) Strings(context.Context) (api.Strings, error) {

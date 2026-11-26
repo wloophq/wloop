@@ -9,9 +9,10 @@
   import Peek from "./Peek.svelte";
   import Queue from "./Queue.svelte";
 
-  // The floating widget's panel page, in a window the host places beside the tab: the panel with the agents and the
-  // queue, or a peek's card of what arrived, or nothing while the window is hidden. It reports its size and mode, so
-  // the window fits what it draws, and asks the host to hide the window as it closes, which it says once as it loads.
+  // The floating widget's panel page, in a window the host places beside the tab: the panel with its filter, the
+  // agents and the queue, or a peek's card of what arrived, or nothing while the window is hidden. It reports its size
+  // and mode, so the window fits what it draws, and asks the host to hide the window as it closes, which it says once
+  // as it loads.
   const f = floatState();
   const open = $derived(f.mode === "panel");
   const n = $derived(f.items.length);
@@ -25,6 +26,21 @@
 
   let root: HTMLElement | undefined = $state();
   let menu = $state(false);
+
+  // query is the filter's field as typed; it narrows the queue once committed, and follows the filter the host sends.
+  let query = $state("");
+  $effect(() => {
+    query = f.filter.q;
+  });
+
+  function commit(): void {
+    f.setFilter({ q: query, kinds: f.filter.kinds });
+  }
+
+  function toggleKind(kind: string): void {
+    const kinds = f.filter.kinds.includes(kind) ? f.filter.kinds.filter((k) => k !== kind) : [...f.filter.kinds, kind];
+    f.setFilter({ q: f.filter.q, kinds });
+  }
 
   const HIDES: { mode: FloatHide; label: () => string }[] = [
     { mode: "quiet", label: () => t("Hide until something new") },
@@ -58,7 +74,7 @@
   });
 
   $effect(() => {
-    void [f.mode, f.peeked, f.items.length, f.read, maxW, maxH, menu, f.turns];
+    void [f.mode, f.peeked, f.items.length, f.read, maxW, maxH, menu, f.turns, f.kinds.length];
     queueMicrotask(() => report());
   });
 
@@ -130,7 +146,7 @@
     <section class="fl-panel" aria-label={f.title || undefined} onclickcapture={unarmed}>
       <header class="fl-head">
         <i class="fl-mark" aria-hidden="true"></i>
-        <h2>{n ? tn("{n} wait on you", n) : t("Nothing waits on you")}</h2>
+        <h2>{f.filtered ? tn("{n} of {total} wait on you", n, { total: fmtNumber(f.total) }) : n ? tn("{n} wait on you", n) : t("Nothing waits on you")}</h2>
         <span class="fl-sp"></span>
         {#if n}<span class="fl-meta">{t("{n} of {total}", { n: fmtNumber(f.current + 1), total: fmtNumber(n) })}</span>{/if}
         <button type="button" class="fl-quiet" aria-pressed={f.pinned ? "true" : "false"} onclick={() => f.setPinned(!f.pinned)}>{t("Pin")}</button>
@@ -143,6 +159,14 @@
           {/if}
         </span>
       </header>
+      <div class="fl-filter">
+        <input type="search" aria-label={t("Filter the queue")} placeholder={t("Filter the queue")} bind:value={query} onchange={commit} onkeydown={(e) => e.key === "Enter" && commit()} />
+        {#if f.kinds.length}
+          <span class="fl-kinds" role="group" aria-label={t("Decision kinds")}>
+            {#each f.kinds as k (k.id)}<button type="button" data-kind={k.id} aria-pressed={f.filter.kinds.includes(k.id) ? "true" : "false"} use:hovered onclick={() => toggleKind(k.id)}>{k.label}</button>{/each}
+          </span>
+        {/if}
+      </div>
       <div class="fl-body">
         {#if f.read === "offline"}
           <p class="fl-off">{t("The daemon is not answering.")}</p>

@@ -596,18 +596,20 @@ func bridgeJS(method string, args ...any) string {
 // floatPlaceJS tells the tab's page p.
 func floatPlaceJS(p window.FloatPlace) string {
 	return bridgeJS("place", struct {
-		Edge string `json:"edge"`
-	}{p.Edge})
+		Edge   string             `json:"edge"`
+		Filter window.FloatFilter `json:"filter"`
+	}{p.Edge, p.Filter})
 }
 
 // panelShowJS tells the panel's page to show p.
 func panelShowJS(p window.PanelPlace) string {
 	return bridgeJS("show", p.Mode, struct {
-		Item string  `json:"item"`
-		Side string  `json:"side"`
-		MaxW float64 `json:"maxW"`
-		MaxH float64 `json:"maxH"`
-	}{p.Item, p.Side, p.MaxW, p.MaxH})
+		Item   string             `json:"item"`
+		Side   string             `json:"side"`
+		MaxW   float64            `json:"maxW"`
+		MaxH   float64            `json:"maxH"`
+		Filter window.FloatFilter `json:"filter"`
+	}{p.Item, p.Side, p.MaxW, p.MaxH, p.Filter})
 }
 
 // pageMessage hands the controller a message one of the float's pages sent

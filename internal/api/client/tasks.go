@@ -80,11 +80,19 @@ func (c *Client) TaskDo(ctx context.Context, id, verb string, req api.TaskReques
 	return res, err
 }
 
-// QueueAll is the queue of every decision kind, narrowed by the lens query, every item when "".
-func (c *Client) QueueAll(ctx context.Context, query string) (api.Queue, error) {
+// QueueAll is the queue of every decision kind, narrowed by the lens query and to kinds, every item when both
+// are empty.
+func (c *Client) QueueAll(ctx context.Context, query string, kinds ...string) (api.Queue, error) {
 	path := api.QueueAllPath
+	v := url.Values{}
 	if query != "" {
-		path += "?" + url.Values{"q": {query}}.Encode()
+		v.Set("q", query)
+	}
+	for _, k := range kinds {
+		v.Add("kind", k)
+	}
+	if len(v) > 0 {
+		path += "?" + v.Encode()
 	}
 	var out api.Queue
 	err := c.do(ctx, ReadTimeout, http.MethodGet, path, nil, &out)

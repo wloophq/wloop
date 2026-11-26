@@ -530,3 +530,46 @@ test("a keyboard activation of an action runs at once in a panel that has the ke
   await settle();
   expect(resolved()).toEqual(["/api/gates/1/approve"]);
 });
+
+test("the panel's header filters the queue by a lens query and by kind, tells the host, and counts what it shows of the whole", async () => {
+  const kinds = [{ id: "answer", label: "Agent questions" }, { id: "send-draft", label: "Drafts to send" }, { id: "review-step", label: "Steps to review" }];
+  served = { title: "Needs you", kinds, items: [item(1, { kind: "answer" }), item(2)] };
+  const daemon = new FakeDaemon({ "/api/queue": () => served, "/api/turns/live": () => turns() });
+  daemon.fallback = (call) => {
+    const u = new URL(call.url, "http://x");
+    if (u.pathname !== "/api/queue") throw new Error("unexpected");
+    const ks = u.searchParams.getAll("kind");
+    const q = (u.searchParams.get("q") || "").toLowerCase();
+    return { ...served, items: served.items.filter((it: J) => (!ks.length || ks.includes(it.kind)) && it.task.title.toLowerCase().includes(q)) };
+  };
+  const filters = () => posted.filter((m) => m.type === "float:filter").map((m) => m.filter);
+  await floatLoad();
+  const c = render(FloatPanel).container;
+  floatState().show("panel", { filter: { q: "", kinds: [] } });
+  await settle();
+  const heading = () => (c.querySelector(".fl-head h2") as HTMLElement).textContent;
+  const chips = () => [...c.querySelectorAll(".fl-kinds button")].map((b) => [b.textContent!.trim(), b.getAttribute("aria-pressed")]);
+  expect(heading()).toBe("2 wait on you");
+  expect(chips()).toEqual([["Agent questions", "false"], ["Steps to review", "false"]]);
+
+  await fireEvent.click(c.querySelector('.fl-kinds button[data-kind="answer"]') as HTMLElement);
+  await floatLoad();
+  await settle();
+  expect(filters()).toEqual([{ q: "", kinds: ["answer"] }]);
+  expect(chips()).toEqual([["Agent questions", "true"], ["Steps to review", "false"]]);
+  expect(heading()).toBe("1 of 2 wait on you");
+  expect(c.querySelectorAll(".fl-queue > li")).toHaveLength(1);
+
+  const field = c.querySelector(".fl-filter input") as HTMLInputElement;
+  await fireEvent.input(field, { target: { value: " change 7 " } });
+  await fireEvent.keyDown(field, { key: "Enter" });
+  await floatLoad();
+  await settle();
+  expect(filters().at(-1)).toEqual({ q: "change 7", kinds: ["answer"] });
+  expect(heading()).toBe("0 of 2 wait on you");
+
+  floatState().show("panel", { filter: { q: "@work", kinds: [] } });
+  await settle();
+  expect((c.querySelector(".fl-filter input") as HTMLInputElement).value).toBe("@work");
+  expect(filters()).toHaveLength(2);
+});

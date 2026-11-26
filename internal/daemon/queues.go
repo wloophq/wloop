@@ -68,17 +68,31 @@ func (s *Server) handleQueueAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d := s.loaded().Decisions
+	kinds := r.URL.Query()["kind"]
+	for _, k := range kinds {
+		if !decision.Valid(decision.Kind(k)) {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown decision kind %q", k))
+			return
+		}
+	}
 	all, err := s.home(g).QueueAll(ctx, d.Order, d.Sort, s.queueKeep(ctx, g, r))
 	if err != nil {
 		writeTasksError(w, err)
 		return
+	}
+	if len(kinds) > 0 {
+		all = slices.DeleteFunc(all, func(it home.Item) bool { return !slices.Contains(kinds, string(it.Found.Kind)) })
 	}
 	items, err := s.queueItems(ctx, g, all)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, api.Queue{View: s.loaded().Views.QueueView(), Title: d.QueueAll, Empty: d.EmptyAll, Total: len(items), Items: items})
+	served := make([]api.QueueKind, len(d.Order))
+	for i, k := range d.Order {
+		served[i] = api.QueueKind{ID: string(k), Label: d.Kinds[k].Queue}
+	}
+	writeJSON(w, api.Queue{View: s.loaded().Views.QueueView(), Title: d.QueueAll, Empty: d.EmptyAll, Total: len(items), Items: items, Kinds: served})
 }
 
 // queuePass is ctx carrying one pass of the tasks, which every kind's view and every item's task view read, so

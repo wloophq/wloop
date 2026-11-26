@@ -2,6 +2,7 @@ package window
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"time"
 
@@ -34,16 +35,47 @@ func (r Rect) bottom() float64 { return r.Y + r.H }
 type Screen struct{ Frame, Visible Rect }
 
 // FloatPlace is what the tab's page needs of its placement: the edge it is
-// docked on, which stands it upright, "" when free.
-type FloatPlace struct{ Edge string }
+// docked on, which stands it upright, "" when free, and the filter of the
+// queue it counts.
+type FloatPlace struct {
+	Edge   string
+	Filter FloatFilter
+}
 
 // PanelPlace is what the panel's page is told to show: its Mode, "" to
 // close, the Item to open on or peek at by its key ("" keeps the current
-// one), the Side of the tab it sits on, and the room it may fill there.
+// one), the Side of the tab it sits on, the room it may fill there, and the
+// filter of the queue it shows.
 type PanelPlace struct {
 	Mode, Item, Side string
 	MaxW, MaxH       float64
+	Filter           FloatFilter
 }
+
+// FloatFilter narrows the queue the floating widget shows: Q is a lens query,
+// as the cockpit's q, and Kinds the decision kinds it keeps, every kind when
+// none.
+type FloatFilter struct {
+	Q     string   `json:"q"`
+	Kinds []string `json:"kinds,omitempty"`
+}
+
+// On says whether f narrows the queue.
+func (f FloatFilter) On() bool { return f.Q != "" || len(f.Kinds) > 0 }
+
+// clean is f without the spaces around its query and without empty or
+// repeated kinds.
+func (f FloatFilter) clean() FloatFilter {
+	out := FloatFilter{Q: strings.TrimSpace(f.Q)}
+	for _, k := range f.Kinds {
+		if k = strings.TrimSpace(k); k != "" && !slices.Contains(out.Kinds, k) {
+			out.Kinds = append(out.Kinds, k)
+		}
+	}
+	return out
+}
+
+func (f FloatFilter) equal(o FloatFilter) bool { return f.Q == o.Q && slices.Equal(f.Kinds, o.Kinds) }
 
 // FloatBridge is the global each float page exposes for the host to call.
 var FloatBridge = brand.Command + "Float"
@@ -285,6 +317,26 @@ func LoadPlacement(d Defaults) (FloatPlacement, bool) {
 	return p, true
 }
 
+// FilterKey is the defaults key the float's filter is saved under, beside its
+// placement.
+var FilterKey = PlacementKey + ".filter"
+
+// SaveFilter keeps f in d for the next launch.
+func SaveFilter(d Defaults, f FloatFilter) {
+	b, _ := json.Marshal(f)
+	d.SetString(FilterKey, string(b))
+}
+
+// LoadFilter is the filter saved in d; false when none is, or it does not
+// read.
+func LoadFilter(d Defaults) (FloatFilter, bool) {
+	var f FloatFilter
+	if json.Unmarshal([]byte(d.String(FilterKey)), &f) != nil {
+		return FloatFilter{}, false
+	}
+	return f.clean(), true
+}
+
 // The messages the float's pages send the host, and the modes the panel
 // draws in. The tab sends its size (float:size), asks for the panel
 // (float:panel, toggling it on a click) and for a peek at an item that
@@ -292,7 +344,8 @@ func LoadPlacement(d Defaults) (FloatPlacement, bool) {
 // that it closed (float:close), as it does once as it loads. The tab also
 // says how its last read of the queue went (float:state: ok, offline or
 // failed) whenever it changes. Either opens a route in the main window
-// (float:open) or hides the widget (float:hide).
+// (float:open), hides the widget (float:hide) or sets the filter of the queue
+// it shows (float:filter).
 const (
 	FloatSize      = "float:size"
 	FloatOpen      = "float:open"
@@ -301,6 +354,7 @@ const (
 	FloatPeek      = "float:peek"
 	FloatClose     = "float:close"
 	FloatState     = "float:state"
+	FloatFilterSet = "float:filter"
 	ReadOK         = "ok"
 	ReadOffline    = "offline"
 	ReadFailed     = "failed"
@@ -319,6 +373,7 @@ type FloatMessage struct {
 	Item   string
 	Toggle bool
 	Read   string
+	Filter FloatFilter
 }
 
 // ParseFloatMessage reads raw, a JSON object naming its message in "type";
@@ -332,11 +387,15 @@ func ParseFloatMessage(raw string) (FloatMessage, bool) {
 		Item   string
 		Toggle bool
 		Read   string
+		Filter *FloatFilter
 	}
 	if json.Unmarshal([]byte(raw), &body) != nil {
 		return FloatMessage{}, false
 	}
 	m := FloatMessage{Kind: body.Type, W: body.W, H: body.H, Mode: body.Mode, Route: body.Route, Item: body.Item, Toggle: body.Toggle, Read: body.Read}
+	if body.Filter != nil {
+		m.Filter = *body.Filter
+	}
 	ok := false
 	switch m.Kind {
 	case FloatSize:
@@ -347,6 +406,8 @@ func ParseFloatMessage(raw string) (FloatMessage, bool) {
 		ok = true
 	case FloatState:
 		ok = m.Read == ReadOK || m.Read == ReadOffline || m.Read == ReadFailed
+	case FloatFilterSet:
+		ok = body.Filter != nil
 	}
 	if !ok {
 		return FloatMessage{}, false
@@ -534,7 +595,7 @@ func (c *Controller) placeFloat() {
 	c.tabFrame = ClampToScreens(c.placement, c.screens)
 	c.cfg.Host.SetFloatFrame(c.tabFrame)
 	if c.tellPlace && c.pageReady {
-		c.cfg.Host.PlaceFloat(FloatPlace{Edge: c.placement.Edge})
+		c.cfg.Host.PlaceFloat(FloatPlace{Edge: c.placement.Edge, Filter: c.filter})
 		c.tellPlace = false
 	}
 }
@@ -605,12 +666,14 @@ func (c *Controller) floatGone(win string) {
 	}
 }
 
-// shared handles what either page may ask: a route in the main window, or a
-// hide.
+// shared handles what either page may ask: a route in the main window, a
+// hide, or a filter.
 func (c *Controller) shared(m FloatMessage) {
 	switch m.Kind {
 	case FloatOpen:
 		_ = c.Show(m.Route)
+	case FloatFilterSet:
+		c.setFilter(m.Filter)
 	case FloatHide:
 		c.mu.Lock()
 		hide := c.floatHide
@@ -618,6 +681,47 @@ func (c *Controller) shared(m FloatMessage) {
 		if hide != nil {
 			hide(m.Mode)
 		}
+	}
+}
+
+// FloatFilter is the filter of the queue the float shows.
+func (c *Controller) FloatFilter() FloatFilter {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.filter
+}
+
+// OnFloatFilter sets what runs when the float's filter changes; until set,
+// nothing.
+func (c *Controller) OnFloatFilter(fn func()) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.filterSet = fn
+}
+
+// setFilter keeps f for the next launch and tells it to both pages, the
+// panel's while it shows, when it changed.
+func (c *Controller) setFilter(f FloatFilter) {
+	f = f.clean()
+	c.mu.Lock()
+	if f.equal(c.filter) {
+		c.mu.Unlock()
+		return
+	}
+	c.filter = f
+	if c.cfg.Defaults != nil {
+		SaveFilter(c.cfg.Defaults, f)
+	}
+	c.tellPlace = true
+	c.placeFloat()
+	if c.panel.want != "" {
+		c.panel.pending = &PanelPlace{Mode: c.panel.want, Side: c.panel.side, MaxW: c.panel.room.W, MaxH: c.panel.room.H, Filter: f}
+		c.tellPanel()
+	}
+	heard := c.filterSet
+	c.mu.Unlock()
+	if heard != nil {
+		heard()
 	}
 }
 
@@ -652,6 +756,7 @@ func (c *Controller) openPanel(p PanelPlace) {
 		c.panel.url, c.panel.ready = u, false
 		c.cfg.Host.LoadFloatPanel(u)
 	}
+	p.Filter = c.filter
 	p.Side, c.panel.room = PanelRoom(c.tabFrame, c.placement.Edge, c.screens)
 	p.MaxW, p.MaxH, c.panel.side = c.panel.room.W, c.panel.room.H, p.Side
 	if p.Mode != c.panel.want {
@@ -690,7 +795,7 @@ func (c *Controller) placePanel() {
 	side, room := PanelRoom(c.tabFrame, c.placement.Edge, c.screens)
 	if side != c.panel.side || room != c.panel.room {
 		c.panel.side, c.panel.room = side, room
-		c.panel.pending = &PanelPlace{Mode: c.panel.want, Side: side, MaxW: room.W, MaxH: room.H}
+		c.panel.pending = &PanelPlace{Mode: c.panel.want, Side: side, MaxW: room.W, MaxH: room.H, Filter: c.filter}
 		c.tellPanel()
 	}
 	c.cfg.Host.ShowFloatPanel(PanelFrame(c.tabFrame, c.placement.Edge, c.panel.w, c.panel.h, c.screens), c.panel.want)

@@ -1033,6 +1033,12 @@ html.float-page body { display: block; overflow: hidden; }
 .fl-menu-list button { padding: var(--space-4) var(--space-8); background: none; border: 0; border-radius: var(--radius-sm); text-align: left; font-size: var(--text-meta); cursor: pointer; }
 .fl-menu-list button:hover, .fl-menu-list button[data-hover] { background: var(--hover); }
 .fl-link { display: block; margin: var(--space-2) 0; padding: 0; color: var(--me-text); }
+.fl-filter { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); padding: var(--space-6) var(--space-12); border-bottom: 1px solid var(--rule); }
+.fl-filter input { flex: 1 1 100%; min-width: 0; padding: var(--space-4) var(--space-8); font: var(--text-meta) var(--sans); color: var(--ink); background: var(--panel); border: 1px solid var(--rule); border-radius: var(--radius-sm); }
+.fl-kinds { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+.fl-kinds button { padding: 0 var(--space-8); font-size: var(--text-overline); line-height: 1.6; color: var(--muted); background: none; border: 1px solid var(--rule-strong); border-radius: var(--radius-pill); cursor: pointer; }
+.fl-kinds button:hover, .fl-kinds button[data-hover] { background: var(--hover); }
+.fl-kinds button[aria-pressed="true"] { color: var(--me-text); border-color: currentColor; }
 .fl-body { overflow-y: auto; min-height: 0; padding-bottom: var(--space-8); }
 .fl-off { margin: var(--space-16) var(--space-12); color: var(--muted); }
 .fl-err { margin: 0; padding: var(--space-6) var(--space-12); border-top: 1px solid var(--rule); color: var(--err); font-size: var(--text-meta); }

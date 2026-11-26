@@ -796,6 +796,9 @@
 # The floating widget.
 "{n} wait on you" = { one = "{n} espera por você", other = "{n} esperam por você" }
 "Nothing waits on you" = "Nada espera por você"
+"{n} of {total} wait on you" = { one = "{n} de {total} espera por você", other = "{n} de {total} esperam por você" }
+"Filter the queue" = "Filtrar a fila"
+"Decision kinds" = "Tipos de decisão"
 "Pin" = "Fixar"
 "Offline" = "Offline"
 "The daemon is not answering." = "O daemon não está respondendo."

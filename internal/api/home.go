@@ -10,8 +10,9 @@ const HomePath = "/api/home"
 const QueuePath = "/api/queues/{kind}"
 
 // QueueAllPath serves the queue of every decision kind, as Queue with no Kind and with View the view drawn as
-// the queue: the kinds in the order decisions.toml gives, each kind's items oldest decision first. Its query
-// parameter q is QueuePath's.
+// the queue: the kinds in the order decisions.toml gives, each kind's items oldest decision first, and Kinds every
+// kind in that order. Its query parameter q is QueuePath's; each kind parameter keeps the items of that kind, every
+// kind when none.
 const QueueAllPath = "/api/queue"
 
 // Home is the briefing, the home's sections and the capture field.
@@ -81,6 +82,14 @@ type Queue struct {
 	Empty string      `json:"empty"`
 	Total int         `json:"total"`
 	Items []QueueItem `json:"items"`
+	// Kinds are the decision kinds the queue of every kind may list, in its order.
+	Kinds []QueueKind `json:"kinds,omitempty"`
+}
+
+// QueueKind is a decision kind and the title of its queue.
+type QueueKind struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
 }
 
 // QueueItem is one decision of kind Kind, which Word words: a task's open gate, a failed delivery's approved

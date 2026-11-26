@@ -3412,6 +3412,7 @@
   "Counts": "Counts",
   "Cut": "Cut",
   "Daemon not answering: {error}": "Daemon not answering: {error}",
+  "Decision kinds": "Decision kinds",
   "Decision queue": "Decision queue",
   "Descending": "Descending",
   "Detail": "Detail",
@@ -3442,6 +3443,7 @@
   "Filter": "Filter",
   "Filter is:{flag}; Alt+click excludes": "Filter is:{flag}; Alt+click excludes",
   "Filter the list": "Filter the list",
+  "Filter the queue": "Filter the queue",
   "Filter, group and sort": "Filter, group and sort",
   "Filter, group and sort the tasks": "Filter, group and sort the tasks",
   "Filter: text, where:, author:, wait:me, risk:high, tag:lang:go  ( / )": "Filter: text, where:, author:, wait:me, risk:high, tag:lang:go  ( / )",
@@ -4128,6 +4130,10 @@
    "other": "{n} files"
   },
   "{n} of {total}": "{n} of {total}",
+  "{n} of {total} wait on you": {
+   "one": "{n} of {total} waits on you",
+   "other": "{n} of {total} wait on you"
+  },
   "{n} open questions in the brief": {
    "one": "{n} open question in the brief",
    "other": "{n} open questions in the brief"
@@ -4312,6 +4318,7 @@
   "Counts": "Contagens",
   "Cut": "Recortar",
   "Daemon not answering: {error}": "O daemon não responde: {error}",
+  "Decision kinds": "Tipos de decisão",
   "Decision queue": "Fila de decisões",
   "Descending": "Decrescente",
   "Detail": "Detalhe",
@@ -4342,6 +4349,7 @@
   "Filter": "Filtro",
   "Filter is:{flag}; Alt+click excludes": "Filtrar is:{flag}; Alt+clique exclui",
   "Filter the list": "Filtrar a lista",
+  "Filter the queue": "Filtrar a fila",
   "Filter, group and sort": "Filtrar, agrupar e ordenar",
   "Filter, group and sort the tasks": "Filtrar, agrupar e ordenar as tarefas",
   "Filter: text, where:, author:, wait:me, risk:high, tag:lang:go  ( / )": "Filtro: texto, where:, author:, wait:me, risk:high, tag:lang:go  ( / )",
@@ -5028,6 +5036,10 @@
    "other": "{n} arquivos"
   },
   "{n} of {total}": "{n} de {total}",
+  "{n} of {total} wait on you": {
+   "one": "{n} de {total} espera por você",
+   "other": "{n} de {total} esperam por você"
+  },
   "{n} open questions in the brief": {
    "one": "{n} pergunta em aberto no brief",
    "other": "{n} perguntas em aberto no brief"

@@ -829,3 +829,39 @@ func TestAQueuePageReadsRelatedTasksFromItsPass(t *testing.T) {
 		t.Errorf("%d reads of single tasks for a queue page whose pass holds them, want 0", reads)
 	}
 }
+
+func TestQueueAllNarrowsByKind(t *testing.T) {
+	t.Parallel()
+	q := newQueueRig(t, nil)
+	q.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "send the notes"},
+		task.Task{ID: "t-0000000000000002", State: "next", Category: task.CategoryReady, Title: "pick a name"},
+		task.Task{ID: "t-0000000000000003", State: "next", Category: task.CategoryReady, Title: "plan the move"})
+	q.open(t, "t-0000000000000001", gate.KindDraft, "41", 2*time.Hour)
+	q.open(t, "t-0000000000000002", gate.KindQuestion, "7", time.Hour)
+	q.open(t, "t-0000000000000003", gate.KindPlan, "1", 3*time.Hour)
+	var narrowed api.Queue
+	if code := get(t, q.s, api.QueueAllPath+"?kind=approve-plan&kind=answer", &narrowed); code != 200 {
+		t.Fatalf("%d", code)
+	}
+	if want := []string{"answer", "approve-plan"}; !slices.Equal(kindsOf(narrowed), want) || narrowed.Total != 2 {
+		t.Fatalf("narrowed %v over %d, want %v", kindsOf(narrowed), narrowed.Total, want)
+	}
+	if code := get(t, q.s, api.QueueAllPath+"?kind=nonsense", nil); code != 400 {
+		t.Fatalf("an unknown kind answered %d, want 400", code)
+	}
+}
+
+func TestQueueAllServesItsKindsInProfileOrder(t *testing.T) {
+	t.Parallel()
+	q := newQueueRig(t, nil)
+	got := q.all(t)
+	l := q.s.loaded().Decisions
+	if len(got.Kinds) != len(l.Order) {
+		t.Fatalf("kinds %+v, want one per kind of %v", got.Kinds, l.Order)
+	}
+	for i, k := range l.Order {
+		if got.Kinds[i] != (api.QueueKind{ID: string(k), Label: l.Kinds[k].Queue}) {
+			t.Errorf("kind %d %+v, want %s worded by its queue", i, got.Kinds[i], k)
+		}
+	}
+}

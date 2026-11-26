@@ -806,6 +806,9 @@
 # The floating widget.
 "{n} wait on you" = { one = "{n} waits on you", other = "{n} wait on you" }
 "Nothing waits on you" = "Nothing waits on you"
+"{n} of {total} wait on you" = { one = "{n} of {total} waits on you", other = "{n} of {total} wait on you" }
+"Filter the queue" = "Filter the queue"
+"Decision kinds" = "Decision kinds"
 "Pin" = "Pin"
 "Offline" = "Offline"
 "The daemon is not answering." = "The daemon is not answering."

@@ -54,7 +54,7 @@ type Daemon interface {
 	Plugins(ctx context.Context) ([]api.Plugin, error)
 	Views(ctx context.Context) (api.ViewsCatalog, error)
 	Counters(ctx context.Context, area, query string) (api.Counters, error)
-	QueueAll(ctx context.Context, query string) (api.Queue, error)
+	QueueAll(ctx context.Context, query string, kinds ...string) (api.Queue, error)
 }
 
 type Config struct {
@@ -77,6 +77,9 @@ type Config struct {
 	// so it carries what waits on the user; nil takes every shown float as
 	// ready.
 	FloatReady func() bool
+	// FloatFilter is the filter of the queue the float shows; nil shows
+	// the whole queue.
+	FloatFilter func() window.FloatFilter
 	// Defaults keeps the float's visibility across launches; nil keeps it
 	// for this run only.
 	Defaults window.Defaults
@@ -129,6 +132,12 @@ type Controller struct {
 	// not, so each reason is logged once.
 	queueRead bool
 	queueErr  string
+	// shown is the queue the float's filter shows, nil without a filter, so
+	// the float shows needs; shownRead says the last pullTasks read it, and
+	// shownErr is why its last read failed, "" when it did not.
+	shown     *api.Queue
+	shownRead bool
+	shownErr  string
 	counters  *api.Counters
 	// tasksLoading and rowsLoading are the plugins the last pages of tasks and of rows said are still
 	// loading.
@@ -398,7 +407,7 @@ func (c *Controller) refresh(ctx context.Context, health, rows bool) {
 		})
 		return
 	}
-	c.floatRefreshed(rows && c.queueRead)
+	c.floatRefreshed(rows && c.queueRead && c.shownRead)
 	c.cfg.Tray.SetTitle(c.title())
 	c.cfg.Tray.SetMenu(c.menu(c.health))
 	c.notify()
