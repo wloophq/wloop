@@ -67,10 +67,11 @@
     f.hide(mode);
   }
 
-  // unarmed drops a click on an action of a panel that is not armed for a click yet (FloatState.clickArmed).
+  // unarmed drops a pointer's click on an action of a panel that is not armed for a click yet (FloatState.clickArmed);
+  // a keyboard's activation (detail 0) goes through, as Enter does, since only a window that has the keyboard hears it.
   function unarmed(e: MouseEvent): void {
     const t = e.target as Element | null;
-    if (f.clickArmed || !t || !t.closest || !t.closest(".act")) return;
+    if (f.clickArmed || e.detail === 0 || !t || !t.closest || !t.closest(".act")) return;
     e.preventDefault();
     e.stopPropagation();
   }

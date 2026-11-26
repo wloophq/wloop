@@ -504,12 +504,29 @@ test("a click on an action of a panel the pointer just opened does nothing, unti
   const c = render(FloatPanel).container;
   floatState().show("panel");
   await settle();
+  now += FLOAT_ARM_MS;
+  floatState().shown();
   const primary = () => c.querySelector<HTMLButtonElement>(".fl-panel .act.primary")!;
-  await fireEvent.click(primary());
+  await fireEvent.click(primary(), { detail: 1 });
   await settle();
   expect(resolved()).toEqual([]);
   now += FLOAT_ARM_MS;
-  await fireEvent.click(primary());
+  await fireEvent.click(primary(), { detail: 1 });
+  await settle();
+  expect(resolved()).toEqual(["/api/gates/1/approve"]);
+});
+
+test("a keyboard activation of an action runs at once in a panel that has the keyboard, as Enter does", async () => {
+  floatDeps.focused = () => true;
+  const daemon = new FakeDaemon({ "/api/queue": () => served, "/api/turns/live": () => turns() });
+  daemon.fallback = () => ({});
+  const resolved = () => daemon.calls.filter((x) => x.init && x.init.method === "POST").map((x) => x.url);
+  await floatLoad();
+  const c = render(FloatPanel).container;
+  floatState().show("panel");
+  floatState().shown();
+  await settle();
+  await fireEvent.click(c.querySelector<HTMLButtonElement>(".fl-panel .act.primary")!, { detail: 0 });
   await settle();
   expect(resolved()).toEqual(["/api/gates/1/approve"]);
 });

@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"sync/atomic"
 	"testing"
@@ -127,10 +128,10 @@ func TestGatesListFiltersByKind(t *testing.T) {
 	}
 }
 
-// countedGates counts the reads of a gates.Reader.
+// countedGates counts the reads of a gates.Reader; open counts the reads of every open gate.
 type countedGates struct {
 	gates.Reader
-	ofTask, where atomic.Int32
+	ofTask, where, open atomic.Int32
 }
 
 func (c *countedGates) OfTask(ctx context.Context, id task.ID) ([]gate.Gate, error) {
@@ -140,6 +141,9 @@ func (c *countedGates) OfTask(ctx context.Context, id task.ID) ([]gate.Gate, err
 
 func (c *countedGates) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {
 	c.where.Add(1)
+	if q.Kind == "" && len(q.Subjects) == 0 && slices.Equal(q.Statuses, []gate.Status{gate.Open}) {
+		c.open.Add(1)
+	}
 	return c.Reader.Where(ctx, q)
 }
 
@@ -167,8 +171,9 @@ func TestAListPageReadsTheOpenGatesOnce(t *testing.T) {
 			t.Fatalf("%s: gates %+v, want its open question", v.ID, v.Gates)
 		}
 	}
-	if of, where := counted.ofTask.Load(), counted.where.Load(); of != 0 || where > 1 {
-		t.Fatalf("%d reads of a task's gates and %d of the open gates for a page of %d tasks, want none per task and the open gates at most once: the page's task facts may have read them for the pass", of, where, n)
+	of, open := counted.ofTask.Load()+r.factGates.ofTask.Load(), counted.open.Load()+r.factGates.open.Load()
+	if of != 0 || open != 1 {
+		t.Fatalf("%d reads of a task's gates and %d of the open gates, by the views and the task facts, for a page of %d tasks; want 0 and 1", of, open, n)
 	}
 }
 
@@ -188,7 +193,8 @@ func TestTheHomeReadsTheGatesOnceForThePage(t *testing.T) {
 	if code := get(t, r.s, api.HomePath, &h); code != 200 {
 		t.Fatalf("%d", code)
 	}
-	if of, where := counted.ofTask.Load(), counted.where.Load(); of != 0 || where > 2 {
-		t.Fatalf("%d reads of a task's gates and %d of the gates for a home of %d tasks, want none per task", of, where, n)
+	of, open := counted.ofTask.Load()+r.factGates.ofTask.Load(), counted.open.Load()+r.factGates.open.Load()
+	if of != 0 || open != 1 {
+		t.Fatalf("%d reads of a task's gates and %d of the open gates, by the home and the task facts, for a home of %d tasks; want 0 and 1", of, open, n)
 	}
 }

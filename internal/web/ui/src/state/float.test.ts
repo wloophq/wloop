@@ -29,6 +29,7 @@ beforeEach(() => {
   resetStore();
   resetFloat();
   floatDeps.resolve = floatResolve;
+  floatDeps.focused = () => true;
   served = queue(gateItem(1, "Ana's retry change"), gateItem(2, "Bo's export fix"), gateItem(3, "Cy's docs pass"));
   daemon = new FakeDaemon({ "/api/queue": () => structuredClone(served), "/api/turns/live": () => turns });
   daemon.fallback = (c) => {
@@ -126,6 +127,7 @@ test("a peek the host shows lasts its while, then ends, and the item stays the o
   await vi.advanceTimersByTimeAsync(FLOAT_PEEK_MS);
   expect([f.mode, f.peeking]).toEqual(["peek", false]);
   f.show("panel");
+  f.shown();
   expect([f.mode, f.items[f.current].task.id]).toEqual(["panel", "t-2"]);
 });
 
@@ -146,6 +148,7 @@ test("leaving closes the open panel and asks the host to hide its window, unless
   await floatLoad();
   const f = floatState();
   f.show("panel");
+  f.shown();
   f.setPinned(true);
   f.leave();
   f.blur();
@@ -153,6 +156,7 @@ test("leaving closes the open panel and asks the host to hide its window, unless
   f.close();
   expect([f.mode, f.pinned, posted]).toEqual(["", false, [{ type: "float:close" }]]);
   f.show("panel");
+  f.shown();
   f.leave();
   expect([f.mode, posted.length]).toEqual(["", 2]);
 });
@@ -312,6 +316,7 @@ test("a panel shown less than FLOAT_ARM_MS ago runs no primary unless its window
   let focused = false;
   floatDeps.focused = () => focused;
   f.show("panel");
+  f.shown();
   await f.act();
   expect(posts()).toEqual([]);
   focused = true;
@@ -320,6 +325,7 @@ test("a panel shown less than FLOAT_ARM_MS ago runs no primary unless its window
   focused = false;
   f.close();
   f.show("panel");
+  f.shown();
   await vi.advanceTimersByTimeAsync(FLOAT_ARM_MS - 1);
   await f.act();
   expect(posts()).toEqual(["/api/gates/1/approve"]);
@@ -356,4 +362,20 @@ test("a hidden panel page reads nothing on events, and reads what it missed as i
   floatChange({ data: JSON.stringify({ type: "changed", gates: true }) });
   await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
   expect(daemon.urls).toEqual(["/api/queue"]);
+});
+
+test("the arming clock starts as the host says it showed the panel, not as the page asks for it", async () => {
+  await floatLoad();
+  const f = floatState();
+  f.show("panel");
+  await vi.advanceTimersByTimeAsync(FLOAT_ARM_MS);
+  expect(f.clickArmed).toBe(false);
+  f.shown();
+  await vi.advanceTimersByTimeAsync(FLOAT_ARM_MS - 1);
+  expect(f.clickArmed).toBe(false);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(f.clickArmed).toBe(true);
+  f.close();
+  f.show("panel");
+  expect(f.clickArmed).toBe(false);
 });

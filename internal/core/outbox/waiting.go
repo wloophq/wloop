@@ -52,26 +52,39 @@ func OpenGates(ctx context.Context, where func(context.Context, gates.Query) ([]
 // one pass share one read.
 func ReadWaiting(ctx context.Context, r WaitingReads) (Waiting, error) {
 	return coretasks.Once(ctx, passWaiting, func() (Waiting, error) {
-		var w Waiting
-		if r.Where == nil {
-			return w, nil
-		}
-		var err error
-		if r.Pinned != nil {
-			if w.Pinned, err = r.Pinned(ctx); err != nil {
-				return Waiting{}, err
-			}
-		}
-		if w.open, err = OpenGates(ctx, r.Where); err != nil {
+		return r.read(ctx, func() (map[task.ID][]gate.Gate, error) { return OpenGates(ctx, r.Where) })
+	})
+}
+
+// ReadWaitingOf is what task id, whose open gates are open, waits on: in the pass ctx carries ReadWaiting's, which
+// reads every open gate once for the pass, and outside one read with open alone.
+func ReadWaitingOf(ctx context.Context, r WaitingReads, id task.ID, open []gate.Gate) (Waiting, error) {
+	if _, ok := coretasks.PassOf(ctx); ok {
+		return ReadWaiting(ctx, r)
+	}
+	return r.read(ctx, func() (map[task.ID][]gate.Gate, error) { return map[task.ID][]gate.Gate{id: open}, nil })
+}
+
+func (r WaitingReads) read(ctx context.Context, open func() (map[task.ID][]gate.Gate, error)) (Waiting, error) {
+	var w Waiting
+	if r.Where == nil {
+		return w, nil
+	}
+	var err error
+	if r.Pinned != nil {
+		if w.Pinned, err = r.Pinned(ctx); err != nil {
 			return Waiting{}, err
 		}
-		if r.Drafts != nil {
-			if w.undelivered, err = Undelivered(ctx, r.Drafts, r.Where); err != nil {
-				return Waiting{}, err
-			}
+	}
+	if w.open, err = open(); err != nil {
+		return Waiting{}, err
+	}
+	if r.Drafts != nil {
+		if w.undelivered, err = Undelivered(ctx, r.Drafts, r.Where); err != nil {
+			return Waiting{}, err
 		}
-		return w, nil
-	})
+	}
+	return w, nil
 }
 
 // Of are the decisions task id waits on, as m maps its gates and its linked units' sources.

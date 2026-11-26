@@ -504,14 +504,20 @@ func (h *host) ShowFloatPanel(r window.Rect, mode string) {
 
 // showPanel shows the panel window at r in mode, which alone decides whether
 // it may become key: the controller shows it only at a size its page drew
-// for what it was last asked, so a late size of the page never does.
+// for what it was last asked, so a late size of the page never does. A full
+// panel the window did not show yet tells its page, whose actions take a
+// click only some time after.
 func (h *host) showPanel(r window.Rect, mode string) {
 	if h.panelNative.show == nil {
 		return
 	}
+	was := h.panelMode
 	h.panelNative.setFrame(r)
 	h.panelNative.show()
 	h.setPanelMode(mode)
+	if mode == window.ModePanel && was != window.ModePanel {
+		h.panelNative.run(bridgeJS("shown"))
+	}
 }
 
 func (h *host) HideFloatPanel() { h.do(h.hidePanel) }

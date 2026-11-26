@@ -65,6 +65,8 @@ type tasksRig struct {
 	// facts are the tasks' facts the views read, factReads how many times they were computed.
 	facts     func(context.Context, task.Task) (workflow.Facts, error)
 	factReads atomic.Int32
+	// factGates count the facts' reads of the gates.
+	factGates *countedGates
 	// linked reads the read model's link state of a unit for the facts when set.
 	linked bool
 }
@@ -97,6 +99,7 @@ func newTasksRig(t testing.TB, edit func(*Deps)) *tasksRig {
 				return bundledLoaded()
 			}
 		}
+		r.factGates = &countedGates{Reader: db.Gates(func() time.Time { return tasksNow })}
 		r.facts = countedLensFacts(db, loaded, tasksNow, &r.factReads, func(ctx context.Context, u unit.Unit) (facttask.Link, error) {
 			if !r.linked {
 				return facttask.Link{}, nil
@@ -108,7 +111,7 @@ func newTasksRig(t testing.TB, edit func(*Deps)) *tasksRig {
 				return nil, nil
 			}
 			return r.s.deps.Gates.Pinned(ctx)
-		})
+		}, r.factGates)
 		r.g = coretasks.New(withLens(coretasks.Deps{States: loadedHandlers{taskstest.BundledStates, loaded}, Authority: taskstest.BundledStates.Authority, Store: db.Tasks(), Items: r.ledger,
 			Facts: coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled, Me: func() task.Me { return meID }},
 			Me:    meID, Clock: fixedClock(tasksNow), Disabled: disabledOf(enabled), Wakes: db.Wakes(),

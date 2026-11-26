@@ -21,6 +21,7 @@ var clientTokens = map[string]string{
 	"show":            "a method of the floating widget's page bridge the host calls",
 	"leave":           "a method of the floating widget's page bridge the host calls",
 	"blur":            "a method of the floating widget's page bridge the host calls",
+	"shown":           "a method of the floating widget's page bridge the host calls",
 	"drawsBackground": "the key of a web view's own background in AppKit's key-value coding",
 	"Enter":           "a key's name as the served bindings spell it",
 	"Esc":             "a key's name as the served bindings spell it",
@@ -65,7 +66,7 @@ var clientTokens = map[string]string{
 }
 
 // clientTokenUses is how many literals clientTokens lets pass; a new one raises it on purpose, in review.
-const clientTokenUses = 71
+const clientTokenUses = 72
 
 var (
 	singleWord = regexp.MustCompile(`^[\s(·,;:—–-]*\pL[\pL'’…-]*\pL[\s.,:;!?…)·]*$`)

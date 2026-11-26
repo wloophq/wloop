@@ -908,9 +908,6 @@ func (s *Server) queueCounted(ctx context.Context, g *coretasks.Service, c *task
 		}
 	}
 	items, err := s.home(g).QueueAll(ctx, l.Decisions.Order, l.Decisions.Sort, take)
-	if err == nil {
-		items, err = s.servable(ctx, items)
-	}
 	if err != nil {
 		s.logf("tasks: counting the queue: %v", err)
 		return

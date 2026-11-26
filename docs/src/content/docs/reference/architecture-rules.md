@@ -161,6 +161,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `sequential` | ✅ | a project verb's handler |
 | `session` | ✅ | the delegate prompt's mode |
 | `show` | ✅ | a method of the floating widget's page bridge the host calls |
+| `shown` | ✅ | a method of the floating widget's page bridge the host calls |
 | `sweep` | ✅ | a job the daemon triggers |
 | `true` | ✅ | a flag's value an action takes |
 | `tui` | ✅ | the terminal client's name as an events subscriber and a surface |

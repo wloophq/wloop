@@ -166,13 +166,23 @@ type queueReads struct {
 	retry   *draft.Draft
 }
 
-// readQueueItem reads what it's gate names; an error says the item cannot be served.
+// readQueueItem reads what it's gate names, once in the pass ctx carries; an error says the item cannot be
+// served.
 func (s *Server) readQueueItem(ctx context.Context, it home.Item, pinned map[int64]int64) (queueReads, error) {
-	var r queueReads
 	g := it.Found.Gate
 	if g == nil {
-		return r, nil
+		return queueReads{}, nil
 	}
+	return coretasks.Once(ctx, passQueueItem+strconv.FormatInt(g.ID, 10)+"."+it.Primary.Kind, func() (queueReads, error) {
+		return s.readGateNames(ctx, it, pinned)
+	})
+}
+
+const passQueueItem = "daemon.queue_item."
+
+func (s *Server) readGateNames(ctx context.Context, it home.Item, pinned map[int64]int64) (queueReads, error) {
+	var r queueReads
+	g := it.Found.Gate
 	if it.Primary.Kind == home.ActionRetry {
 		d, err := s.retryDraft(ctx, *g)
 		if err != nil {

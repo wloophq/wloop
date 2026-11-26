@@ -134,6 +134,9 @@ func (c countingGates) OfTask(ctx context.Context, id task.ID) ([]gate.Gate, err
 
 func (c countingGates) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {
 	c.e.reads["gates"]++
+	if q.Kind == "" && len(q.Subjects) == 0 {
+		c.e.reads["every open gate"]++
+	}
 	return c.GateStore.Where(ctx, q)
 }
 

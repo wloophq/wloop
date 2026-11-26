@@ -25,6 +25,7 @@ export interface TabBridge {
 
 export interface PanelBridge {
   show: (m: FloatMode, p?: Partial<PanelPlace> & { item?: string }) => void;
+  shown: () => void;
   leave: () => void;
   blur: () => void;
 }
@@ -140,7 +141,7 @@ export function installFloat(win: J, role: FloatRole): TabBridge | PanelBridge {
             f.setPlace(p);
           },
         }
-      : { show: (m, p) => f.show(m, p), leave: () => f.leave(), blur: () => f.blur() };
+      : { show: (m, p) => f.show(m, p), shown: () => f.shown(), leave: () => f.leave(), blur: () => f.blur() };
   win[FLOAT_BRIDGE] = bridge;
   floatDeps.resolve = floatResolve;
   floatDeps.run = floatRun;

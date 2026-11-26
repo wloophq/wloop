@@ -21,6 +21,11 @@ type Decisions interface {
 	Of(ctx context.Context, e task.Task) ([]decision.Found, error)
 }
 
+// Serves keeps the queue items that can be served, so every count of a queue counts what it serves.
+type Serves interface {
+	Servable(ctx context.Context, items []Item) ([]Item, error)
+}
+
 // Words are the profile's and the plugins' words in the served locale.
 type Words interface {
 	Profile() Profile

@@ -405,6 +405,8 @@ func TestTheOpenPanelHearsItsWindowResignKey(t *testing.T) {
 		h.do(func() {
 			h.showPanel(window.Rect{W: 1, H: 1}, window.ModePanel)
 		})
+		synctest.Wait()
+		panel.taken()
 		h.do(h.panelResigned)
 		synctest.Wait()
 		if ran, _ := panel.taken(); len(ran) != 1 || ran[0] != bridgeJS("blur") {
@@ -513,5 +515,33 @@ func TestQuittingWaitsForTheWorkerAtMostItsGrace(t *testing.T) {
 		}
 		close(mainThread)
 		h.running.Wait()
+	})
+}
+
+// The panel's page hears that its window shows the full panel once the host
+// has shown it, so its arming clock starts then; a peek, and a full panel
+// shown again at a new size, say nothing.
+func TestThePanelPageHearsItsWindowShowTheFullPanel(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		panel := &fakeFloat{up: true}
+		h := runningHost(t, &fakeFloat{up: true}, panel, window.Handlers{})
+		h.LoadFloatPanel(cockpitPanel)
+		shown := func() int {
+			synctest.Wait()
+			ran, _ := panel.taken()
+			return slices.Index(ran, bridgeJS("shown"))
+		}
+		h.ShowFloatPanel(window.Rect{W: 356, H: 60}, window.ModePeek)
+		if i := shown(); i >= 0 {
+			t.Fatal("a peek told the page the full panel shows")
+		}
+		h.ShowFloatPanel(window.Rect{W: 476, H: 600}, window.ModePanel)
+		if i := shown(); i < 0 {
+			t.Fatal("the full panel showed and its page did not hear it")
+		}
+		h.ShowFloatPanel(window.Rect{W: 476, H: 640}, window.ModePanel)
+		if i := shown(); i >= 0 {
+			t.Fatal("a new size of the shown panel told its page again")
+		}
 	})
 }

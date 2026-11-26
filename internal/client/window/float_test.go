@@ -1,6 +1,7 @@
 package window
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"sync"
@@ -499,8 +500,13 @@ func TestAFloatPageThatLoadedIsKeptAcrossADaemonRestart(t *testing.T) {
 	})
 }
 
-// The float reports ready only once its page has reported in since it was
-// last loaded, and says so to its hook once.
+// readState is the tab's report of how its read of the queue went.
+func readState(read string) FloatMessage {
+	return FloatMessage{Window: FloatTab, Kind: FloatState, Read: read}
+}
+
+// The float reports ready only once its page has said how its read of the
+// queue went since it was last loaded, and says so to its hook once.
 func TestTheFloatIsReadyOnceItsPageReportsIn(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		r := floatRig(t, nil, laptop)
@@ -513,11 +519,12 @@ func TestTheFloatIsReadyOnceItsPageReportsIn(t *testing.T) {
 			t.Fatal("ready before its page reported in")
 		}
 		r.host.handlers().OnFloat(FloatMessage{Window: FloatPanel, Kind: FloatClose})
-		if r.ctl.FloatReady() || readies != 0 {
-			t.Fatal("the panel's page made the float ready")
-		}
 		r.host.handlers().OnFloat(size(112, 32))
-		r.host.handlers().OnFloat(size(140, 32))
+		if r.ctl.FloatReady() || readies != 0 {
+			t.Fatal("a page that has not said how its read went made the float ready")
+		}
+		r.host.handlers().OnFloat(readState(ReadOK))
+		r.host.handlers().OnFloat(readState(ReadOK))
 		if !r.ctl.FloatReady() || readies != 1 {
 			t.Fatalf("ready %v, hook ran %d times; want ready, once", r.ctl.FloatReady(), readies)
 		}
@@ -528,39 +535,75 @@ func TestTheFloatIsReadyOnceItsPageReportsIn(t *testing.T) {
 	})
 }
 
-// A tab whose page says the daemon refused its read of the queue, or whose
-// web content process ended, carries nothing, so it is not ready and its hook
-// hears it; one that says the daemon is offline still carries the queue as
-// the menu bar would, since both read the same daemon. A page whose process
-// ended is reloaded by its web view, not loaded anew here.
+// A tab whose page says its read failed or the daemon is offline still
+// carries the queue for FloatDownAfter, so one failed read posts no banner;
+// past it, it is not ready and its hook hears it once. A tab whose web content
+// process ended carries nothing at once; its web view reloads the page.
 func TestATabThatCannotShowTheQueueIsNotReady(t *testing.T) {
+	for _, read := range []string{ReadFailed, ReadOffline} {
+		t.Run(read, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				r := shownRig(t, nil, laptop)
+				var changes atomic.Int32
+				r.ctl.OnFloatReady(func() { changes.Add(1) })
+				r.host.handlers().OnFloat(readState(ReadOK))
+				changes.Store(0)
+				r.host.handlers().OnFloat(readState(read))
+				time.Sleep(FloatDownAfter / 2)
+				r.host.handlers().OnFloat(readState(ReadOK))
+				r.host.handlers().OnFloat(readState(read))
+				time.Sleep(FloatDownAfter - time.Nanosecond)
+				synctest.Wait()
+				if !r.ctl.FloatReady() || changes.Load() != 0 {
+					t.Fatalf("ready %v, hook ran %d times; want a tab down for less than FloatDownAfter still ready", r.ctl.FloatReady(), changes.Load())
+				}
+				r.host.handlers().OnFloat(readState(read))
+				time.Sleep(time.Nanosecond)
+				synctest.Wait()
+				if r.ctl.FloatReady() || changes.Load() != 1 {
+					t.Fatalf("ready %v, hook ran %d times; want not ready, once, after FloatDownAfter", r.ctl.FloatReady(), changes.Load())
+				}
+				r.host.handlers().OnFloat(readState(ReadOK))
+				if !r.ctl.FloatReady() || changes.Load() != 2 {
+					t.Fatalf("ready %v, hook ran %d times; want ready again", r.ctl.FloatReady(), changes.Load())
+				}
+				r.host.taken()
+				r.host.handlers().OnFloatGone(FloatTab)
+				if r.ctl.FloatReady() || changes.Load() != 3 {
+					t.Fatalf("ready %v, hook ran %d times; want not ready once its process ended", r.ctl.FloatReady(), changes.Load())
+				}
+				if calls := r.host.taken(); len(calls) != 0 {
+					t.Fatalf("host calls %q, want none: the web view reloads its page", calls)
+				}
+				r.host.handlers().OnFloat(readState(ReadOK))
+				if !r.ctl.FloatReady() || changes.Load() != 4 {
+					t.Fatalf("ready %v, hook ran %d times; want ready as the reloaded page reports in", r.ctl.FloatReady(), changes.Load())
+				}
+			})
+		})
+	}
+}
+
+// A tab whose page stops reporting its read, as one whose script hangs, is
+// not ready FloatSilentAfter after its last report, and its hook hears it.
+func TestATabThatStopsReportingIsNotReady(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		r := shownRig(t, nil, laptop)
-		changes := 0
-		r.ctl.OnFloatReady(func() { changes++ })
-		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatState, Read: ReadOffline})
-		if !r.ctl.FloatReady() || changes != 0 {
-			t.Fatalf("ready %v, hook ran %d times; want an offline tab still ready", r.ctl.FloatReady(), changes)
+		var changes atomic.Int32
+		r.ctl.OnFloatReady(func() { changes.Add(1) })
+		r.host.handlers().OnFloat(readState(ReadOK))
+		for range 3 {
+			time.Sleep(FloatSilentAfter - time.Nanosecond)
+			r.host.handlers().OnFloat(readState(ReadOK))
 		}
-		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatState, Read: ReadFailed})
-		if r.ctl.FloatReady() || changes != 1 {
-			t.Fatalf("ready %v, hook ran %d times; want not ready, once", r.ctl.FloatReady(), changes)
+		synctest.Wait()
+		if !r.ctl.FloatReady() || changes.Load() != 1 {
+			t.Fatalf("ready %v, hook ran %d times; want a tab that keeps reporting ready", r.ctl.FloatReady(), changes.Load())
 		}
-		r.host.handlers().OnFloat(FloatMessage{Window: FloatTab, Kind: FloatState, Read: ReadOK})
-		if !r.ctl.FloatReady() || changes != 2 {
-			t.Fatalf("ready %v, hook ran %d times; want ready again", r.ctl.FloatReady(), changes)
-		}
-		r.host.taken()
-		r.host.handlers().OnFloatGone(FloatTab)
-		if r.ctl.FloatReady() || changes != 3 {
-			t.Fatalf("ready %v, hook ran %d times; want not ready once its process ended", r.ctl.FloatReady(), changes)
-		}
-		if calls := r.host.taken(); len(calls) != 0 {
-			t.Fatalf("host calls %q, want none: the web view reloads its page", calls)
-		}
-		r.host.handlers().OnFloat(size(112, 32))
-		if !r.ctl.FloatReady() || changes != 4 {
-			t.Fatalf("ready %v, hook ran %d times; want ready as the reloaded page reports in", r.ctl.FloatReady(), changes)
+		time.Sleep(FloatSilentAfter)
+		synctest.Wait()
+		if r.ctl.FloatReady() || changes.Load() != 2 {
+			t.Fatalf("ready %v, hook ran %d times; want not ready FloatSilentAfter after its last report", r.ctl.FloatReady(), changes.Load())
 		}
 	})
 }
@@ -923,5 +966,67 @@ func TestAPanelIsNotPlacedWithoutScreens(t *testing.T) {
 		r.host.taken()
 		r.host.handlers().OnScreens(nil)
 		want(t, r.host.taken())
+	})
+}
+
+// A float the controller reloads at a new address as its events come back
+// carries nothing until the new page reports in, and its hook hears it.
+func TestAFloatReloadedAtANewAddressTellsItsHook(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		port := "7000"
+		first := make(chan api.Change)
+		r := &rig{host: &fakeHost{}, events: &fakeEvents{streams: []chan api.Change{first, make(chan api.Change)}, stop: make(chan struct{})}, logs: &logs{}}
+		var mu sync.Mutex
+		url := func(route string) (string, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			return "http://127.0.0.1:" + port + "/#" + route, nil
+		}
+		r.ctl = New(Config{Host: r.host, Daemon: r.events, CockpitURL: url})
+		r.run(t)
+		synctest.Wait()
+		r.host.handlers().OnScreens([]Screen{laptop})
+		if err := r.ctl.ShowFloat(); err != nil {
+			t.Fatal(err)
+		}
+		var changes atomic.Int32
+		r.ctl.OnFloatReady(func() { changes.Add(1) })
+		r.host.handlers().OnFloat(readState(ReadOK))
+		mu.Lock()
+		port = "7001"
+		mu.Unlock()
+		close(first)
+		time.Sleep(time.Second)
+		synctest.Wait()
+		if r.ctl.FloatReady() || changes.Load() != 2 {
+			t.Fatalf("ready %v, hook ran %d times; want the reloaded float not ready, its hook told", r.ctl.FloatReady(), changes.Load())
+		}
+	})
+}
+
+// Once Run returns, no check the controller armed tells its hook anything.
+func TestAStoppedControllerTellsItsHookNothing(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := &rig{host: &fakeHost{}, events: &fakeEvents{streams: []chan api.Change{make(chan api.Change)}, stop: make(chan struct{})}, logs: &logs{}}
+		r.ctl = New(Config{Host: r.host, Daemon: r.events, CockpitURL: cockpitURL})
+		ctx, cancel := context.WithCancel(context.Background())
+		done := make(chan error, 1)
+		go func() { done <- r.ctl.Run(ctx) }()
+		synctest.Wait()
+		r.host.handlers().OnScreens([]Screen{laptop})
+		if err := r.ctl.ShowFloat(); err != nil {
+			t.Fatal(err)
+		}
+		var changes atomic.Int32
+		r.ctl.OnFloatReady(func() { changes.Add(1) })
+		r.host.handlers().OnFloat(readState(ReadOK))
+		cancel()
+		close(r.events.stop)
+		<-done
+		time.Sleep(FloatSilentAfter)
+		synctest.Wait()
+		if n := changes.Load(); n != 1 {
+			t.Fatalf("hook ran %d times, want once, before Run returned", n)
+		}
 	})
 }
