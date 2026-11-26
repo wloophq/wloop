@@ -19,6 +19,8 @@ type Service struct {
 	Lists     Lists
 	Decisions Decisions
 	Words     Words
+	// Serves, when set, keeps the items every queue and count serves.
+	Serves Serves
 }
 
 // Home is the briefing, the sections and the capture hint.
@@ -142,11 +144,11 @@ func (s Service) count(ctx context.Context, p Profile, c Counter, ts []task.Task
 	}
 	var shares []share
 	if c.Kind != "" {
-		ds, err := s.decisions(ctx, c.Kind, ts)
+		its, err := s.items(ctx, c.Kind, ts)
 		if err != nil {
 			return Count{}, "", err
 		}
-		n, shares = len(ds), sharesOf(ds)
+		n, shares = len(its), sharesOf(its)
 	}
 	out := Count{ID: c.ID, Kind: c.Kind, View: s.viewOf(c), N: n}
 	form := s.Words.Form(n)
@@ -189,11 +191,11 @@ type share struct {
 	N      int
 }
 
-// sharesOf counts ds by the plugin of each decision's unit, the most first.
-func sharesOf(ds []taskDecision) []share {
+// sharesOf counts its by the plugin of each item's unit, the most first.
+func sharesOf(its []Item) []share {
 	by := map[unit.ProviderID]int{}
-	for _, d := range ds {
-		by[d.found.Unit.Provider]++
+	for _, it := range its {
+		by[it.Found.Unit.Provider]++
 	}
 	out := make([]share, 0, len(by))
 	for p, n := range by {

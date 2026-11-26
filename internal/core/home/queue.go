@@ -52,12 +52,8 @@ func (s Service) Queue(ctx context.Context, k decision.Kind, keep coretasks.Keep
 		return Queue{}, err
 	}
 	q := Queue{Kind: k, View: kw.View, Title: kw.Queue, Empty: kw.Empty}
-	ds, err := s.decisions(ctx, k, sets[kw.View])
-	if err != nil {
+	if q.Items, err = s.items(ctx, k, sets[kw.View]); err != nil {
 		return Queue{}, err
-	}
-	for _, d := range ds {
-		q.Items = append(q.Items, s.item(kw, d.task, d.found))
 	}
 	slices.SortStableFunc(q.Items, func(a, b Item) int { return a.Found.Since.Compare(b.Found.Since) })
 	if p, ok := onePlugin(q.Items); ok {
@@ -86,14 +82,11 @@ func (s Service) QueueAll(ctx context.Context, order []decision.Kind, sort decis
 	return out, nil
 }
 
-type taskDecision struct {
-	task  task.Task
-	found decision.Found
-}
-
-// decisions are the decisions of kind k ts wait on, in ts's order: what a queue lists and its home counter counts.
-func (s Service) decisions(ctx context.Context, k decision.Kind, ts []task.Task) ([]taskDecision, error) {
-	var out []taskDecision
+// items are the items of the decisions of kind k ts wait on that Serves keeps, in ts's order: what a queue lists
+// and its home counter counts.
+func (s Service) items(ctx context.Context, k decision.Kind, ts []task.Task) ([]Item, error) {
+	kw := s.Words.Kind(k)
+	var out []Item
 	for _, e := range ts {
 		found, err := s.Decisions.Of(ctx, e)
 		if err != nil {
@@ -101,11 +94,14 @@ func (s Service) decisions(ctx context.Context, k decision.Kind, ts []task.Task)
 		}
 		for _, f := range found {
 			if f.Kind == k {
-				out = append(out, taskDecision{e, f})
+				out = append(out, s.item(kw, e, f))
 			}
 		}
 	}
-	return out, nil
+	if s.Serves == nil || len(out) == 0 {
+		return out, nil
+	}
+	return s.Serves.Servable(ctx, out)
 }
 
 func (s Service) item(kw KindWords, e task.Task, f decision.Found) Item {

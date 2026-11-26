@@ -464,6 +464,36 @@ func (f failingDraftGates) Where(ctx context.Context, q gates.Query) ([]gate.Gat
 	return f.Reader.Where(ctx, q)
 }
 
+// countedDraftGates count the reads of a draft's gates by subject.
+type countedDraftGates struct {
+	gates.Reader
+	n *atomic.Int32
+}
+
+func (c countedDraftGates) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {
+	if q.Kind == gate.KindDraft && len(q.Subjects) > 0 && len(q.Statuses) == 0 {
+		c.n.Add(1)
+	}
+	return c.Reader.Where(ctx, q)
+}
+
+// The queue reads what each item's gate names once, though it both keeps the
+// items it can serve and serves them.
+func TestTheQueueReadsWhatAnItemsGateNamesOnce(t *testing.T) {
+	t.Parallel()
+	q := newQueueRig(t, nil)
+	q.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "answer the vendor"})
+	q.pinnedQuestion(t, "t-0000000000000001")
+	var n atomic.Int32
+	q.s.deps.GateReader = countedDraftGates{q.s.deps.GateReader, &n}
+	if got := q.all(t); len(got.Items) != 1 {
+		t.Fatalf("items %+v, want the question", got.Items)
+	}
+	if got := n.Load(); got != 2 {
+		t.Fatalf("%d reads of the pinned drafts' gates, want one for each of the 2", got)
+	}
+}
+
 // A question whose pinned drafts' gates cannot be read leaves the queue, and
 // its count, alike.
 func TestAQuestionWhosePinnedDraftsCannotBeReadLeavesTheQueueAndItsCount(t *testing.T) {
@@ -479,6 +509,12 @@ func TestAQuestionWhosePinnedDraftsCannotBeReadLeavesTheQueueAndItsCount(t *test
 	get(t, q.s, api.CountersPath, &c)
 	if view := q.s.loaded().Views.QueueView(); got.Total != 1 || c.Views[view] != 1 {
 		t.Fatalf("queue %d items, counted %d; want the 1 question that reads, both", got.Total, c.Views[view])
+	}
+	var h api.Home
+	get(t, q.s, api.HomePath, &h)
+	i := slices.IndexFunc(h.Briefing.Counters, func(c api.HomeCounter) bool { return c.ID == "needs-you" })
+	if i < 0 || h.Briefing.Counters[i].Count != 1 || h.Sections[0].Total != 1 || len(h.Sections[0].Items) != 1 {
+		t.Fatalf("home counters %+v, section %+v; want the briefing and Needs you to count the 1 question that reads", h.Briefing.Counters, h.Sections[0])
 	}
 }
 

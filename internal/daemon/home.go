@@ -84,7 +84,14 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 // home is the home service over g and the loaded profile.
 func (s *Server) home(g *coretasks.Service) home.Service {
 	l := s.loaded()
-	return home.Service{Lists: g, Words: homeWords{l}, Decisions: &taskDecisions{s: s, m: l.Decisions.Map}}
+	return home.Service{Lists: g, Words: homeWords{l}, Decisions: &taskDecisions{s: s, m: l.Decisions.Map}, Serves: queueServes{s}}
+}
+
+// queueServes keeps the queue items whose gate's subject reads (servable).
+type queueServes struct{ s *Server }
+
+func (q queueServes) Servable(ctx context.Context, its []home.Item) ([]home.Item, error) {
+	return q.s.servable(ctx, its)
 }
 
 // waiting is what the gates and the drafts make the tasks wait on; in a pass, read once.
