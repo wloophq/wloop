@@ -14,7 +14,7 @@ import {
 } from "../../state/verbs";
 
 // The one decision card every surface draws: a task's open gate (a question, a plan, a post, a proposal) or a
-// draft, with its actions. The detail draws them; the Outbox and the queues draw the same components.
+// draft, with its actions. The detail draws them; the queues draw the same components.
 
 function changed(): void {
   scheduler.load({ tasks: true });

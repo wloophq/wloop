@@ -21,6 +21,7 @@ func TestNothingLinksToARemovedView(t *testing.T) {
 	ids := strings.Join(removedViews, "|")
 	link := regexp.MustCompile(`(view=|views\.|nav:|view\s*=\s*"|View:\s*"|views\s*=\s*\[[^\]]*")(` + ids + `)\b`)
 	command := regexp.MustCompile(`(%s|\{\{command\}\}|` + regexp.QuoteMeta(brand.Command) + `) outbox\b`)
+	example := regexp.MustCompile(`"outbox[ "]`)
 	roots := []string{"../../profiles", "../../plugins", "../web/ui/src", "../client/menubar", "../cli", "../../skills", "../../docs/src/content/docs"}
 	for _, root := range roots {
 		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -40,7 +41,11 @@ func TestNothingLinksToARemovedView(t *testing.T) {
 				if m := link.FindString(line); m != "" {
 					t.Errorf("%s:%d names a removed view: %s", path, i+1, m)
 				}
-				if m := command.FindString(line); m != "" {
+				m := command.FindString(line)
+				if root == "../cli" {
+					m += example.FindString(line)
+				}
+				if m != "" {
 					t.Errorf("%s:%d names the removed outbox command: %s", path, i+1, m)
 				}
 			}

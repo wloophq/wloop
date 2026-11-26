@@ -104,10 +104,14 @@ func (c *Controller) shownItems() []api.QueueItem {
 // carriedTasks are the tasks whose Needs you banner a float that carries
 // the queue mutes: those whose every decision its filter shows, since a
 // task's one banner stands for all of them; nil, every task, without a
-// filter.
+// filter; none while the whole queue's last read failed, which leaves what a
+// task holds unknown.
 func (c *Controller) carriedTasks() map[string]bool {
 	if c.shown == nil {
 		return nil
+	}
+	if !c.queueRead {
+		return map[string]bool{}
 	}
 	left := map[string]int{}
 	for _, it := range c.needs.Items {

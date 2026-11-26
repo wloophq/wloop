@@ -1019,3 +1019,26 @@ func TestATaskWithADecisionTheFilterLeavesOutKeepsItsBanner(t *testing.T) {
 		t.Fatalf("posted %q, want the banner of the task whose draft the filter leaves out", got)
 	}
 }
+
+// A filtered float whose read of the whole queue failed cannot tell whether it
+// shows every decision of a task, so it carries none and every banner posts.
+func TestAFilteredFloatWithAStaleWholeQueueCarriesNoBanner(t *testing.T) {
+	r, h := floatRig(t, nil)
+	h.setFilter(window.FloatFilter{Kinds: []string{"answer"}})
+	r.c.vis, r.c.started = Visibility{Mode: VisibilityShown}, true
+	r.d.tasks["inbox"] = []api.TaskView{pendingTask(1)}
+	r.d.queue = decisions("answer")
+	r.c.Refresh(context.Background())
+	if got := neededIDs(r.notes); len(got) != 0 {
+		t.Fatalf("posted %q, want the question's banner carried", got)
+	}
+	q := decisions("answer", "send-draft")
+	q.Items[1].Task = q.Items[0].Task
+	r.d.mu.Lock()
+	r.d.queue, r.d.wholeErr = q, errors.New("the store is busy")
+	r.d.mu.Unlock()
+	r.c.Refresh(context.Background())
+	if got, want := neededIDs(r.notes), []string{pendingTask(1).Attention.ID}; !slices.Equal(got, want) {
+		t.Fatalf("posted %q, want the banner of the task whose new draft the filter hides", got)
+	}
+}

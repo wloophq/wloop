@@ -227,7 +227,7 @@ func askOn(ctx context.Context, e *Env, d dintent.Def, u unit.Unit, p intentArgs
 		return err
 	}
 	if res.Seq > 0 {
-		fmt.Fprintf(e.Out, "%s %s: started headless as turn %d; what it drafts waits in Needs you (%s needs --kind send-draft)\n", d.Name, u.Label(), res.Seq, brand.Command)
+		fmt.Fprintf(e.Out, "%s %s: started headless as turn %d; what it drafts or asks waits in Needs you (%s needs)\n", d.Name, u.Label(), res.Seq, brand.Command)
 		return nil
 	}
 	fmt.Fprintf(e.Out, "%s %s: sent\n", d.Name, u.Label())

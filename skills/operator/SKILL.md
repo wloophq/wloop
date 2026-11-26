@@ -84,7 +84,7 @@ and the menu bar list; among the bundled ones:
 | View | Meaning |
 |---|---|
 | `inbox` | tasks nobody has clarified yet; once clarified a task never returns |
-| `needs-you` | a decision waits on the user: an open gate (a question, a draft, a plan, a step), a failed delivery, a source's situation |
+| `needs-you` | a decision waits on the user: an open gate (a question, a draft, a plan, a step), a failed delivery, a source's situation or link signal (an approved pull request to merge) |
 | `next` | the user's own next action, with no decision waiting on them |
 | `waiting` | the next step is someone else's, grouped by who owes it |
 | `stalled` | waiting too long: a source says a link stalled, or the check date of a task someone else owes passed with nothing moving |

@@ -82,6 +82,7 @@ type fakeDaemon struct {
 	queueErr    error      // QueueAll answers it
 	narrowReads int        // reads of the queue narrowed by a query or kinds
 	narrowErr   error      // a narrowed QueueAll answers it
+	wholeErr    error      // a QueueAll of the whole queue answers it
 }
 
 // QueueAll narrows the queue as the daemon does, reading a query as words of an item's task title.
@@ -90,6 +91,9 @@ func (f *fakeDaemon) QueueAll(_ context.Context, query string, kinds ...string) 
 	defer f.mu.Unlock()
 	if err := cmp.Or(f.err, f.queueErr); err != nil {
 		return api.Queue{}, err
+	}
+	if query == "" && len(kinds) == 0 && f.wholeErr != nil {
+		return api.Queue{}, f.wholeErr
 	}
 	if query != "" || len(kinds) > 0 {
 		f.narrowReads++

@@ -9,6 +9,7 @@ import (
 	facttask "github.com/wloophq/wloop/internal/adapter/facts/task"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
+	"github.com/wloophq/wloop/internal/domain/decision"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -34,7 +35,7 @@ const (
 )
 
 // lensViews are the lens views a pull request's task shows in.
-var lensViews = []string{"next", "stalled", "in-loop", "approved", "done"}
+var lensViews = []string{"needs-you", "next", "stalled", "in-loop", "approved", "done"}
 
 // prCase is one pull request as the GitHub plugin reports it in a snapshot, the host's state over it, what the
 // host's pipeline makes of it for its task (the category of its state, who its items wait on, its open items and
@@ -70,17 +71,17 @@ type prCase struct {
 // prCases are every situation of situation.Order, each at least once.
 var prCases = []prCase{
 	{name: "round pending", kind: situation.KindRoundPending, source: situation.KindReview, waitingOn: "me", pending: true,
-		category: task.CategoryReady, owes: []string{"me"}, items: 1, gates: 1},
+		category: task.CategoryReady, owes: []string{"me"}, items: 1, gates: 1, lens: []string{"needs-you"}},
 	{name: "agent asks", kind: situation.KindLoopWaiting, source: situation.KindReview, waitingOn: "me", review: true, turn: "asked",
-		category: task.CategoryReady, owes: []string{"me"}, items: 1, gates: 1, runs: 1, lens: []string{"in-loop"}},
+		category: task.CategoryReady, owes: []string{"me"}, items: 1, gates: 1, runs: 1, lens: []string{"needs-you", "in-loop"}},
 	{name: "agent stopped", kind: situation.KindLoopStopped, source: situation.KindReview, waitingOn: "me", review: true, turn: "failed",
 		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"next", "in-loop"}},
 	{name: "round blocked", kind: situation.KindBlocked, source: situation.KindBlocked, waitingOn: "me",
-		category: task.CategoryReady, owes: []string{"me"}, items: 1, gates: 1},
+		category: task.CategoryReady, owes: []string{"me"}, items: 1, gates: 1, lens: []string{"needs-you"}},
 	{name: "to address", kind: situation.KindToAddress, source: situation.KindToAddress, waitingOn: "me", author: prViewer, workspace: true,
 		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"next"}},
 	{name: "held by the cap", kind: situation.KindHeldByCap, source: situation.KindHeldByCap, waitingOn: "me", review: true,
-		category: task.CategoryReady, owes: []string{"me"}, items: 1, gates: 1, lens: []string{"in-loop"}},
+		category: task.CategoryReady, owes: []string{"me"}, items: 1, gates: 1, lens: []string{"needs-you", "in-loop"}},
 	{name: "agent working in a review workspace", kind: situation.KindLoopWorking, source: situation.KindReview, waitingOn: "me", review: true,
 		turn: "started", category: task.CategoryReady, owes: []string{loopPerson}, items: 1, runs: 1, lens: []string{"in-loop"}},
 	{name: "agent working in an author workspace", kind: situation.KindLoopWorking, source: situation.KindChanges, waitingOn: "me",
@@ -108,17 +109,17 @@ var prCases = []prCase{
 	{name: "approved in my review workspace", kind: situation.KindReview, source: situation.KindReview, waitingOn: "reviewer", review: true, approved: true,
 		category: task.CategoryWaiting, owes: []string{"github:bruno"}, items: 1, lens: []string{"in-loop", "approved"}},
 	{name: "no reviewer on mine", kind: situation.KindNoReviewer, source: situation.KindNoReviewer, waitingOn: "author", author: prViewer,
-		category: task.CategoryReady, owes: []string{"me"}, items: 1},
+		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"needs-you"}},
 	{name: "mine can merge", kind: situation.KindMerge, source: situation.KindMerge, waitingOn: "me", author: prViewer, workspace: true,
-		approved: true, category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"approved"}},
+		approved: true, category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"needs-you", "approved"}},
 	{name: "mine draft", kind: situation.KindDraft, source: situation.KindDraft, waitingOn: "author", author: prViewer, workspace: true,
 		category: task.CategoryWaiting, owes: []string{}, items: 1},
 	{name: "mine can merge, waiting on its author", kind: situation.KindMerge, source: situation.KindMerge, waitingOn: "author", author: prViewer,
-		workspace: true, approved: true, category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"approved"}},
+		workspace: true, approved: true, category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"needs-you", "approved"}},
 	{name: "reply due on mine", kind: situation.KindReply, source: situation.KindReply, waitingOn: "author", author: prViewer,
 		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"next"}},
 	{name: "a draft to approve on a review asked of another", kind: situation.KindReview, source: situation.KindReview, waitingOn: "reviewer",
-		category: task.CategoryWaiting, owes: []string{"github:bruno"}, items: 1, gates: 1},
+		category: task.CategoryWaiting, owes: []string{"github:bruno"}, items: 1, gates: 1, lens: []string{"needs-you"}},
 	{name: "muted review", kind: situation.KindMuted, source: situation.KindReview, waitingOn: "me", stalled: true, muted: true,
 		category: task.CategoryDeferred, owes: []string{"me"}, items: 1},
 	{name: "merged in a review workspace", kind: situation.KindDone, source: situation.KindDone, review: true, state: "MERGED",
@@ -305,26 +306,18 @@ func (c prCase) facts(t *testing.T, l *intentload.Loaded, row api.Row) workflow.
 	return f
 }
 
-// decisions are what the task waits on you to decide, as the profile maps them: one per open gate, and, while
-// the task is open, its pull request's situation and each link signal on.
+// decisions are what the task waits on you to decide, as the facts provider reads them: its open gates, and, while
+// the task is open, its pull request's situation and link signals.
 func (c prCase) decisions(l *intentload.Loaded, row api.Row) []string {
-	out := []string{}
-	if c.gates > 0 {
-		out = append(out, string(l.Decisions.Map.Gates[gate.KindQuestion]))
+	open := make([]gate.Gate, c.gates)
+	for i := range open {
+		open[i] = gate.Gate{Kind: gate.KindQuestion, Status: gate.Open}
 	}
-	if c.category == task.CategoryDone || c.category == task.CategoryDropped {
-		return out
+	var links []decision.Source
+	if c.category != task.CategoryDone && c.category != task.CategoryDropped {
+		links = []decision.Source{{Unit: unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}, Situation: string(row.Kind), Signals: prrow.Signals(row)}}
 	}
-	m := l.Decisions.Map
-	if k, ok := m.Situations[unit.GitHub][string(row.Kind)]; ok {
-		out = append(out, string(k))
-	}
-	for name, on := range prrow.Signals(row) {
-		if k, ok := m.Signals[unit.GitHub][name]; ok && on {
-			out = append(out, string(k))
-		}
-	}
-	return out
+	return decision.Names(l.Decisions.Map.Of(open, nil, links))
 }
 
 // prStaleDays is tasks.stale_waiting_days as the bundled configuration sets it.
