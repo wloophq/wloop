@@ -13,6 +13,7 @@ const saved = { ...floatDeps };
 let posted: J[] = [];
 let raw: string[] = [];
 let served: J;
+let live: J[] = [];
 const turns = (running: J[] = []) => ({ running, done: [], asked: 0, usual: {} });
 const item = (id: number): J => ({
   kind: "review-step", word: "step", tone: "me", task: { id: "t-" + id, title: "Ana's change " + id, units: [] },
@@ -26,10 +27,11 @@ beforeEach(() => {
   resetFloatSize();
   posted = [];
   raw = [];
+  live = [];
   floatDeps.post = (m) => posted.push(m);
   (window as J).webkit = { messageHandlers: { external: { postMessage: (m: string) => raw.push(m) } } };
   served = { title: "Needs you", items: [item(1)] };
-  new FakeDaemon({ "/api/queue": () => served, "/api/turns/live": () => turns() });
+  new FakeDaemon({ "/api/queue": () => served, "/api/turns/live": () => turns(live) });
 });
 
 afterEach(() => {
@@ -154,9 +156,29 @@ test("the tab shows the count and the running turns alone: no mark, no dot besid
   expect(pill(c).querySelector(".fl-age")).toBeNull();
 });
 
-test("the tab draws no outline of its own around its fill", () => {
+test("the tab is one circle with the count, and two side by side while turns run, the second a ring with their count", async () => {
+  await floatLoad();
+  const c = render(FloatTab).container;
+  await settle();
+  expect(pill(c).querySelectorAll(".fl-slot").length).toBe(1);
+  expect(pill(c).querySelector(".fl-count")!.textContent).toBe("1");
+  live = [{ intent: "review", started: new Date().toISOString() }, { intent: "address", started: new Date().toISOString() }];
+  await floatLoad();
+  await settle();
+  const slots = pill(c).querySelectorAll(".fl-slot");
+  expect(slots.length).toBe(2);
+  expect(slots[1].querySelector(".fl-ring")).not.toBeNull();
+  expect(slots[1].textContent!.trim()).toBe("2");
+});
+
+test("the tab is a flat circle: round, as wide as tall per slot, with no outline, shadow or backdrop blur", () => {
   const css = readFileSync("../static/app.css", "utf8");
-  const pillRule = (css.match(/\n\.fl-pill\s*\{[^}]*\}/) || [""])[0];
-  expect(pillRule).toContain("background:");
+  const rule = (sel: string) => (css.match(new RegExp("\\n" + sel.replace(/[.[\]]/g, "\\$&") + "\\s*\\{([^}]*)\\}")) || ["", ""])[1];
+  const pillRule = rule(".fl-pill");
+  expect(pillRule).toMatch(/border-radius:\s*var\(--fl-slot\)/);
   expect(pillRule).not.toMatch(/(^|[;\s])border:\s*(?!0)/);
+  expect(pillRule).not.toMatch(/box-shadow|backdrop-filter/);
+  const slot = rule(".fl-slot");
+  expect(slot).toMatch(/width:\s*var\(--fl-slot\)/);
+  expect(slot).toMatch(/height:\s*var\(--fl-slot\)/);
 });

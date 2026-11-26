@@ -5,7 +5,8 @@
   import { floatDrag, progress } from "./float";
   import Ring from "./Ring.svelte";
 
-  // The tab: how many decisions wait on the user and how many turns run; a dot when nothing waits and nothing runs.
+  // The tab: a circle with how many decisions wait on the user, and beside it, while turns run, a second circle with
+  // their ring and count; a dot when nothing waits and nothing runs, a muted or failed dot when the queue is unread.
   // A drag moves the window, a click toggles the panel, an Option-click hides the widget until something new.
   let {
     f,
@@ -62,13 +63,11 @@
   {#if idle}
     <i class="fl-dot tone-muted" aria-hidden="true"></i>
   {:else}
-    {#if f.read === "offline"}
-      <span class="fl-offline">{t("Offline")}</span>
-    {:else if f.read === "failed"}
-      <span class="fl-offline">{t("Queue unavailable")}</span>
+    {#if f.read === "offline" || f.read === "failed"}
+      <span class="fl-slot"><i class={["fl-dot", f.read === "failed" ? "tone-err" : "tone-muted"]} aria-hidden="true"></i></span>
     {:else}
-      <span class="fl-count">{fmtNumber(n)}</span>
-      {#if running.length}<span class="fl-running"><Ring value={ring} />{fmtNumber(running.length)}</span>{/if}
+      <span class="fl-slot fl-count">{fmtNumber(n)}</span>
+      {#if running.length}<span class="fl-slot fl-running"><Ring value={ring} size={26} /><b>{fmtNumber(running.length)}</b></span>{/if}
     {/if}
   {/if}
 </div>

@@ -980,21 +980,22 @@ html.float-page body { display: block; overflow: hidden; }
 .fl .tone-muted { --tone: var(--muted); --tone-text: var(--muted); }
 .fl-dot { display: inline-block; width: 7px; height: 7px; border-radius: var(--radius-pill); background: var(--tone, var(--me)); flex: none; }
 .fl-pill {
-  display: inline-flex; align-items: center; gap: var(--space-10); height: 32px; padding: 0 var(--space-12); max-width: 420px;
-  border-radius: 16px; background: color-mix(in srgb, var(--panel) 88%, transparent);
-  box-shadow: 0 6px 24px #0000002e; backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  --fl-slot: 36px;
+  display: inline-flex; align-items: center; border-radius: var(--fl-slot); background: color-mix(in srgb, var(--panel) 96%, transparent);
   font: var(--text-meta) var(--mono); font-feature-settings: "tnum"; white-space: nowrap; cursor: pointer; user-select: none; touch-action: none;
 }
-.fl-pill.dot { height: auto; padding: var(--space-6); gap: 0; }
+.fl-slot { position: relative; display: inline-flex; align-items: center; justify-content: center; width: var(--fl-slot); height: var(--fl-slot); flex: none; }
+.fl-pill.dot { padding: var(--space-6); }
 .fl-pill.dot .fl-dot { width: 8px; height: 8px; }
 .fl-pill.offline { color: var(--muted); }
-.fl-count { display: inline-flex; align-items: center; gap: var(--space-6); font-weight: 700; color: var(--me-text); }
-.fl-running { display: inline-flex; align-items: center; gap: var(--space-4); color: var(--loop-text); }
+.fl-count { font-weight: 700; color: var(--me-text); }
+.fl-running { color: var(--loop-text); }
+.fl-running .fl-ring { position: absolute; }
+.fl-running b { font-weight: 600; font-size: var(--text-overline); }
 .fl-age { color: var(--faint); font: var(--text-meta) var(--mono); font-feature-settings: "tnum"; white-space: nowrap; }
 .fl-age.late { color: var(--late); background: var(--late-bg); padding: 0 var(--space-4); border-radius: var(--radius-sm); }
 .fl-flyout b { color: var(--tone-text, var(--me-text)); font-weight: 600; }
-.fl[data-edge] .fl-pill { flex-direction: column; justify-content: center; width: 34px; height: auto; min-height: 84px; padding: var(--space-8) 0; gap: var(--space-6); }
-.fl[data-edge] .fl-pill .fl-count, .fl[data-edge] .fl-pill .fl-running { flex-direction: column; }
+.fl[data-edge] .fl-pill { flex-direction: column; }
 /* A peek is a card in the panel's window, beside the tab. */
 .fl-flyout {
   display: block; max-width: min(340px, calc(var(--fl-max-w) - 16px)); padding: var(--space-8) var(--space-12); text-align: left;
