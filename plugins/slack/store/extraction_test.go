@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -175,8 +174,8 @@ func TestMarkClosedKeepsTheNewestMessageItSaw(t *testing.T) {
 }
 
 // TestAClosureMarkedBeforeClosedTSHoldsUntilANewerMessage: migrating a store marked before closed_ts gives a
-// thread's closure the newest message the extraction read, and one with none, a DM segment's, the ts of the
-// migration.
+// thread's closure the newest message the extraction read, a DM segment's, which keeps none, the newest message
+// of its range, and one with no message stored a ts any message is after.
 func TestAClosureMarkedBeforeClosedTSHoldsUntilANewerMessage(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -185,30 +184,36 @@ func TestAClosureMarkedBeforeClosedTSHoldsUntilANewerMessage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	thread, segment, open := unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/1.1"}, unit.Unit{Provider: "slack", Key: "T000AAA/D000AAA/seg/s1"},
-		unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/2.1"}
-	if _, err := old.ExecContext(ctx, `INSERT INTO extraction_cursors (provider, unit_key, last_ts, closure_marked, at) VALUES
-		('slack', ?, '1700000003.000100', 1, ''), ('slack', ?, '', 1, ''), ('slack', ?, '1700000004.000100', 0, '')`, thread.Key, segment.Key, open.Key); err != nil {
-		t.Fatal(err)
+	thread, segment, empty, open := unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/1.1"}, unit.Unit{Provider: "slack", Key: "T000AAA/D000AAA/seg/s1"},
+		unit.Unit{Provider: "slack", Key: "T000AAA/D000AAA/seg/s3"}, unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/2.1"}
+	for _, q := range []string{
+		`INSERT INTO extraction_cursors (provider, unit_key, last_ts, closure_marked, at) VALUES
+			('slack', '` + thread.Key + `', '1700000003.000100', 1, ''), ('slack', '` + segment.Key + `', '', 1, ''),
+			('slack', '` + empty.Key + `', '', 1, ''), ('slack', '` + open.Key + `', '1700000004.000100', 0, '')`,
+		`INSERT INTO segment_map (provider, conversation, segment_id, team, from_ts, to_ts, created_at, updated_at) VALUES
+			('slack', 'D000AAA', 's1', 'T000AAA', '1700000010.000100', '1700000020.000100', '', ''),
+			('slack', 'D000AAA', 's2', 'T000AAA', '1700000030.000100', '', '', ''),
+			('slack', 'D000AAA', 's3', 'T000AAA', '1700000050.000100', '', '', '')`,
+		`INSERT INTO slack_messages (conversation, ts, user, text) VALUES ('D000AAA', '1700000011.000100', 'U1', 'a'),
+			('D000AAA', '1700000019.000100', 'U2', 'b'), ('D000AAA', '1700000031.000100', 'U1', 'c')`,
+	} {
+		if _, err := old.ExecContext(ctx, q); err != nil {
+			t.Fatalf("%s: %v", q, err)
+		}
 	}
 	old.Close()
-	before := time.Now().Add(-time.Second)
 	db, err := Open(ctx, dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	st, err := db.Extraction().States(ctx, []unit.Unit{thread, segment, open})
-	if err != nil || st[thread].ClosedTS != "1700000003.000100" || st[open].ClosedTS != "" {
-		t.Fatalf("states %+v %v", st, err)
+	st, err := db.Extraction().States(ctx, []unit.Unit{thread, segment, empty, open})
+	if err != nil {
+		t.Fatal(err)
 	}
-	if at := tsTime(st[segment].ClosedTS); at.Before(before) || at.After(time.Now().Add(time.Second)) {
-		t.Errorf("the segment's closure is at %q, want the migration's ts", st[segment].ClosedTS)
+	for u, want := range map[unit.Unit]string{thread: "1700000003.000100", segment: "1700000019.000100", empty: "0.000000", open: ""} {
+		if st[u].ClosedTS != want {
+			t.Errorf("%s closed at %q, want %q", u.Key, st[u].ClosedTS, want)
+		}
 	}
-}
-
-func tsTime(ts string) time.Time {
-	var sec, usec int64
-	fmt.Sscanf(ts, "%d.%d", &sec, &usec)
-	return time.Unix(sec, usec*1000)
 }

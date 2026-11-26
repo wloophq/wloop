@@ -33,7 +33,7 @@ func TestAClosedConversationLeavesTheViewUntilAnItemOpens(t *testing.T) {
 	if !f.inSlackView(t, u) {
 		t.Fatal("the thread is not in the Slack view")
 	}
-	if err := f.db.Extraction().MarkClosed(context.Background(), u, f.now, ""); err != nil {
+	if err := f.db.Extraction().MarkClosed(context.Background(), u, f.now, ts(3)); err != nil {
 		t.Fatal(err)
 	}
 	if f.inSlackView(t, u) {
@@ -104,10 +104,12 @@ func TestSomeoneElsesMessageAfterTheClosureReopensTheConversation(t *testing.T) 
 }
 
 // TestAClosureOfAUnitWithNoMessageHoldsUntilALaterOne: unit.closed on a unit with no stored message keeps the ts
-// of when it applied, so a message posted before it that comes in later keeps it closed.
+// of when it applied, so a message posted before it that comes in later keeps it closed, and one posted after it
+// reopens it.
 func TestAClosureOfAUnitWithNoMessageHoldsUntilALaterOne(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t)
+	f.now = tsAt(8)
 	u := dslack.ThreadUnit(team, chan1, ts(1))
 	d := src.Draft{Evidence: src.Evidence{At: tsAt(5)}}
 	if err := (&Plugin{p: f.p}).ApplyEffect(context.Background(), src.EffectRequest{Effect: EffectUnitClosed, Unit: u.Wire(), Draft: &d}); err != nil {
@@ -116,5 +118,13 @@ func TestAClosureOfAUnitWithNoMessageHoldsUntilALaterOne(t *testing.T) {
 	st, err := f.db.Extraction().States(context.Background(), []unit.Unit{u})
 	if err != nil || !dslack.TSTime(st[u].ClosedTS).Equal(tsAt(5).Truncate(time.Microsecond)) {
 		t.Fatalf("closed at %q (%v), want the ts of %v", st[u].ClosedTS, err, tsAt(5))
+	}
+	f.reply(t, other, 4)
+	if f.inSlackView(t, u) {
+		t.Fatal("a message posted before the closure reopened it")
+	}
+	f.reply(t, other, 6)
+	if !f.inSlackView(t, u) {
+		t.Fatal("a message posted after the closure did not reopen it")
 	}
 }

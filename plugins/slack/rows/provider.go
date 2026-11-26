@@ -247,8 +247,6 @@ func (p *Provider) conversation(ctx context.Context, cache map[string]store.Conv
 	return c, nil
 }
 
-// facts are the unit's object and messages: a thread's replies, or the
-// messages a DM segment's range anchors.
 // Newest is the ts of u's newest stored message, "" when it has none.
 func (p *Provider) Newest(ctx context.Context, u unit.Unit) (string, error) {
 	k, err := dslack.ParseUnit(u)
@@ -262,6 +260,8 @@ func (p *Provider) Newest(ctx context.Context, u unit.Unit) (string, error) {
 	return msgs[len(msgs)-1].TS, nil
 }
 
+// facts are the unit's object and messages: a thread's replies, or the
+// messages a DM segment's range anchors.
 func (p *Provider) facts(ctx context.Context, k dslack.Key) (store.ObjectRow, []store.MessageRow, error) {
 	db := p.src.DB.Slack()
 	if k.Segment == "" {
@@ -311,9 +311,6 @@ func (in *Input) Closed() bool {
 	}
 	if !in.state.ClosureMarked {
 		return false
-	}
-	if in.state.ClosedTS == "" {
-		return true
 	}
 	for _, m := range slices.Backward(in.msgs) {
 		if m.User != in.viewer || in.viewer == "" {

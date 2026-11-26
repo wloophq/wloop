@@ -11,8 +11,7 @@ const markClosedSQL = `INSERT INTO extraction_cursors (provider, unit_key, closu
 	ON CONFLICT (provider, unit_key) DO UPDATE SET closure_marked = 1, closed_ts = excluded.closed_ts`
 
 // MarkClosed records u's unit.closed at at, which no extraction pass
-// clears, with newest, the ts of the newest message u had then; "" when
-// unknown.
+// clears, with newest, the ts of the newest message u had then.
 func (s *ExtractionStore) MarkClosed(ctx context.Context, u unit.Unit, at time.Time, newest string) error {
 	_, err := s.db.Write(ctx, func(tx *Tx) error {
 		tx.Touch(u)

@@ -191,7 +191,7 @@ func TestRowsReadUnitClosedFromClosureMarked(t *testing.T) {
 	if c := f.card(t, u); c.ClosurePosted {
 		t.Fatalf("a sent draft's anchor is no closure: %+v", c)
 	}
-	if err := f.db.Extraction().MarkClosed(context.Background(), u, f.now, ""); err != nil {
+	if err := f.db.Extraction().MarkClosed(context.Background(), u, f.now, ts(3)); err != nil {
 		t.Fatal(err)
 	}
 	if c := f.card(t, u); !c.ClosurePosted {
