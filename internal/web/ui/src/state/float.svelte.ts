@@ -12,6 +12,8 @@ export const FLOAT_TURNS = "/api/turns/live";
 // FLOAT_PEEK_MS is how long a peek shows; FLOAT_FOCUS_MS how long the peeked item stays the one the panel opens on.
 export const FLOAT_PEEK_MS = 4500;
 export const FLOAT_FOCUS_MS = 12000;
+// FLOAT_PEEK_LINGER_MS is how long a peek stays after the pointer leaves its card.
+export const FLOAT_PEEK_LINGER_MS = 1500;
 // FLOAT_QUIET_MS is how long arrivals must stop before the next one peeks again, so a burst peeks once.
 export const FLOAT_QUIET_MS = 10000;
 // FLOAT_RETRY_MS is the first wait before a failed read is retried, doubling up to FLOAT_RETRY_MAX_MS.
@@ -134,6 +136,20 @@ function peekAt(key: string): void {
   marks.timers.focus = timer.set(() => {
     marks.focus = "";
   }, FLOAT_FOCUS_MS);
+}
+
+// holdPeek keeps a peek shown while the pointer is on its card, bringing back one that was leaving.
+function holdPeek(): void {
+  if (fl.mode !== "peek") return;
+  timer.clear(marks.timers.peek);
+  fl.peeking = true;
+}
+
+// releasePeek lets a held peek leave FLOAT_PEEK_LINGER_MS after the pointer left its card.
+function releasePeek(): void {
+  if (fl.mode !== "peek" || !fl.peeking) return;
+  timer.clear(marks.timers.peek);
+  marks.timers.peek = timer.set(endPeek, FLOAT_PEEK_LINGER_MS);
 }
 
 // arrived asks for a peek at item unless a burst is on; every arrival keeps the burst on until FLOAT_QUIET_MS pass
@@ -430,6 +446,8 @@ export function floatState() {
       return this.read === "ok";
     },
     setPlace,
+    holdPeek,
+    releasePeek,
     show,
     openPanel,
     close,

@@ -115,7 +115,7 @@
   role="presentation"
 >
   {#if peeked}
-    <button type="button" class="fl-flyout" data-state={leaving ? "leaving" : "shown"} use:hovered onclick={() => f.openPanel(f.peekKey)}><span class="fl-flyout-text"><Peek item={peeked} /></span></button>
+    <button type="button" class="fl-flyout" data-state={leaving ? "leaving" : "shown"} use:hovered onpointerenter={() => f.holdPeek()} onpointerleave={() => f.releasePeek()} onclick={() => f.openPanel(f.peekKey)}><span class="fl-flyout-text"><Peek item={peeked} /></span></button>
   {/if}
   {#if open}
     <section class="fl-panel" aria-label={f.title || undefined}>

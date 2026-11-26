@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render } from "@testing-library/svelte";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { J } from "../../lib/util";
 import { nav } from "../../state/route.svelte";
-import { FLOAT_PEEK_MS, floatDeps, floatLoad, floatState, itemKey, resetFloat } from "../../state/float.svelte";
+import { FLOAT_PEEK_LINGER_MS, FLOAT_PEEK_MS, floatDeps, floatLoad, floatState, itemKey, resetFloat } from "../../state/float.svelte";
 import { flushSync } from "svelte";
 import { notice, tasksState } from "../../state/store.svelte";
 import { draftGate, pendingDraft, reviewDraft, taskCatalog } from "../../testing/gates";
@@ -407,6 +407,36 @@ test.each(["left", "right", "above", "below"] as const)("beside the tab on its %
   await vi.advanceTimersByTimeAsync(1);
   await tick();
   expect([flyout(c), floatState().mode, closes()]).toEqual([null, "", 2]);
+});
+
+test("the pointer on the peek's card keeps it shown, and it leaves FLOAT_PEEK_LINGER_MS after the pointer does", async () => {
+  motion();
+  const c = await peekAt();
+  await vi.advanceTimersByTimeAsync(FLOAT_PEEK_MS - 1);
+  await fireEvent.pointerEnter(flyout(c)!);
+  await vi.advanceTimersByTimeAsync(FLOAT_PEEK_MS * 3);
+  await tick();
+  expect([flyout(c)!.dataset.state, closes()]).toEqual(["shown", 1]);
+  await fireEvent.pointerLeave(flyout(c)!);
+  await vi.advanceTimersByTimeAsync(FLOAT_PEEK_LINGER_MS - 1);
+  await tick();
+  expect(flyout(c)!.dataset.state).toBe("shown");
+  await vi.advanceTimersByTimeAsync(1);
+  await tick();
+  expect(flyout(c)!.dataset.state).toBe("leaving");
+});
+
+test("the pointer reaching a leaving peek's card brings it back", async () => {
+  motion();
+  const c = await peekAt();
+  await vi.advanceTimersByTimeAsync(FLOAT_PEEK_MS);
+  await tick();
+  expect(flyout(c)!.dataset.state).toBe("leaving");
+  await fireEvent.pointerEnter(flyout(c)!);
+  await tick();
+  await vi.advanceTimersByTimeAsync(LEAVE_MS * 2);
+  await tick();
+  expect([flyout(c)!.dataset.state, closes()]).toEqual(["shown", 1]);
 });
 
 test("a peek the host asks for while the last one leaves keeps the card", async () => {
