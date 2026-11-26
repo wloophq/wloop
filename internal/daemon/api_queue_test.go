@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http/httptest"
 	"os"
@@ -617,5 +618,25 @@ func TestTheDigestAndTheReviewCountTheQueueViewByItsItems(t *testing.T) {
 	get(t, q.s, api.ReviewPath, &rv)
 	if d.Counts.Views["needs-you"] != 2 || len(rv.Steps) != 1 || rv.Steps[0].Count != 2 {
 		t.Fatalf("digest %d, review %+v; want the queue's two items", d.Counts.Views["needs-you"], rv.Steps)
+	}
+}
+
+// The queue reads every kind's view and serves each item's task over one pass of the tasks, so serving it
+// computes each task's facts once, however many kinds it ranges over.
+func TestTheQueueComputesEachTasksFactsOnce(t *testing.T) {
+	t.Parallel()
+	q := newQueueRig(t, nil)
+	const n = 12
+	for i := range n {
+		id := task.ID(fmt.Sprintf("t-%016x", i+1))
+		q.put(t, task.Task{ID: id, State: "next", Category: task.CategoryReady, Title: fmt.Sprintf("send note %d", i+1)})
+		q.open(t, id, gate.KindDraft, strconv.Itoa(100+i), time.Duration(i+1)*time.Minute)
+	}
+	q.factReads.Store(0)
+	if got := q.all(t); len(got.Items) != n {
+		t.Fatalf("%d items, want %d", len(got.Items), n)
+	}
+	if got := q.factReads.Load(); got != n {
+		t.Fatalf("%d facts reads for a queue of %d tasks, want %d", got, n, n)
 	}
 }

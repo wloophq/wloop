@@ -39,7 +39,10 @@ func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	ctx := withPlanReads(r.Context())
+	ctx, ok := s.queuePass(withPlanReads(r.Context()), w, g)
+	if !ok {
+		return
+	}
 	q, err := s.home(g).Queue(ctx, k, s.queueKeep(ctx, g, r))
 	if err != nil {
 		writeTasksError(w, err)
@@ -58,7 +61,10 @@ func (s *Server) handleQueueAll(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	ctx := withPlanReads(r.Context())
+	ctx, ok := s.queuePass(withPlanReads(r.Context()), w, g)
+	if !ok {
+		return
+	}
 	d := s.loaded().Decisions
 	all, err := s.home(g).QueueAll(ctx, d.Order, d.Sort, s.queueKeep(ctx, g, r))
 	if err != nil {
@@ -71,6 +77,17 @@ func (s *Server) handleQueueAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, api.Queue{View: s.loaded().Views.QueueView(), Title: d.QueueAll, Empty: d.EmptyAll, Total: len(items), Items: items})
+}
+
+// queuePass is ctx carrying one pass of the tasks, which every kind's view and every item's task view read, so
+// a task's facts, and what they load for every task, such as the drafts the open questions pin, are read once.
+func (s *Server) queuePass(ctx context.Context, w http.ResponseWriter, g *coretasks.Service) (context.Context, bool) {
+	n, err := g.Snapshot(ctx)
+	if err != nil {
+		writeTasksError(w, err)
+		return nil, false
+	}
+	return n.Within(ctx), true
 }
 
 // queueKeep is the lens r's query parameter q narrows a queue by; nil when it names none.
