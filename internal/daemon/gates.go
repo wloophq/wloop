@@ -362,26 +362,17 @@ func gateView(g gate.Gate, d intentload.GatesDef) api.GateView {
 func (s *Server) openGatesOf(ctx context.Context, id task.ID) ([]gate.Gate, error) {
 	rd := s.deps.GateReader
 	if _, ok := coretasks.PassOf(ctx); ok {
-		open, err := s.openGates(ctx, rd)
+		open, err := s.openGates(ctx)
 		return open[id], err
 	}
 	gs, err := rd.OfTask(ctx, id)
 	return slices.DeleteFunc(gs, func(g gate.Gate) bool { return g.Status != gate.Open }), err
 }
 
-// openGates are every open gate of rd by task, the oldest first, read once per pass.
-func (s *Server) openGates(ctx context.Context, rd gates.Reader) (map[task.ID][]gate.Gate, error) {
-	return coretasks.Once(ctx, passOpenGates, func() (map[task.ID][]gate.Gate, error) {
-		gs, err := rd.Where(ctx, gates.Query{Statuses: []gate.Status{gate.Open}})
-		out := map[task.ID][]gate.Gate{}
-		for _, g := range gs {
-			out[g.Task] = append(out[g.Task], g)
-		}
-		return out, err
-	})
+// openGates are every open gate by task, the oldest first, read once per pass, which what the tasks wait on shares.
+func (s *Server) openGates(ctx context.Context) (map[task.ID][]gate.Gate, error) {
+	return outbox.OpenGates(ctx, s.deps.GateReader.Where)
 }
-
-const passOpenGates = "daemon.open_gates"
 
 // openGates sets v's open gates.
 func (ev *taskViewer) openGates(ctx context.Context, e task.Task, v *api.TaskView) error {

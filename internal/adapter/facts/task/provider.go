@@ -394,15 +394,11 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		sources = nil
 	}
 	if p.d.Decisions != nil {
-		pinned, err := p.pinned(ctx)
+		w, err := p.waiting(ctx)
 		if err != nil {
 			return nil, err
 		}
-		undelivered, err := p.undelivered(ctx, e.ID)
-		if err != nil {
-			return nil, err
-		}
-		if found := p.d.Decisions().Of(gates.Unpinned(gs, pinned), undelivered, sources); len(found) > 0 {
+		if found := w.Of(p.d.Decisions(), e.ID, sources); len(found) > 0 {
 			f["task.decisions"], f["task.decision_since"] = decision.Names(found), found[0].Since
 		}
 	}
@@ -824,37 +820,23 @@ func (p *Provider) gates(ctx context.Context, id task.ID) ([]gate.Gate, error) {
 		return nil, nil
 	}
 	if _, ok := coretasks.PassOf(ctx); ok {
-		open, err := coretasks.Once(ctx, passGates, func() (map[task.ID][]gate.Gate, error) {
-			gs, err := p.d.Gates.Where(ctx, gates.Query{Statuses: []gate.Status{gate.Open}})
-			out := map[task.ID][]gate.Gate{}
-			for _, g := range gs {
-				out[g.Task] = append(out[g.Task], g)
-			}
-			return out, err
-		})
+		open, err := outbox.OpenGates(ctx, p.d.Gates.Where)
 		return open[id], err
 	}
 	gs, err := p.d.Gates.OfTask(ctx, id)
 	return slices.DeleteFunc(gs, func(g gate.Gate) bool { return g.Status != gate.Open }), err
 }
 
-// pinned are the drafts an open message pins; in a pass, read once.
-func (p *Provider) pinned(ctx context.Context) (map[int64]int64, error) {
-	if p.d.Pinned == nil {
-		return nil, nil
+// waiting is what the gates and the drafts make the tasks wait on; in a pass, read once.
+func (p *Provider) waiting(ctx context.Context) (outbox.Waiting, error) {
+	var r outbox.WaitingReads
+	if p.d.Gates != nil {
+		r.Where, r.Pinned = p.d.Gates.Where, p.d.Pinned
+		if p.d.Drafts != nil {
+			r.Drafts = p.d.Drafts
+		}
 	}
-	return coretasks.Once(ctx, passPinned, func() (map[int64]int64, error) { return p.d.Pinned(ctx) })
-}
-
-// undelivered are task id's approved draft gates whose drafts failed to deliver; in a pass, read once.
-func (p *Provider) undelivered(ctx context.Context, id task.ID) ([]gate.Gate, error) {
-	if p.d.Drafts == nil || p.d.Gates == nil {
-		return nil, nil
-	}
-	all, err := coretasks.Once(ctx, passUndelivered, func() (map[task.ID][]gate.Gate, error) {
-		return outbox.Undelivered(ctx, p.d.Drafts, p.d.Gates.Where)
-	})
-	return all[id], err
+	return outbox.ReadWaiting(ctx, r)
 }
 
 // wake is task id's wake; in a pass, every task's is read once.
@@ -864,13 +846,10 @@ func (p *Provider) wake(ctx context.Context, id task.ID) (wake.Wake, bool, error
 
 // What every task's facts read of the store as a whole, once per pass.
 const (
-	passOpenTurns   = "facts.open_turns"
-	passTurns       = "facts.turns"
-	passGates       = "facts.gates"
-	passPinned      = "facts.pinned"
-	passUndelivered = "facts.undelivered"
-	passSettled     = "facts.settled."
-	passTask        = "facts.task."
+	passOpenTurns = "facts.open_turns"
+	passTurns     = "facts.turns"
+	passSettled   = "facts.settled."
+	passTask      = "facts.task."
 )
 
 // items are the items of units; those of the pass ctx carries are read once for every unit of it.

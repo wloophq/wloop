@@ -129,12 +129,11 @@ func (s *Server) queueItems(ctx context.Context, g *coretasks.Service, its []hom
 	return out, nil
 }
 
-// queuePins are the drafts the open questions pin, by draft, with the message that pins each; nil without gates.
+// queuePins are the drafts the open questions pin, by draft, with the message that pins each, as the queue's
+// decisions read them.
 func (s *Server) queuePins(ctx context.Context) (map[int64]int64, error) {
-	if svc := s.deps.Gates; svc != nil {
-		return svc.Pinned(ctx)
-	}
-	return nil, nil
+	w, err := s.waiting(ctx)
+	return w.Pinned, err
 }
 
 // queueItem is it as the queue serves it, with r, what its gate names.
