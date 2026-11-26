@@ -10,7 +10,7 @@ import (
 )
 
 // removedViews are core views removed with no alias; what replaces each is in the release notes.
-var removedViews = []string{"needs-me", "blocked-by-me", "home-blocked"}
+var removedViews = []string{"needs-me", "blocked-by-me", "home-blocked", "outbox"}
 
 // TestNothingLinksToARemovedView checks that the bundled profiles, the cockpit, the menu bar and the CLI name no
 // removed view: no route, view table, view reference or key binding to one.

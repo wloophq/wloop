@@ -287,8 +287,8 @@ var otherFacts = []Fact{
 	unitDraftFact("held_kind", expr.String, "The kind of the draft draft.held_ref names, as its plugin's manifest names it, such as review; empty when none."),
 	unitDraftFact("held_basis", expr.String, "The basis the draft draft.held_ref names was written against, such as the head commit a review read; empty when none. Nothing reads the unit's live basis for it: a workflow compares it with the unit's own facts, such as a pull request's head and commits, to tell the unit moved past it."),
 	unitDraftFact("held_stale", expr.Bool, "The draft draft.held_ref names was refused as stale, its approval or a check finding the unit moved past its basis; true until its content is revised."),
-	enum(viewToo(approvalFact("delivery", expr.String, "How the unit's plugin posts the draft: message, reaction or comment. A plugin that posts every text as a comment makes each draft that is not a reaction a comment, whatever its proposer asked for.")), enumOf(DraftDeliveries...)),
-	viewToo(approvalFact("proposer", expr.String, "What proposed the draft: workflow:<name> for a workflow's draft.propose, intent:<name> for a turn's or a session's, rule:<name> for a plugin rule's, user for one you wrote, session for one a session wrote outside any intent's turn.")),
+	enum(approvalFact("delivery", expr.String, "How the unit's plugin posts the draft: message, reaction or comment. A plugin that posts every text as a comment makes each draft that is not a reaction a comment, whatever its proposer asked for."), enumOf(DraftDeliveries...)),
+	approvalFact("proposer", expr.String, "What proposed the draft: workflow:<name> for a workflow's draft.propose, intent:<name> for a turn's or a session's, rule:<name> for a plugin rule's, user for one you wrote, session for one a session wrote outside any intent's turn."),
 	approvalFact("effects", expr.List, "The effects the draft applies once sent when the loop named them, a workflow's draft.propose or a plugin rule; empty for a turn's or a session's draft, whose agent names them. A workflow's rules and the configuration's read it; an intent's do not."),
 	approvalFact("purpose", expr.String, "The draft's purpose when the loop named it, a workflow's draft.propose or a plugin rule; empty for a turn's or a session's draft, whose agent names it. A workflow's rules and the configuration's read it; an intent's do not."),
 	enum(wf("trigger", "kind", expr.String, "sweep, event or schedule."), enumOf("sweep", "event", "schedule")),
@@ -376,12 +376,6 @@ func unitDraftFact(name string, t expr.Type, doc string) Fact {
 // named draft.<name>.
 func approvalFact(name string, t expr.Type, doc string) Fact {
 	return Fact{Name: DraftSlot + "." + name, Type: t, Slots: []FactSlot{ApprovalSlot}, Doc: doc}
-}
-
-// viewToo makes f, a fact of the draft a rule reads, one a draft facet reads too.
-func viewToo(f Fact) Fact {
-	f.Slots = append(slices.Clone(f.Slots), DraftViewSlot)
-	return f
 }
 
 // payloadFacts are the approval facts of provider p's draft kinds, each a

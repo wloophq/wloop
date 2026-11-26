@@ -95,7 +95,7 @@ type Draft struct {
 	ID        ID
 	Unit      unit.Unit
 	Items     []string // item ids of Unit; may be empty
-	Task      string   // the task it serves, "" none; the Outbox row of the draft itself is "draft:<ID>"
+	Task      string   // the task it serves, "" none; the draft's own task is "draft:<ID>"
 	Kind      Kind
 	Purpose   string    // what it is for: "nudge", "close", "ask_owner", or any label its proposer names
 	Delivery  Delivery  // how it is posted

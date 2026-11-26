@@ -260,8 +260,8 @@ describe("keys_test.go", () => {
     const views = [...viewsFixture, { id: "issues", provider: "linear", order: 2 }, { id: "triage", provider: "linear", order: 1 }];
     const k = harness({ views, providers: ["github", "slack", "linear", "wiki"] });
     k.keys.setBindings([...BINDINGS, { key: "g l", action: "nav:linear", context: "global", owner: "linear" }, { key: "g y", action: "nav:wiki", context: "global", owner: "wiki" }]);
-    for (const c of ["g", "g", "g", "l", "g", "y", "g", "o"]) await k.press(c);
-    expect(k.log.nav).toEqual(["needs-me", "triage", "outbox"]);
+    for (const c of ["g", "g", "g", "l", "g", "y", "g", "i"]) await k.press(c);
+    expect(k.log.nav).toEqual(["needs-me", "triage", "inbox"]);
   });
 
   test("TestLensViewsAndKeysComeFromTheCatalog: only the served keys jump, and the help reads their labels", async () => {

@@ -21,178 +21,6 @@
       "description": "What clients call a view's own order in the sort menu, such as \"View order\". Required in the bundled profile; a user layer may replace it.",
       "type": "string"
     },
-    "draft_facets": {
-      "additionalProperties": {
-        "additionalProperties": false,
-        "description": "A draft facet, by its id. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.",
-        "properties": {
-          "buckets": {
-            "additionalProperties": {
-              "additionalProperties": false,
-              "description": "A bucket, by its id.",
-              "properties": {
-                "label": {
-                  "description": "The text people read; the id when absent.",
-                  "type": "string"
-                },
-                "within": {
-                  "description": "How long ago an instant may be and still fall in the bucket.",
-                  "type": "string"
-                }
-              },
-              "type": "object"
-            },
-            "description": "For a facet that sorts by time: the buckets its instants fall in, by id, in the order the file declares them; the first whose within covers the time since the instant wins, and one with no within takes the rest.",
-            "type": "object"
-          },
-          "colors": {
-            "additionalProperties": {
-              "description": "Not read: a draft's card shows no facet's values.",
-              "enum": [
-                "me",
-                "author",
-                "reviewer",
-                "loop",
-                "nobody"
-              ],
-              "type": "string"
-            },
-            "description": "Not read: a draft's card shows no facet's values.",
-            "type": "object"
-          },
-          "empty": {
-            "description": "What a group of drafts with no value shows.",
-            "type": "string"
-          },
-          "fact": {
-            "description": "The draft fact the facet reads (draft.proposer, draft.kind, draft.where, ...). Required.",
-            "type": "string"
-          },
-          "group": {
-            "default": false,
-            "description": "Whether a list can group by the facet.",
-            "type": "boolean"
-          },
-          "label": {
-            "description": "The name people read. Required.",
-            "type": "string"
-          },
-          "label_prefix": {
-            "description": "Not read: a draft's card shows no facet's values.",
-            "type": "string"
-          },
-          "match": {
-            "default": "exact",
-            "description": "How a filter's text matches a value: the whole value, its last segment, its first, or a person's team.",
-            "enum": [
-              "exact",
-              "suffix",
-              "prefix",
-              "team"
-            ],
-            "type": "string"
-          },
-          "menu": {
-            "default": true,
-            "description": "Whether the facet is offered in the filter menu.",
-            "type": "boolean"
-          },
-          "merge": {
-            "default": "union",
-            "description": "Not read: a draft has one value of its fact, so nothing joins.",
-            "enum": [
-              "union",
-              "rows-first",
-              "own"
-            ],
-            "type": "string"
-          },
-          "rank": {
-            "description": "The facet's values in their order, first first.",
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "show": {
-            "description": "Not read: a draft's card shows no facet's values.",
-            "oneOf": [
-              {
-                "type": "string"
-              },
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              }
-            ]
-          },
-          "show_label": {
-            "description": "Not read: a draft's card shows no facet's values.",
-            "type": "string"
-          },
-          "show_max": {
-            "description": "Not read: a draft's card shows no facet's values.",
-            "type": "integer"
-          },
-          "show_values": {
-            "default": "all",
-            "description": "Not read: a draft's card shows no facet's values.",
-            "enum": [
-              "all",
-              "first"
-            ],
-            "type": "string"
-          },
-          "show_when": {
-            "additionalProperties": {
-              "description": "Not read: a draft's card shows no facet's values.",
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            "description": "Not read: a draft's card shows no facet's values.",
-            "type": "object"
-          },
-          "sort": {
-            "description": "How the facet's values order: by rank, as text, or as instants (time). Absent, as text.",
-            "enum": [
-              "rank",
-              "text",
-              "time"
-            ],
-            "type": "string"
-          },
-          "strip": {
-            "default": false,
-            "description": "Not read: a draft's card shows no facet's values.",
-            "type": "boolean"
-          },
-          "units": {
-            "default": "all",
-            "description": "Not read: a draft sits on one unit.",
-            "enum": [
-              "all",
-              "primary"
-            ],
-            "type": "string"
-          },
-          "values": {
-            "additionalProperties": {
-              "description": "The text of one value.",
-              "type": "string"
-            },
-            "description": "The text people read for a value, by value. A layer adds or replaces the values it names and keeps the lower layers' others, so a plugin's layer words its own id, such as its provider in `source`.",
-            "type": "object"
-          }
-        },
-        "type": "object"
-      },
-      "description": "The draft facets, by id: the fields the Outbox filters, groups and sorts drafts by, in the order the file declares them, a user layer's new ones after the bundled. Their ids match the task facets of the same meaning, and a layer's entry here never touches the task facet of the same id.",
-      "type": "object"
-    },
     "empty": {
       "description": "What a view without its own empty shows when it lists nothing, over the view's label as `{{.label}}`. Required in the bundled profile; a user layer may replace it.",
       "type": "string"
@@ -780,18 +608,17 @@
           },
           "layout": {
             "default": "list",
-            "description": "How the cockpit draws the view: list, its rows; board, a lane per group, which a person may switch back to the list; outbox, the Outbox's drafts, which the lens filters, groups and sorts over the `draft_facets` and the view's own `group` and `sort` (draft facts), read from the Outbox's own route whatever the view lists; queue, what waits on you one decision at a time, the queue of every decision kind in decisions.toml's order, read from its own route whatever the view lists, which the home's section and counter of the view and the menu bar open; with no `when` of its own, such a view lists the tasks of the views decisions.toml's kinds name.",
+            "description": "How the cockpit draws the view: list, its rows; board, a lane per group, which a person may switch back to the list; queue, what waits on you one decision at a time, the queue of every decision kind in decisions.toml's order, read from its own route whatever the view lists, which the home's section and counter of the view and the menu bar open; with no `when` of its own, such a view lists the tasks of the views decisions.toml's kinds name.",
             "enum": [
               "list",
               "board",
-              "outbox",
               "queue"
             ],
             "type": "string"
           },
           "opens": {
             "additionalProperties": false,
-            "description": "What a page of the view opens instead of its own, such as the Outbox's, which opens what waits on you narrowed to the drafts to send; none opens its own.",
+            "description": "What a page of the view opens instead of its own, such as one that opens what waits on you narrowed to the drafts to send; none opens its own.",
             "properties": {
               "kind": {
                 "description": "The decision kind of decisions.toml that narrows the view it opens, such as send-draft; none shows it whole.",

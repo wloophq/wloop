@@ -133,10 +133,6 @@
             },
             "description": "The payload's fields, by the key they have in the payload, at any depth.",
             "type": "object"
-          },
-          "label": {
-            "description": "What the draft kind is called to a person, such as \"Review\": the Outbox's name for the kind, and the head of its group when drafts group by kind. A kind with no label shows its name.",
-            "type": "string"
           }
         },
         "type": "object"

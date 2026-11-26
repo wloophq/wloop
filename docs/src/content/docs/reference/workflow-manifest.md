@@ -98,9 +98,6 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 | `drafts.withdraw.rule[]` | table |  | A rule tried before when, in order, that withdraws with a reason of its own. |
 | `drafts.withdraw.rule[].when` | predicate |  | When the rule withdraws an open draft the workflow proposed, over the unit's facts and the draft's. Required. |
 | `drafts.withdraw.rule[].reason` | one of `assigned`, `moot`, `outside`, `joined` | `moot` | The reason the draft the rule withdraws stores. |
-| `outbox` | table |  | How the Outbox heads the group of the drafts the workflow proposed. |
-| `outbox.title` | string, localized |  | The group's title, what the drafts are for, such as "Ask who hasn't answered"; the summary when absent. |
-| `outbox.about` | string, localized |  | One line under the title on when the workflow drafts them, such as "Drafted when a conversation where you asked something goes quiet." |
 
 ## Steps
 

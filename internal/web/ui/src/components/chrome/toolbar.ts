@@ -3,7 +3,6 @@ import { fmtNumber, t } from "../../lib/i18n.svelte";
 import {
   fieldById, fillWord, groupedRows, groupField, groupLabel, inView, lensWords, parseSort, qualifierToken, sm, toggledQualifier, rowByKey, withoutQualifiers, type Lens,
 } from "../../lib/lens";
-import { isOutboxView, outboxLensItems } from "../../lib/drafts";
 import { taskLensItems } from "../../lib/tasks";
 import { isSet, labelOf, unitKey, type J } from "../../lib/util";
 import { lensResult, moveFocus, readLens } from "../../lib/view";
@@ -21,10 +20,8 @@ export function sortLabel(sort: string, fields: Field[] = catalog.fields): strin
   return field ? `${(fieldById(field, fields) as Field).label.toLowerCase()} ${desc ? "descending" : "ascending"}` : "";
 }
 
-// lensItems are what lens's view lists before the lens: the Outbox's drafts, a task view's tasks, a row view's
-// rows.
+// lensItems are what lens's view lists before the lens: a task view's tasks, a row view's rows.
 export function lensItems(lens: Lens): J[] {
-  if (isOutboxView(lens.view)) return outboxLensItems();
   if (isCoreView(lens.view)) return taskLensItems();
   return state.rows.filter((r) => inView(r, lens.view, lens.done));
 }

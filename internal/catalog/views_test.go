@@ -119,7 +119,7 @@ func TestAQuestionGateOnADoneTaskShowsInNeedsYou(t *testing.T) {
 }
 
 // TestEveryOpenGateShowsInABundledView checks that an open gate of every kind, on a task of every category, is
-// in a bundled view the badge names, through its task, and a draft also in a view over gates.
+// in a bundled view the badge names, through its task.
 func TestEveryOpenGateShowsInABundledView(t *testing.T) {
 	l := bundled(t)
 	for _, k := range gate.Kinds {
@@ -128,39 +128,6 @@ func TestEveryOpenGateShowsInABundledView(t *testing.T) {
 			if !slices.ContainsFunc(inViews(t, l, f), l.Views.Badged) {
 				t.Errorf("an open %s gate on a %s task is in no view the badge names: %v", k, c, inViews(t, l, f))
 			}
-		}
-		g := gate.Gate{Kind: k, Status: gate.Open}
-		var over []string
-		for _, v := range l.Views.Views {
-			if in, err := GateViewAt(l.Views, v.ID, g, intentload.GateFacts(g, "held"), lensNow); err != nil {
-				t.Fatal(err)
-			} else if in {
-				over = append(over, v.ID)
-			}
-		}
-		if want := k == gate.KindDraft; want != slices.Contains(over, "outbox") {
-			t.Errorf("an open %s gate: in %v", k, over)
-		}
-	}
-}
-
-func TestOutboxKeepsAFailedApprovedDraft(t *testing.T) {
-	l := bundled(t)
-	for _, c := range []struct {
-		status   gate.Status
-		delivery string
-		want     bool
-	}{
-		{gate.Open, "held", true},
-		{gate.Approved, "queued", false},
-		{gate.Approved, "sending", true},
-		{gate.Approved, "failed", true},
-		{gate.Approved, "sent", false},
-		{gate.Rejected, "dropped", false},
-	} {
-		g := gate.Gate{Kind: gate.KindDraft, Status: c.status}
-		if in, err := GateViewAt(l.Views, "outbox", g, intentload.GateFacts(g, c.delivery), lensNow); err != nil || in != c.want {
-			t.Errorf("a %s draft gate delivery %s: in the outbox %v, %v", c.status, c.delivery, in, err)
 		}
 	}
 }

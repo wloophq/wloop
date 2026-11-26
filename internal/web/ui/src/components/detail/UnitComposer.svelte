@@ -10,7 +10,7 @@
   import ActionResult from "../actions/ActionResult.svelte";
   import { replyArgs, replySendsNow } from "./unit";
 
-  // A reply in the unit's conversation, or a reaction where the unit takes one, posted as a draft: Save to Outbox
+  // A reply in the unit's conversation, or a reaction where the unit takes one, posted as a draft: Save as draft
   // holds it for approval, Send now approves it at once. Its text lives in detailState.compose.
   let { u }: { u: J } = $props();
 
@@ -30,7 +30,7 @@
     }
     try {
       const d = await postJSON("/api/drafts", { unit: u, kind: args.kind, text: args.text, reaction: args.reaction, send: args.send === "now", source: "cockpit" });
-      setNotice(d.state === "queued" ? t("Draft {id} approved; it goes out in a moment", { id: d.id }) : t("Draft {id} saved to the Outbox for your approval", { id: d.id }));
+      setNotice(d.state === "queued" ? t("Draft {id} approved; it goes out in a moment", { id: d.id }) : t("Draft {id} saved; it waits in Needs you for your approval", { id: d.id }));
       scheduler.load({ tasks: true });
       detailState.compose = { key, text: "", reaction: "" };
     } catch (err) {
@@ -61,7 +61,7 @@
   <div class="d-actions">
     {#each order as send, i (send)}
       <ActionButton slot={`unit:reply:${send ? "send" : "save"}`} class={"act" + (i === 0 ? " primary" : "")} run={() => run(send)}
-        >{send ? t("Send now") : t("Save to Outbox")}</ActionButton>
+        >{send ? t("Send now") : t("Save as draft")}</ActionButton>
     {/each}
   </div>
   <ActionResult slots={["unit:reply:send", "unit:reply:save"]} />

@@ -1,6 +1,3 @@
-# The words of the GitHub plugin's provider in the core's source facets.
+# The words of the GitHub plugin's provider in the core's source facet.
 [facets.source.values]
-github = "GitHub"
-
-[draft_facets.source.values]
 github = "GitHub"

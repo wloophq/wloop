@@ -1,6 +1,3 @@
-# The words of the Slack plugin's provider in the core's source facets.
+# The words of the Slack plugin's provider in the core's source facet.
 [facets.source.values]
-slack = "Slack"
-
-[draft_facets.source.values]
 slack = "Slack"

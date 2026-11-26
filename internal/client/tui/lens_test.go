@@ -63,7 +63,7 @@ func TestTUIListsLensViewsFromTheCatalog(t *testing.T) {
 	if parked < 0 || doing < 0 || parked > doing || strings.Index(screen, "Call the bank") > doing {
 		t.Fatalf("the groups do not follow the served states' order and labels:\n%s", screen)
 	}
-	for _, name := range []string{"Focus", "Inbox", "Next", "Waiting", "Outbox"} {
+	for _, name := range []string{"Focus", "Inbox", "Next", "Waiting", "Held drafts"} {
 		if strings.Contains(screen, name) {
 			t.Fatalf("the screen names %q, a view the catalog does not serve:\n%s", name, screen)
 		}

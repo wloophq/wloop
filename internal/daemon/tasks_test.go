@@ -832,8 +832,10 @@ func TestCountersWithTermsCountWhatTheFilteredListsShow(t *testing.T) {
 			if code := get(t, r.s, api.CountersPath+"?"+q.Encode(), &c); code != 200 {
 				t.Fatalf("%v: %d", terms, code)
 			}
+			def := bundledLoaded().Views
 			for _, view := range storedViews() {
-				if spec, _ := bundledLoaded().Views.View(view); !spec.Rail {
+				counted := slices.Contains(def.Badge, view) || slices.ContainsFunc(def.Review, func(st intentload.ReviewStepDef) bool { return st.View == view })
+				if spec, _ := def.View(view); !spec.Rail && !counted {
 					if _, counted := c.Views[view]; counted {
 						t.Errorf("%s is off the rail and counted", view)
 					}
@@ -1448,7 +1450,7 @@ func TestRailFalseViewsServedWithRail(t *testing.T) {
 	for _, v := range cat.Views {
 		rail[v.ID] = v.Rail
 	}
-	if rail["home-stalled"] || rail["decide-answer"] || !rail["next"] || !rail["outbox"] {
+	if rail["home-stalled"] || rail["decide-answer"] || !rail["next"] || !rail["waiting"] {
 		t.Fatalf("rail = %v", rail)
 	}
 }

@@ -36,7 +36,7 @@ const stampToken = "20060102T150405.000000000"
 var notifiedDrafts = []draft.State{draft.Held, draft.Failed}
 
 // attention is e's notification, nil when it posts none: an Inbox task notifies once, a task anywhere else once
-// while a question, post or proposal gate is open on it, a draft of the Outbox once unless it serves a task that
+// while a question, post or proposal gate is open on it, a held or failed draft once unless it serves a task that
 // notifies, whose id the draft then keys. A draft is never approved from a notification, which shows its text
 // cut. Nothing of a disabled plugin notifies.
 func (ev *taskViewer) attention(ctx context.Context, e task.Task) *api.Attention {

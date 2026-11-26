@@ -91,7 +91,6 @@ and the menu bar list; among the bundled ones:
 | `approved` | the work is approved: a source says a link is ready |
 | `done` | done and still holding a workspace on disk, to remove |
 | `snoozed` | asleep until a date, an event or a condition |
-| `outbox` | drafts waiting on approval, and approved ones whose delivery is under way or failed |
 
 The profile's `[badge]` names the views whose tasks the menu bar notifies,
 the daily digest counts and `status` lists, Inbox and Needs me by default;

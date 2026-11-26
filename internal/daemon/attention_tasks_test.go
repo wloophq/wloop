@@ -34,6 +34,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/meter/metertest"
 )
 
@@ -109,7 +110,7 @@ func (r *notifyRig) notified(t *testing.T) map[string]api.TaskView {
 			if e.Attention == nil {
 				continue
 			}
-			if v != "inbox" && v != "outbox" && v != "focus" && len(e.Gates) == 0 && !pullRequestTask(e) {
+			if v != "inbox" && v != "focus" && len(e.Gates) == 0 && !pullRequestTask(e) {
 				t.Errorf("%s task %s (%s) with no open gate notifies %+v", v, e.ID, e.State, e.Attention)
 			}
 			out[e.ID] = e
@@ -290,10 +291,10 @@ func proposed(id int64, task string) draft.Draft {
 func attentions(t *testing.T, r *tasksRig) map[string]*api.Attention {
 	t.Helper()
 	out := map[string]*api.Attention{}
-	for _, v := range storedViews() {
+	for _, v := range storedViewsOf(r.s.loaded()) {
 		for _, e := range r.page(t, "view="+v).Tasks {
 			if e.Attention != nil {
-				if v != "inbox" && v != "outbox" && v != "focus" && len(e.Gates) == 0 {
+				if v != "inbox" && v != heldDraftsView && v != "focus" && len(e.Gates) == 0 {
 					t.Errorf("%s task %s with no open gate notifies %+v", v, e.ID, e.Attention)
 				}
 				out[e.ID] = e.Attention
@@ -347,9 +348,9 @@ func TestOnlyInboxAndOutboxNotify(t *testing.T) {
 	}
 }
 
-func TestOutboxDraftNotifiesOnce(t *testing.T) {
+func TestADraftInAViewOverGatesNotifiesOnce(t *testing.T) {
 	t.Parallel()
-	r := newTasksRig(t, nil)
+	r := newTasksRig(t, func(d *Deps) { d.Intents = heldDraftsLoaded(t) })
 	r.put(t, task.Task{ID: "t-next", State: "next", Category: task.CategoryReady, Units: []unit.Unit{r7u}})
 	failed := proposed(3, "")
 	failed.State = draft.Failed
@@ -578,7 +579,10 @@ func answerWaits(ctx context.Context, t *testing.T, f *storetest.Fixture, u unit
 
 func TestADraftOfASilentInboxTaskNotifiesItself(t *testing.T) {
 	t.Parallel()
-	r := newTasksRig(t, func(d *Deps) { d.PluginEnabled = func(p unit.ProviderID) bool { return p != "slack" } })
+	r := newTasksRig(t, func(d *Deps) {
+		d.Intents = heldDraftsLoaded(t)
+		d.PluginEnabled = func(p unit.ProviderID) bool { return p != "slack" }
+	})
 	slack := unit.Unit{Provider: "slack", Key: "T000/C000/1.2"}
 	r.put(t, task.Task{ID: "t-off", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{slack}}, task.Task{ID: "t-in", State: "inbox", Category: task.CategoryInbox})
 	failed := proposed(2, "t-in")
@@ -636,10 +640,13 @@ func TestAnotherDerivedTaskOfANotifyingRowStaysSilent(t *testing.T) {
 
 // storedViews are the views the tasks store serves; review needs its source.
 // storedViews are the bundled views that list something.
-func storedViews() []string {
+func storedViews() []string { return storedViewsOf(bundledLoaded()) }
+
+// storedViewsOf are the views of l that list tasks or gates.
+func storedViewsOf(l *intentload.Loaded) []string {
 	var out []string
-	for _, v := range bundledLoaded().Views.Views {
-		if catalog.Lists(bundledLoaded().Views, v.ID) {
+	for _, v := range l.Views.Views {
+		if catalog.Lists(l.Views, v.ID) {
 			out = append(out, v.ID)
 		}
 	}
@@ -652,6 +659,9 @@ func TestANotificationOffersOnlyTheVerbsTheProfileOffers(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "tasks.toml"), []byte("[verbs.dismiss]\noffer = '!task.id.startsWith(\"draft:\")'\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(dir, "views.toml"), []byte(heldDraftsBody), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	cache := cacheOver(t, dir)
 	r := newTasksRig(t, func(d *Deps) { d.Intents = cache.Get })
 	withOutbox(r, proposed(1, ""))
@@ -662,7 +672,7 @@ func TestANotificationOffersOnlyTheVerbsTheProfileOffers(t *testing.T) {
 
 func TestBannerCategoryIsNeeds(t *testing.T) {
 	t.Parallel()
-	r := newTasksRig(t, nil)
+	r := newTasksRig(t, func(d *Deps) { d.Intents = heldDraftsLoaded(t) })
 	r.put(t, task.Task{ID: "t-in", State: "inbox", Category: task.CategoryInbox, Title: "ask ana about the export"})
 	failed := proposed(2, "")
 	failed.State = draft.Failed

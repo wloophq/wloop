@@ -1,4 +1,4 @@
-[Focus 1]   Inbox 2    Outbox 1    Next 4    Waiting 4    Projects 0
+[Focus 1]   Inbox 2    Held drafts 1    Next 4    Waiting 4    Projects 0
 
 >  5h 0m  acme/api#7  ★ Reply on the batch export review  next
 

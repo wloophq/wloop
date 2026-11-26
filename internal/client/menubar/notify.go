@@ -227,7 +227,7 @@ func (c *Controller) reply(ctx context.Context, r Response, task string) error {
 		return nil
 	}
 	args := map[string]string{"text": r.Text, "send": "draft"}
-	title := c.words().T("Reply saved to the Outbox", nil)
+	title := c.words().T("Reply saved for your approval", nil)
 	if r.Send {
 		args["send"], title = "now", c.words().T("Reply sent", nil)
 	}

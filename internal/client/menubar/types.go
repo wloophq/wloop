@@ -75,8 +75,8 @@ const (
 	// ActionAnswer answers the question with Response.Text, OptionID, Yes or
 	// No.
 	ActionAnswer Action = "answer"
-	// ActionReply writes Response.Text as a reply on the task's unit: to the
-	// Outbox, or sent at once with Response.Send.
+	// ActionReply writes Response.Text as a reply on the task's unit: held for
+	// approval, or sent at once with Response.Send.
 	ActionReply Action = "reply"
 )
 

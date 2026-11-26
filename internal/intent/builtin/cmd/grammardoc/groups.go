@@ -31,14 +31,14 @@ var groups = map[builtin.Surface][]group{
 		{"Judgment", []string{"profile", "dims", "also_profile"}},
 		{"What it records", []string{"record"}},
 		{"Gate approval", []string{"gates"}},
-		{"Effects and drafts", []string{"effects", "drafts", "outbox"}},
+		{"Effects and drafts", []string{"effects", "drafts"}},
 	},
 	builtin.SurfaceWorkflow: {
 		{"What it matches", []string{"summary", "provider", "when", "order", "key", "marks"}},
 		{"When it is planned", []string{"trigger", "observe", "enabled", "limits"}},
 		{"Steps", []string{"step"}},
 		{"Gate approval", []string{"ask", "gates"}},
-		{"Drafts", []string{"drafts", "outbox"}},
+		{"Drafts", []string{"drafts"}},
 	},
 	builtin.SurfaceConfig: {
 		{"Agent and workspaces", []string{"profile", "agent", "agent_home", "agent_models", "projects_dir", "workspace_managers", "intents"}},

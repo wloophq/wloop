@@ -124,10 +124,6 @@ summary = "Fechar a execução parada sem retomá-la."
 "unit.closed" = "A conversa é encerrada e as tarefas abertas que a contêm terminam."
 
 [drafts]
-by_hand = "Escritos à mão"
-by_hand_about = "Respostas e reações que você mesmo escreveu, esperando o envio."
-by_session = "Escritos por um agente"
-by_session_about = "Rascunhados por uma sessão de agente com que você trabalha, fora de qualquer revisão ou rodada."
 quoted = "Cita um item de {conversation}, uma conversa da qual a pessoa não participa."
 stale = "Escrito sobre uma versão anterior de onde vai ser publicado, então não pode ser aprovado: revise ou descarte."
 hold = "Retido para você: nenhuma regra sua o envia."

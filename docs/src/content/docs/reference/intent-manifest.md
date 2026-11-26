@@ -207,9 +207,6 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `drafts` | table |  | The drafts its turns' agents propose. |
 | `drafts.allowed_effects` | list of `task.nudged`, `unit.closed`, `pr.reviewed`, `pr.nudged` |  | The effects its agents may declare on their drafts. |
 | `drafts.attach_posts` | bool | `false` | On a turn whose unit is a task, the unit of each post its agent makes, sent at once or once approved, is attached to the task; reactions and edits are not posts. |
-| `outbox` | table |  | How the Outbox heads the group of the drafts the intent's turns proposed, when drafts group by proposer. |
-| `outbox.title` | string, localized |  | The group's title, in the plural, such as "Reviews"; the label when absent. |
-| `outbox.about` | string, localized |  | One line under the title on when the intent drafts them, such as "Drafted by a review round of a pull request." |
 
 An intent with `builds` is a builder: it needs `prompt` and holds no role. Any other needs `workspace`, `[session]`, `[headline]` and `[record]`.
 

@@ -3323,7 +3323,6 @@
   "All keys": "All keys",
   "Also send to the conversation": "Also send to the conversation",
   "An answer approves a draft: open the question's task to see it before you answer.": "An answer approves a draft: open the question's task to see it before you answer.",
-  "An open question decides these drafts: the option you pick posts its draft and withdraws the other options' drafts.": "An open question decides these drafts: the option you pick posts its draft and withdraws the other options' drafts.",
   "Answer": "Answer",
   "Answer in your own words": "Answer in your own words",
   "Answer not sent": "Answer not sent",
@@ -3391,7 +3390,6 @@
   "Copy this text": "Copy this text",
   "Could not copy: {error}": "Could not copy: {error}",
   "Could not list the tasks: {error}": "Could not list the tasks: {error}",
-  "Could not load the Outbox: {error}": "Could not load the Outbox: {error}",
   "Could not load the actions: {error}": "Could not load the actions: {error}",
   "Could not load the areas: {error}": "Could not load the areas: {error}",
   "Could not load the home: {error}": "Could not load the home: {error}",
@@ -3424,7 +3422,7 @@
   "Draft a message you approve before it posts": "Draft a message you approve before it posts",
   "Draft text": "Draft text",
   "Draft {id} approved; it goes out in a moment": "Draft {id} approved; it goes out in a moment",
-  "Draft {id} saved to the Outbox for your approval": "Draft {id} saved to the Outbox for your approval",
+  "Draft {id} saved; it waits in Needs you for your approval": "Draft {id} saved; it waits in Needs you for your approval",
   "Draft {purpose}": "Draft {purpose}",
   "Due in 24h": "Due in 24h",
   "Edit": "Edit",
@@ -3486,7 +3484,6 @@
   "Intake {seq} ({intent}) waits for the brief, attempt {attempt}": "Intake {seq} ({intent}) waits for the brief, attempt {attempt}",
   "It changed since the question pinned it and is now at rev {rev}; picking this option posts what it says now.": "It changed since the question pinned it and is now at rev {rev}; picking this option posts what it says now.",
   "Items": "Items",
-  "Keep it": "Keep it",
   "Kept {n} with details": {
    "one": "Kept {n} with details",
    "other": "Kept {n} with details"
@@ -3626,7 +3623,7 @@
   "Reply": "Reply",
   "Reply not saved": "Reply not saved",
   "Reply on {unit} failed: {error}": "Reply on {unit} failed: {error}",
-  "Reply saved to the Outbox": "Reply saved to the Outbox",
+  "Reply saved for your approval": "Reply saved for your approval",
   "Reply sent": "Reply sent",
   "Repositories (color: share stalled)": "Repositories (color: share stalled)",
   "Repository": "Repository",
@@ -3652,7 +3649,6 @@
   "Run {verb} on the task, with “{task}”": "Run {verb} on the task, with “{task}”",
   "Runs": "Runs",
   "Save as draft": "Save as draft",
-  "Save to Outbox": "Save to Outbox",
   "Search": "Search",
   "Search or ask": "Search or ask",
   "Search, paste a link, or ask": "Search, paste a link, or ask",
@@ -3693,9 +3689,6 @@
   "Start an agent turn: {intent}": "Start an agent turn: {intent}",
   "Start in {repo}: {brief}": "Start in {repo}: {brief}",
   "Start: {brief}": "Start: {brief}",
-  "Stop drafting these": "Stop drafting these",
-  "Stop this workflow": "Stop this workflow",
-  "Stopped {workflow}": "Stopped {workflow}",
   "Store needs attention: {why}": "Store needs attention: {why}",
   "Sweep now": "Sweep now",
   "Synced {time}": "Synced {time}",
@@ -4113,10 +4106,6 @@
    "one": "{n} done today",
    "other": "{n} done today"
   },
-  "{n} draft": {
-   "one": "{n} draft",
-   "other": "{n} drafts"
-  },
   "{n} draft waits for you": {
    "one": "{n} draft waits for you",
    "other": "{n} drafts wait for you"
@@ -4229,7 +4218,6 @@
   "All keys": "Todas as chaves",
   "Also send to the conversation": "Também enviar na conversa",
   "An answer approves a draft: open the question's task to see it before you answer.": "Uma resposta aprova um rascunho: abra a tarefa da pergunta para vê-lo antes de responder.",
-  "An open question decides these drafts: the option you pick posts its draft and withdraws the other options' drafts.": "Uma pergunta aberta decide estes rascunhos: a opção que você escolher posta o rascunho dela e retira os rascunhos das outras opções.",
   "Answer": "Resposta",
   "Answer in your own words": "Responder com suas palavras",
   "Answer not sent": "Resposta não enviada",
@@ -4297,7 +4285,6 @@
   "Copy this text": "Copie este texto",
   "Could not copy: {error}": "Não foi possível copiar: {error}",
   "Could not list the tasks: {error}": "Não foi possível listar as tarefas: {error}",
-  "Could not load the Outbox: {error}": "Não foi possível carregar a Outbox: {error}",
   "Could not load the actions: {error}": "Não foi possível carregar as ações: {error}",
   "Could not load the areas: {error}": "Não foi possível carregar as áreas: {error}",
   "Could not load the home: {error}": "Não foi possível carregar o início: {error}",
@@ -4330,7 +4317,7 @@
   "Draft a message you approve before it posts": "Rascunhar uma mensagem que você aprova antes de publicar",
   "Draft text": "Texto do rascunho",
   "Draft {id} approved; it goes out in a moment": "Rascunho {id} aprovado; sai em instantes",
-  "Draft {id} saved to the Outbox for your approval": "Rascunho {id} salvo no Outbox para sua aprovação",
+  "Draft {id} saved; it waits in Needs you for your approval": "Rascunho {id} salvo; ele espera sua aprovação em Precisa de você",
   "Draft {purpose}": "Rascunho: {purpose}",
   "Due in 24h": "Vencem em 24h",
   "Edit": "Editar",
@@ -4392,7 +4379,6 @@
   "Intake {seq} ({intent}) waits for the brief, attempt {attempt}": "A entrada {seq} ({intent}) espera o brief, tentativa {attempt}",
   "It changed since the question pinned it and is now at rev {rev}; picking this option posts what it says now.": "Ele mudou desde que a pergunta o fixou e está na revisão {rev}; escolher esta opção posta o que ele diz agora.",
   "Items": "Itens",
-  "Keep it": "Manter",
   "Kept {n} with details": {
    "one": "{n} mantido com detalhes",
    "other": "{n} mantidos com detalhes"
@@ -4532,7 +4518,7 @@
   "Reply": "Resposta",
   "Reply not saved": "Resposta não salva",
   "Reply on {unit} failed: {error}": "A resposta em {unit} falhou: {error}",
-  "Reply saved to the Outbox": "Resposta salva no Outbox",
+  "Reply saved for your approval": "Resposta salva para sua aprovação",
   "Reply sent": "Resposta enviada",
   "Repositories (color: share stalled)": "Repositórios (cor: fatia parada)",
   "Repository": "Repositório",
@@ -4558,7 +4544,6 @@
   "Run {verb} on the task, with “{task}”": "Executar {verb} na tarefa, com “{task}”",
   "Runs": "Execuções",
   "Save as draft": "Salvar como rascunho",
-  "Save to Outbox": "Salvar no Outbox",
   "Search": "Buscar",
   "Search or ask": "Buscar ou pedir",
   "Search, paste a link, or ask": "Busque, cole um link ou pergunte",
@@ -4599,9 +4584,6 @@
   "Start an agent turn: {intent}": "Iniciar um turno do agente: {intent}",
   "Start in {repo}: {brief}": "Iniciar em {repo}: {brief}",
   "Start: {brief}": "Iniciar: {brief}",
-  "Stop drafting these": "Parar de rascunhar estes",
-  "Stop this workflow": "Parar este workflow",
-  "Stopped {workflow}": "{workflow} parado",
   "Store needs attention: {why}": "O banco precisa de atenção: {why}",
   "Sweep now": "Varrer agora",
   "Synced {time}": "Sincronizado às {time}",
@@ -5018,10 +5000,6 @@
   "{n} done today": {
    "one": "{n} concluído hoje",
    "other": "{n} concluídos hoje"
-  },
-  "{n} draft": {
-   "one": "{n} rascunho",
-   "other": "{n} rascunhos"
   },
   "{n} draft waits for you": {
    "one": "{n} rascunho espera por você",
@@ -6311,18 +6289,6 @@
     "over": "tasks",
     "rail": false,
     "layout": "list"
-   },
-   {
-    "id": "outbox",
-    "label": "Outbox",
-    "summary": "Drafts waiting for your approval, and approved ones still sending or that failed to send.",
-    "empty": "No drafts wait on you.",
-    "when": "gate.kind == 'draft' \u0026\u0026 (gate.status == 'open' || gate.delivery in ['sending', 'failed'])",
-    "sort": "draft.created_at",
-    "over": "gates",
-    "group": "draft.proposer",
-    "rail": false,
-    "layout": "outbox"
    },
    {
     "id": "review",

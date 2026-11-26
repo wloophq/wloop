@@ -1,20 +1,14 @@
 package builtin
 
-import (
-	"slices"
-	"strings"
-)
-
 // The layouts a view is drawn in.
 const (
-	ViewLayoutList   = "list"
-	ViewLayoutBoard  = "board"
-	ViewLayoutOutbox = "outbox"
-	ViewLayoutQueue  = "queue"
+	ViewLayoutList  = "list"
+	ViewLayoutBoard = "board"
+	ViewLayoutQueue = "queue"
 )
 
 // ViewLayouts are the layouts of views.*.layout.
-var ViewLayouts = []string{ViewLayoutList, ViewLayoutBoard, ViewLayoutOutbox, ViewLayoutQueue}
+var ViewLayouts = []string{ViewLayoutList, ViewLayoutBoard, ViewLayoutQueue}
 
 // viewsGrammar is the keys of views.toml.
 var viewsGrammar = []Key{
@@ -71,14 +65,14 @@ var viewsGrammar = []Key{
 	{Path: "views.*.sort", In: SurfaceViews, Kind: KindText, Doc: "The facts the view sorts by, comma-separated; a leading - sorts one descending. A view's tasks start oldest first, a parent's children in their sibling order."},
 	{Path: "views.*.key", In: SurfaceViews, Kind: KindText, Doc: "The key that jumps to the view: `g`, a space and a key that no core key uses, such as `g i`. Its help is the view's label, and its help line the view's summary."},
 	{Path: "views.*.hide_disabled", In: SurfaceViews, Kind: KindBool, Default: "false", Doc: "The view hides the tasks whose units are all of a disabled plugin, and the gates on a disabled plugin's units."},
-	{Path: "views.*.opens", In: SurfaceViews, Kind: KindTable, Doc: "What a page of the view opens instead of its own, such as the Outbox's, which opens what waits on you narrowed to the drafts to send; none opens its own."},
+	{Path: "views.*.opens", In: SurfaceViews, Kind: KindTable, Doc: "What a page of the view opens instead of its own, such as one that opens what waits on you narrowed to the drafts to send; none opens its own."},
 	{Path: "views.*.opens.view", In: SurfaceViews, Kind: KindText, Doc: "The view it opens, such as needs-you."},
 	{Path: "views.*.opens.kind", In: SurfaceViews, Kind: KindText, Doc: "The decision kind of decisions.toml that narrows the view it opens, such as send-draft; none shows it whole."},
 	{Path: "views.*.rail", In: SurfaceViews, Kind: KindBool, Default: "true", Doc: "The rail lists the view; false keeps it for the home, a queue or search."},
 	{Path: "views.*.section", In: SurfaceViews, Localized: true, Kind: KindText, Doc: "The rail section the view sits in, by the title the rail heads it with, such as \"What's on you\"; the sections follow in the order the views first name them, after Home and the views with none, which sit untitled at the top, and before each plugin's section."},
 	{Path: "views.*.counted", In: SurfaceViews, Kind: KindBool, Default: "true", Doc: "The rail draws the view's number; false draws none, and the daemon counts the view only when the badge or a review step names it."},
 	{Path: "views.*.remove_clean", In: SurfaceViews, Kind: KindBool, Default: "false", Doc: "The view offers to remove at once the workspaces its tasks' links hold whose checkouts hold nothing that is not published, as each link's remove action does; the rest are kept, with why."},
-	{Path: "views.*.layout", In: SurfaceViews, Kind: KindEnum, Values: named(ViewLayouts...), Default: ViewLayoutList, Doc: "How the cockpit draws the view: list, its rows; board, a lane per group, which a person may switch back to the list; outbox, the Outbox's drafts, which the lens filters, groups and sorts over the `draft_facets` and the view's own `group` and `sort` (draft facts), read from the Outbox's own route whatever the view lists; queue, what waits on you one decision at a time, the queue of every decision kind in decisions.toml's order, read from its own route whatever the view lists, which the home's section and counter of the view and the menu bar open; with no `when` of its own, such a view lists the tasks of the views decisions.toml's kinds name."},
+	{Path: "views.*.layout", In: SurfaceViews, Kind: KindEnum, Values: named(ViewLayouts...), Default: ViewLayoutList, Doc: "How the cockpit draws the view: list, its rows; board, a lane per group, which a person may switch back to the list; queue, what waits on you one decision at a time, the queue of every decision kind in decisions.toml's order, read from its own route whatever the view lists, which the home's section and counter of the view and the menu bar open; with no `when` of its own, such a view lists the tasks of the views decisions.toml's kinds name."},
 	{Path: "rail", In: SurfaceViews, Kind: KindTable, Doc: "The rail's built-in entries, which no view declares, by their route: plan and recent."},
 	{Path: "rail.*", In: SurfaceViews, Kind: KindTable, Doc: "A built-in entry of the rail: plan, the workflows' plan, or recent, the newest events."},
 	{Path: "rail.*.section", In: SurfaceViews, Localized: true, Kind: KindText, Doc: "The rail section the entry sits in, as a view's section names it; it comes after the section's views. None keeps it in the untitled top block."},
@@ -126,40 +120,3 @@ const (
 	ShowLabelDoc  = "For a facet shown in the age part: the label of its date, a template over `{{.age}}`, the age in the row words, and `{{.at}}`, the time, which each client writes in its own locale, such as `since {{.at}}`. Absent, the age alone."
 	ColorsDoc     = "For the facet that colors the strip: the hue of each value's strip and dot, by value; a value it does not name takes nobody's."
 )
-
-// draftFacetsGrammar is the keys of draft_facets: those of facets, over draft facts.
-var draftFacetsGrammar = draftFacetsOf(viewsGrammar)
-
-// notReadByDrafts are the facet keys only a task's row reads, by name: a draft's card shows no facet.
-var notReadByDrafts = []string{"show", "show_values", "show_when", "show_when.*", "show_max", "show_label", "label_prefix", "strip", "colors", "colors.*"}
-
-// draftFacetsOf are the keys of draft_facets the facets keys among keys give.
-func draftFacetsOf(keys []Key) []Key {
-	var out []Key
-	for _, k := range keys {
-		if k.Path != "facets" && !strings.HasPrefix(k.Path, "facets.") {
-			continue
-		}
-		rest := strings.TrimPrefix(k.Path, "facets")
-		k.Path = "draft_facets" + rest
-		switch k.Path {
-		case "draft_facets":
-			k.Doc = "The draft facets, by id: the fields the Outbox filters, groups and sorts drafts by, in the order the file declares them, a user layer's new ones after the bundled. Their ids match the task facets of the same meaning, and a layer's entry here never touches the task facet of the same id."
-		case "draft_facets.*":
-			k.Doc = "A draft facet, by its id. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones."
-		case "draft_facets.*.fact":
-			k.Doc = "The draft fact the facet reads (draft.proposer, draft.kind, draft.where, ...). Required."
-		case "draft_facets.*.empty":
-			k.Doc = "What a group of drafts with no value shows."
-		case "draft_facets.*.merge":
-			k.Doc = "Not read: a draft has one value of its fact, so nothing joins."
-		case "draft_facets.*.units":
-			k.Doc = "Not read: a draft sits on one unit."
-		}
-		if name, ok := strings.CutPrefix(k.Path, "draft_facets.*."); ok && slices.Contains(notReadByDrafts, name) {
-			k.Doc = "Not read: a draft's card shows no facet's values."
-		}
-		out = append(out, k)
-	}
-	return out
-}

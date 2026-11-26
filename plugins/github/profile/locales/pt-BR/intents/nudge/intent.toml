@@ -1,10 +1,6 @@
 label = "Cutucar"
 summary = "Perguntar a quem o pull request espera qual é o próximo passo, num comentário; a orientação é o assunto"
 
-[outbox]
-title = "Cutucadas"
-about = "Rascunhado quando você pede o próximo passo a quem o pull request espera."
-
 [[refuse]]
 why = "{{.pr.nudge.refusal}}"
 

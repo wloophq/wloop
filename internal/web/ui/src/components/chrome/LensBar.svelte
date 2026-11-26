@@ -1,6 +1,5 @@
 <script lang="ts">
   import { EXPLORE, RECENT } from "../../lib/catalog";
-  import { isOutboxView } from "../../lib/drafts";
   import { fmtNumber, t } from "../../lib/i18n.svelte";
   import { fieldById, fillWord, groupField, lensWords, NO_GROUP, parseSort, servedLayout, stripColor, tagKeyField, type Lens, type Pipeline } from "../../lib/lens";
   import { clearLens, setGroup } from "../../lib/view";
@@ -11,8 +10,8 @@
   import { ACTIVITY_FIELDS, copyList, openFilterPalette, sortFields } from "./toolbar";
 
   // The lens bar of a list: the Group and Sort pickers over the fields its lens offers, a removable chip per
-  // filter, "+ Filter", the strip's legend, then the count, the list/board switch (not on the Outbox, which draws
-  // only its list) and Copy list. Recent shows only its filters' chips; Explore none.
+  // filter, "+ Filter", the strip's legend, then the count, the list/board switch and Copy list. Recent shows
+  // only its filters' chips; Explore none.
   let {
     lens,
     res = null,
@@ -90,12 +89,10 @@
     {#if lens.q.trim() || lens.group || sort.field}
       <button type="button" class="act" data-focus="lens:clear" onclick={clearLens}>{t("Clear")}</button>
     {/if}
-    {#if !isOutboxView(lens.view)}
-      <div class="seg" role="group" aria-label={t("Layout")}>
-        <button type="button" aria-pressed={(!board) ? "true" : "false"} data-focus={`lens:${listLayout || "list"}`} onclick={() => writeHash({ layout: listLayout })}>{t("List")}</button
-        ><button type="button" aria-pressed={(board) ? "true" : "false"} data-focus="lens:board" onclick={() => writeHash({ layout: "board" })}>{t("Board")}</button>
-      </div>
-    {/if}
+    <div class="seg" role="group" aria-label={t("Layout")}>
+      <button type="button" aria-pressed={(!board) ? "true" : "false"} data-focus={`lens:${listLayout || "list"}`} onclick={() => writeHash({ layout: listLayout })}>{t("List")}</button
+      ><button type="button" aria-pressed={(board) ? "true" : "false"} data-focus="lens:board" onclick={() => writeHash({ layout: "board" })}>{t("Board")}</button>
+    </div>
     <button type="button" class="pill" data-focus="lens:copy-list" title={t("Copy the items shown here, in this order, as YAML, to paste for an agent")} onclick={() => copyList(lens)}
       >{t("Copy list")}</button
     >

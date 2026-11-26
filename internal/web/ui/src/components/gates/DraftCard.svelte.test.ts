@@ -387,13 +387,6 @@ describe("what the migration is for", () => {
     expect((again.querySelector("select") as HTMLSelectElement).value).toBe("APPROVE");
   });
 
-  test("a draft's context shows the asks it answers and the items it is about", () => {
-    const c = draft(pendingDraft(), null, { context: { asks: [{ summary: "Ship it before Friday", asker: "Bo", quotes: ["Friday at the latest"] }], items: [{ id: "i1", state: "open", summary: "Retry numbers" }] } });
-    expect(texts(c, ".d-context .ask-head")).toEqual(["Ship it before Friday · Bo"]);
-    expect(texts(c, ".d-context .quote")).toEqual(["Friday at the latest"]);
-    expect(texts(c, ".d-context .item")).toEqual(["open Retry numbers"]);
-  });
-
   test("keyOf gives each action its queue key", () => {
     const keys: Record<string, string> = { "queue:primary": "Enter", "queue:edit": "e" };
     const c = draft(pendingDraft(), null, { keyOf: (k: string) => keys[k] || "" });

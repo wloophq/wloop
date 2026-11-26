@@ -451,10 +451,6 @@ func TestFailedDeliveryIsAQueueItem(t *testing.T) {
 	r := newOutboxRig(t)
 	r.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "thank the reviewer"})
 	d, g := r.failedOn(t, "t-0000000000000001", "Thanks for the review.")
-	var outboxPage api.OutboxPage
-	if code := get(t, r.s, api.OutboxPath+"?view=outbox", &outboxPage); code != 200 || !slices.ContainsFunc(outboxPage.Drafts, func(o api.OutboxDraft) bool { return o.ID == int64(d.ID) }) {
-		t.Fatalf("%d: the Outbox lists %+v, want the failed draft", code, outboxPage.Drafts)
-	}
 	for _, path := range []string{api.QueueAllPath, queuePath("send-draft")} {
 		var q api.Queue
 		if code := get(t, r.s, path, &q); code != 200 {
@@ -598,11 +594,16 @@ func TestTheHomesNeedsYouSectionIsTheQueueOfEveryKind(t *testing.T) {
 	if all := q.all(t); all.View != "needs-you" {
 		t.Fatalf("the queue's view %q, want the view that draws it", all.View)
 	}
+}
+
+func TestAViewThatOpensNeedsYouIsServedWithItsRoute(t *testing.T) {
+	t.Parallel()
+	r := newGatesViewRig(t)
 	var cat api.ViewsCatalog
-	get(t, q.s, api.ViewsPath, &cat)
-	i := slices.IndexFunc(cat.Views, func(v api.TaskViewSpec) bool { return v.ID == "outbox" })
+	get(t, r.s, api.ViewsPath, &cat)
+	i := slices.IndexFunc(cat.Views, func(v api.TaskViewSpec) bool { return v.ID == heldDraftsView })
 	if i < 0 || cat.Views[i].Opens != "view=needs-you&kind=send-draft" {
-		t.Fatalf("the Outbox's view %+v, want it to open Needs you narrowed to the drafts to send", cat.Views)
+		t.Fatalf("the %s view %+v, want it to open Needs you narrowed to the drafts to send", heldDraftsView, cat.Views)
 	}
 }
 

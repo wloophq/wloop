@@ -150,49 +150,6 @@ type DraftOption struct {
 	Tone  string `json:"tone,omitempty"`
 }
 
-// OutboxPage is the Outbox's drafts, in the order of its view's sort, with the draft facets a lens over them reads.
-type OutboxPage struct {
-	Drafts []OutboxDraft `json:"drafts"`
-	Facets []FacetSpec   `json:"facets"`
-	// Heads are what a group head shows under a value's title, which the facet's labels carry, by facet id,
-	// then by value; a value with nothing more to say has none.
-	Heads map[string]map[string]OutboxHead `json:"heads,omitempty"`
-	// Questions are the open question gates that pin a draft the page lists, as their cards serve them; a client
-	// shows such a draft with its question, whose answer decides it.
-	Questions []GateView `json:"questions,omitempty"`
-}
-
-// OutboxHead is what a group of drafts says beside its title, in the served locale: About why they were
-// written, and Workflow the workflow that drafted them, which a person may stop; "" for a group of no one
-// workflow.
-type OutboxHead struct {
-	About    string `json:"about,omitempty"`
-	Workflow string `json:"workflow,omitempty"`
-}
-
-// OutboxDraft is a draft with what a person reads to decide on it, the values of its draft facets, by facet
-// id, and the texts a search over the Outbox matches: its text, its unit's label and title, and where it goes.
-type OutboxDraft struct {
-	Draft
-	Context DraftContext        `json:"context"`
-	Facets  map[string][]string `json:"facets,omitempty"`
-	Texts   []string            `json:"texts,omitempty"`
-}
-
-// DraftContext is what a draft answers: the asks of its task, with their quotes, and the items it is about,
-// with where each stands.
-type DraftContext struct {
-	Asks  []AskView    `json:"asks"`
-	Items []OutboxItem `json:"items"`
-}
-
-// OutboxItem is an item a draft is about.
-type OutboxItem struct {
-	ID      string `json:"id"`
-	Summary string `json:"summary"`
-	State   string `json:"state"`
-}
-
 type DraftOrigin struct {
 	Kind     string `json:"kind"`
 	TurnSeq  int64  `json:"turn_seq"`

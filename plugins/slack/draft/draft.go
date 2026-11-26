@@ -158,7 +158,7 @@ type Draft struct {
 	ID        ID
 	Unit      unit.Unit
 	Items     []string // item ids of Unit; may be empty
-	Task      string   // the task it serves, "" none; its row in the Outbox view is its draft gate
+	Task      string   // the task it serves, "" none; its row in a view over gates is its draft gate
 	Kind      Kind
 	Purpose   string    // what it is for: "nudge", "close", "ask_owner", or any label its proposer names
 	Delivery  Delivery  // how it is posted

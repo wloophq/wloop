@@ -3,7 +3,6 @@ import { readHash, writeHash } from "../state/route.svelte";
 import { state } from "../state/store.svelte";
 import { setNotice } from "../state/actions.svelte";
 import { isCoreView } from "./catalog";
-import { isOutboxView, outboxLensItems } from "./drafts";
 import { tn } from "./i18n.svelte";
 import { groupField, lensOf, pipeline, pipelineOf, type Lens, type Pipeline } from "./lens";
 import { taskLensItems } from "./tasks";
@@ -13,9 +12,8 @@ export function readLens(): Lens {
   return lensOf(readHash());
 }
 
-// lensResult is what lens shows of its view: the Outbox's drafts, a task view's tasks, a row view's rows.
+// lensResult is what lens shows of its view: a task view's tasks, a row view's rows.
 export function lensResult(lens: Lens): Pipeline {
-  if (isOutboxView(lens.view)) return pipelineOf(outboxLensItems(), lens, null);
   if (isCoreView(lens.view)) return pipelineOf(taskLensItems(), lens, null);
   return pipeline(state.rows, lens);
 }

@@ -523,14 +523,6 @@
       "summary": "Finished tasks that still hold a workspace on disk, to remove."
     },
     {
-      "key": "g o",
-      "action": "nav:outbox",
-      "context": "global",
-      "owner": "core",
-      "help": "Outbox",
-      "summary": "Drafts waiting for your approval, and approved ones still sending or that failed to send."
-    },
-    {
       "key": "g r",
       "action": "nav:review",
       "context": "global",

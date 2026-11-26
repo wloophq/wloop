@@ -35,7 +35,7 @@ The same keys work in the web cockpit and the terminal client, on the selected t
 
 | Key | Action |
 |---|---|
-| `g i`, `g m`, `g w`, `g c`, `g n`, `g b`, `g t`, `g u`, `g a`, `g z`, `g f`, `g p`, `g d`, `g o`, `g r` | Inbox, Needs me, Waiting, Chase, Fits now, Blocked by me, Stalled, In loop, Approved, Snoozed, Focus, Projects, Done, Outbox, Review: each view's `key` in `views.toml`, and a view of yours adds its own (`g`, a space and a key no core key uses) |
+| `g i`, `g m`, `g w`, `g c`, `g n`, `g b`, `g t`, `g u`, `g a`, `g z`, `g f`, `g p`, `g d`, `g r` | Inbox, Needs me, Waiting, Chase, Fits now, Blocked by me, Stalled, In loop, Approved, Snoozed, Focus, Projects, Done, Review: each view's `key` in `views.toml`, and a view of yours adds its own (`g`, a space and a key no core key uses) |
 | `g g` | the GitHub views: a plugin's own chord, which its UI declares (`key`), served while the plugin is enabled; a view's key in `views.toml` takes it first |
 | `Shift+1`..`9` | switch area |
 | `/` | filter |
@@ -81,6 +81,6 @@ The same keys work in the web cockpit and the terminal client, on the selected t
 
 An intent of yours adds its own uppercase `key`.
 
-In the cockpit, Tab moves from row to row, and on a board from card to card; a row's controls (its facet buttons, links and actions) are out of the Tab order, and Left and Right move between them and the row, Home and End to the first and the last. `j` and `k` move the selection from any of them. A draft's buttons in the Outbox keep their place in the Tab order.
+In the cockpit, Tab moves from row to row, and on a board from card to card; a row's controls (its facet buttons, links and actions) are out of the Tab order, and Left and Right move between them and the row, Home and End to the first and the last. `j` and `k` move the selection from any of them. A draft card's buttons keep their place in the Tab order.
 
 In the terminal, actions that take text ask on the bottom line: Enter sends, Esc cancels. In the reply, edit and delegate prompts, Ctrl+E opens the text in `$VISUAL` or `$EDITOR`, and a draft of several lines opens there directly. Take over, run, nudge, and approving, retrying or discarding a draft ask for a `y` naming what they act on; a `y` typed in the same burst as the key before it does not count. `q` waits for running actions to finish (a second `q` leaves anyway).

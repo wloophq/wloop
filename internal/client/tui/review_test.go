@@ -56,7 +56,7 @@ func reviewStep(id, label, view string, count int, done bool) api.ReviewStep {
 func reviewFixture() api.Review {
 	return api.Review{ID: "r-1", StartedAt: now.Add(-time.Hour), Steps: []api.ReviewStep{
 		reviewStep("inbox", "Inbox to zero", "inbox", 2, false),
-		reviewStep("outbox", "Outbox", "outbox", 1, true),
+		reviewStep("decide-send-draft", "Drafts to send", "decide-send-draft", 1, true),
 		reviewStep("waiting", "Waiting: nudge?", "waiting", 4, false),
 		reviewStep("projects", "Projects without a next action or past their review", "review", 1, false),
 		reviewStep("someday", "Someday", "someday", 0, true),
@@ -124,7 +124,7 @@ func TestReviewKeysTUI(t *testing.T) {
 		t.Fatalf("] moved to %q", m.rv.step)
 	}
 	press(m, Key{Rune: '['}, Key{Rune: '['})
-	if m.rv.step != "outbox" {
+	if m.rv.step != "decide-send-draft" {
 		t.Fatalf("[ [ moved to %q", m.rv.step)
 	}
 	press(m, Key{Rune: ']'})

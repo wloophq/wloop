@@ -52,7 +52,7 @@
 "answer queued; the agent session is told of it when the agent stops" = "resposta na fila; a sessão do agente fica sabendo quando o agente parar"
 "Reply not saved" = "Resposta não salva"
 "Nothing was typed." = "Nada foi digitado."
-"Reply saved to the Outbox" = "Resposta salva no Outbox"
+"Reply saved for your approval" = "Resposta salva para sua aprovação"
 "Reply sent" = "Resposta enviada"
 "Action not sent" = "Ação não enviada"
 # The terminal client.
@@ -219,7 +219,7 @@
 "Posted" = "Publicado"
 "Draft text" = "Texto do rascunho"
 "Draft {id} approved; it goes out in a moment" = "Rascunho {id} aprovado; sai em instantes"
-"Draft {id} saved to the Outbox for your approval" = "Rascunho {id} salvo no Outbox para sua aprovação"
+"Draft {id} saved; it waits in Needs you for your approval" = "Rascunho {id} salvo; ele espera sua aprovação em Precisa de você"
 "Draft {purpose}" = "Rascunho: {purpose}"
 "Due in 24h" = "Vencem em 24h"
 "Enter marks the step done; ] and [ move between steps" = "Enter marca a etapa como concluída; ] e [ andam entre as etapas"
@@ -302,7 +302,6 @@
 "Round sends" = "Envio da rodada"
 "Runs" = "Execuções"
 "Save as draft" = "Salvar como rascunho"
-"Save to Outbox" = "Salvar no Outbox"
 "Send" = "Enviar"
 "Send now" = "Enviar agora"
 "Send reply" = "Enviar resposta"
@@ -612,15 +611,8 @@
 "{unit} by {author} · opened {opened} · updated {updated}" = "{unit} de {author} · aberto {opened} · atualizado {updated}"
 "{unit} is in the inventory." = "{unit} está no inventário."
 "{unit} is not in the inventory." = "{unit} não está no inventário."
-# The Outbox.
+# A folded text and an item's state.
 "Read all" = "Ler tudo"
-"Could not load the Outbox: {error}" = "Não foi possível carregar a Outbox: {error}"
-"{n} draft" = { one = "{n} rascunho", other = "{n} rascunhos" }
-"Stop drafting these" = "Parar de rascunhar estes"
-"An open question decides these drafts: the option you pick posts its draft and withdraws the other options' drafts." = "Uma pergunta aberta decide estes rascunhos: a opção que você escolher posta o rascunho dela e retira os rascunhos das outras opções."
-"Stop this workflow" = "Parar este workflow"
-"Keep it" = "Manter"
-"Stopped {workflow}" = "{workflow} parado"
 "open" = "aberto"
 "resolved" = "resolvido"
 # A unit's items.
@@ -706,7 +698,7 @@
 "That link could not be read, so the default view opened" = "Não foi possível ler esse link, então a visão padrão abriu"
 "{action} ({key})" = "{action} ({key})"
 "In the detail" = "No detalhe"
-# The detail's chrome, the Outbox's groups and the filter bar.
+# The detail's chrome and the filter bar.
 "Changed since you saw it" = "Mudou desde que você viu"
 "{n} draft waits for you" = { one = "{n} rascunho espera por você", other = "{n} rascunhos esperam por você" }
 "Risk" = "Risco"

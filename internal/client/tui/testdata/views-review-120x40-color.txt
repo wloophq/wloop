@@ -1,7 +1,7 @@
- [2mFocus 1[22m    [2mInbox 2[22m    [2mOutbox 1[22m    [2mNext 4[22m    [2mWaiting 4[22m    [2mProjects 0[22m    [2mSomeday 0[22m    [2mLogbook 12[22m   [7m[1m Review [22m[27m
+ [2mFocus 1[22m    [2mInbox 2[22m    [2mHeld drafts 1[22m    [2mNext 4[22m    [2mWaiting 4[22m    [2mProjects 0[22m    [2mSomeday 0[22m    [2mLogbook 12[22m   [7m[1m Review [22m[27m
 
  ▸ ○ Inbox to zero                                       [2m2[22m
-   [2m✓[22m [2mOutbox[22m                                              [2m1[22m
+   [2m✓[22m [2mDrafts to send[22m                                      [2m1[22m
    ○ Waiting: nudge?                                     [2m4[22m
    ○ Projects without a next action or past their review [2m1[22m
    [2m✓[22m [2mSomeday[22m                                             [2m0[22m

@@ -87,16 +87,16 @@ func TestNextActionsOrdersASequentialProjectsNextActionFirst(t *testing.T) {
 	}
 }
 
-// TestAFailedApprovedDraftShowsInTheOutboxWithRetry holds review focus 5: an approved draft whose delivery
-// failed is in the Outbox, as its gate and its draft's task, with Retry offered.
-func TestAFailedApprovedDraftShowsInTheOutboxWithRetry(t *testing.T) {
+// TestAFailedApprovedDraftShowsInAViewOverGatesWithRetry checks that an approved draft whose delivery failed is
+// in a view over gates, as its gate and its draft's task, with Retry offered.
+func TestAFailedApprovedDraftShowsInAViewOverGatesWithRetry(t *testing.T) {
 	t.Parallel()
-	r := newOutboxRig(t)
+	r := newGatesViewRig(t)
 	failed := r.stored(t, draft.Draft{Unit: r7u, Text: "failed once", State: draft.Failed, Error: "refused"})
 	r.stored(t, draft.Draft{Unit: r7u, Text: "out", State: draft.Sent})
-	p := r.page(t, "view=outbox")
-	if got := taskIDs(p.Tasks); !slices.Equal(got, []string{fmt.Sprintf("draft:%d", failed.ID)}) || p.Counters.Views["outbox"] != 1 {
-		t.Fatalf("outbox %v, counters %v", got, p.Counters.Views)
+	p := r.page(t, "view=held-drafts")
+	if got := taskIDs(p.Tasks); !slices.Equal(got, []string{fmt.Sprintf("draft:%d", failed.ID)}) || p.Counters.Views[heldDraftsView] != 1 {
+		t.Fatalf("%s %v, counters %v", heldDraftsView, got, p.Counters.Views)
 	}
 	if len(p.Gates) != 1 || p.Gates[0].Status != string(gate.Approved) || p.Gates[0].Delivery != string(draft.Failed) {
 		t.Fatalf("gates %+v", p.Gates)
@@ -121,28 +121,27 @@ func (o openTasks) Open(ctx context.Context, r coretasks.OpenRequest) (task.Task
 	return o.g.Open(ctx, r)
 }
 
-// TestADraftOnAnUnheldUnitCountsOnlyInTheOutbox checks that a draft on a unit no task holds, whose gate opens a
-// capture task, counts once: its task in the Inbox and not also in Needs me, its gate in the
-// Outbox.
-func TestADraftOnAnUnheldUnitCountsOnlyInTheOutbox(t *testing.T) {
+// TestADraftOnAnUnheldUnitCountsOnlyInAViewOverGates checks that a draft on a unit no task holds, whose gate opens a
+// capture task, counts once: its task in the Inbox and not also in Next actions, its gate in the view over gates.
+func TestADraftOnAnUnheldUnitCountsOnlyInAViewOverGates(t *testing.T) {
 	t.Parallel()
-	r := newOutboxRig(t)
+	r := newGatesViewRig(t)
 	st := r.db.Gates(r.clock.Now)
 	svc := gates.New(gates.Deps{Store: st, Reader: st, Profile: profileGates{r.s.loaded().Gates}, Clock: r.clock, Tasks: openTasks{r.db.Tasks(), r.g}})
 	r.o.Gates, r.s.deps.Gates = rigGates{svc, st}, svc
 	r.propose(t, r7u, "on a unit no task holds", draft.Wait)
-	c := r.page(t, "view=outbox").Counters
-	if c.Views["outbox"] != 1 || c.Views["inbox"] != 1 || c.Views["next"] != 0 {
+	c := r.page(t, "view=held-drafts").Counters
+	if c.Views[heldDraftsView] != 1 || c.Views["inbox"] != 1 || c.Views["next"] != 0 {
 		t.Fatalf("counters %+v", c)
 	}
 }
 
-// TestTheOutboxPageAndCountAgreeUnderAFilter checks that the area and the contexts narrow the Outbox's gates as
+// TestAGatesViewsPageAndCountAgreeUnderAFilter checks that the area and the contexts narrow a view's gates as
 // they narrow its tasks, and the area its count, which the contexts leave as the chips count them apart: a
 // draft stands as a task that takes the properties of the task its gate is on.
-func TestTheOutboxPageAndCountAgreeUnderAFilter(t *testing.T) {
+func TestAGatesViewsPageAndCountAgreeUnderAFilter(t *testing.T) {
 	t.Parallel()
-	r := newOutboxRig(t)
+	r := newGatesViewRig(t)
 	st := r.db.Gates(r.clock.Now)
 	svc := gates.New(gates.Deps{Store: st, Reader: st, Profile: profileGates{r.s.loaded().Gates}, Clock: r.clock, Tasks: openTasks{r.db.Tasks(), r.g}})
 	r.o.Gates, r.s.deps.Gates = rigGates{svc, st}, svc
@@ -156,12 +155,12 @@ func TestTheOutboxPageAndCountAgreeUnderAFilter(t *testing.T) {
 		query        string
 		listed, area int
 	}{
-		{"view=outbox", 2, 2}, {"view=outbox&area=OSS", 1, 1}, {"view=outbox&area=Hiring", 1, 1},
-		{"view=outbox&context=@reply", 1, 2}, {"view=outbox&area=Hiring&context=@reply", 0, 1},
+		{"view=held-drafts", 2, 2}, {"view=held-drafts&area=OSS", 1, 1}, {"view=held-drafts&area=Hiring", 1, 1},
+		{"view=held-drafts&context=@reply", 1, 2}, {"view=held-drafts&area=Hiring&context=@reply", 0, 1},
 	} {
 		p := r.page(t, c.query)
-		if len(p.Gates) != c.listed || len(p.Tasks) != c.listed || p.Counters.Views["outbox"] != c.area {
-			t.Errorf("%s: %d gates, %d tasks, count %d; want %d listed, %d counted", c.query, len(p.Gates), len(p.Tasks), p.Counters.Views["outbox"], c.listed, c.area)
+		if len(p.Gates) != c.listed || len(p.Tasks) != c.listed || p.Counters.Views[heldDraftsView] != c.area {
+			t.Errorf("%s: %d gates, %d tasks, count %d; want %d listed, %d counted", c.query, len(p.Gates), len(p.Tasks), p.Counters.Views[heldDraftsView], c.listed, c.area)
 		}
 	}
 }

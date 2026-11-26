@@ -53,7 +53,7 @@ test("the unit composer posts a draft, and offers a reaction only where the plug
   await fireEvent.click(byFocus(c, "unit:reply:send") as HTMLButtonElement);
   await settle();
   expect(posts).toEqual([{ url: "/api/drafts", body: { unit: thread, text: "Thanks, merged", send: true, source: "cockpit" } }]);
-  expect(results.get("unit:reply:send")).toEqual({ text: "Draft 41 saved to the Outbox for your approval", err: false });
+  expect(results.get("unit:reply:send")).toEqual({ text: "Draft 41 saved; it waits in Needs you for your approval", err: false });
   expect(box.value).toBe("");
   expect(detailState.compose).toEqual({ key: "unit:slack:T1/C1/1700.1", text: "", reaction: "" });
   const reacts = (u: any) => !!byFocus(extras({ row: { unit: u }, items: [] }), "unit:reply:reaction");

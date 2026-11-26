@@ -200,13 +200,8 @@ mode = "run"
 "task.nudged" = "The task is marked as nudged."
 "unit.closed" = "The conversation is closed and the open tasks that hold it end."
 
-# What a draft's card and the Outbox call drafts: the groups of those written by
-# hand or by an agent session, what a draft is for, and where its delivery stands.
+# What a draft's card calls drafts: what a draft is for, and where its delivery stands.
 [drafts]
-by_hand = "Written by hand"
-by_hand_about = "Replies and reactions you wrote yourself, waiting to be sent."
-by_session = "Written by an agent"
-by_session_about = "Drafted by an agent session you work with, outside any review or round."
 quoted = "Quotes an item of {conversation}, a conversation they are not in."
 stale = "Written against an older version of where it posts, so it cannot be approved: revise or discard it."
 hold = "Held for you: no rule of yours sends it."

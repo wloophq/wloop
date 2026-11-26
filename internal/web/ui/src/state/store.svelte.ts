@@ -148,10 +148,6 @@ export const homeState = $state({ home: null as J, error: "" });
 // failed and why its last load failed.
 export const queueState = $state({ key: "", queue: null as J, at: 0, error: "", loadError: "", busy: false });
 
-// outboxState is the last Outbox page read, why the last read failed, and the workflow whose "Stop drafting
-// these" waits for its confirm.
-export const outboxState = $state({ page: null as J, error: "", confirming: "" });
-
 // reviewState is the review on screen: the daemon's Review, the step shown and its tasks.
 export const reviewState = $state({ review: null as J, step: "", error: "" });
 

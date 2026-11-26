@@ -190,38 +190,6 @@ xl = "XL"
 [facets.tag]
 label = "Tag"
 
-[draft_facets.proposer]
-label = "Proposto por"
-
-[draft_facets.workflow]
-label = "Workflow"
-empty = "sem workflow"
-
-[draft_facets.kind]
-label = "Tipo"
-
-[draft_facets.source]
-label = "Origem"
-
-[draft_facets.where]
-label = "Onde"
-
-[draft_facets.people]
-label = "Para (pessoa)"
-empty = "ninguém"
-
-[draft_facets.state]
-label = "Estado"
-
-[draft_facets.state.values]
-failed = "falhou no envio"
-sending = "enviando"
-queued = "na fila"
-held = "esperando você"
-
-[draft_facets.age]
-label = "Escrito"
-
 [views.needs-you]
 label = "Precisa de você"
 summary = "O que espera por você, uma decisão de cada vez: perguntas primeiro, depois rascunhos a enviar, planos, passos e o resto."
@@ -310,12 +278,6 @@ summary = "Tarefas terminadas que ainda têm um workspace em disco, para remover
 empty = "Nenhuma tarefa terminada tem workspace."
 section = "Arquivo"
 
-[views.outbox]
-label = "Outbox"
-summary = "Rascunhos esperando sua aprovação, e os aprovados que ainda estão sendo enviados ou que falharam no envio."
-empty = "Nenhum rascunho espera por você."
-section = "Arquivo"
-
 [views.review-projects]
 label = "Projetos a revisar"
 summary = "Projetos com a revisão vencida, ou sem próxima ação sua e fora de Algum dia."
@@ -369,8 +331,8 @@ section = "Arquivo"
 [review.inbox]
 label = "Zerar a Inbox"
 
-[review.outbox]
-label = "Outbox"
+[review.decide-send-draft]
+label = "Rascunhos para enviar"
 
 [review.waiting]
 label = "Aguardando: cutucar?"

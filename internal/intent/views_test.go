@@ -143,7 +143,7 @@ func TestListTextsComeFromTheProfile(t *testing.T) {
 // The views the rail by question removed are gone with no alias: a user layer that names one gets the error of a
 // view the profile never declared.
 func TestARemovedViewIsUnknownToAUserProfile(t *testing.T) {
-	for _, id := range []string{"needs-me", "blocked-by-me", "home-blocked"} {
+	for _, id := range []string{"needs-me", "blocked-by-me", "home-blocked", "outbox"} {
 		if _, ok := mustBundledViews(t).View(id); ok {
 			t.Errorf("the bundled profile still declares %s", id)
 		}
@@ -152,6 +152,15 @@ func TestARemovedViewIsUnknownToAUserProfile(t *testing.T) {
 			if !strings.Contains(problems, want) {
 				t.Errorf("%s: no %q in:\n%s", id, want, problems)
 			}
+		}
+	}
+}
+
+func TestTheOutboxLensKeysFailAtLoad(t *testing.T) {
+	_, problems := loadListsWith(t, string(defaultLists()), "[draft_facets.kind]\nfact = \"draft.kind\"\nlabel = \"Kind\"\n\n[views.held]\nlabel = \"Held\"\nsummary = \"x\"\nlayout = \"outbox\"\n")
+	for _, want := range []string{"draft_facets: unknown key", `views.held.layout: "outbox" is not one of`} {
+		if !strings.Contains(problems, want) {
+			t.Errorf("no %q in:\n%s", want, problems)
 		}
 	}
 }
@@ -274,7 +283,7 @@ func TestAReviewStepNamesAView(t *testing.T) {
 		}
 		walked = append(walked, st.View)
 	}
-	if want := []string{"inbox", "outbox", "waiting", "review-projects", "someday", "focus"}; !slices.Equal(walked, want) {
+	if want := []string{"inbox", "decide-send-draft", "waiting", "review-projects", "someday", "focus"}; !slices.Equal(walked, want) {
 		t.Errorf("the review walks %v, want %v", walked, want)
 	}
 }
@@ -323,7 +332,7 @@ func TestViewsKeepTheirDeclaredOrderAcrossLayers(t *testing.T) {
 	if want := append(bundled.IDs(), "zeta", "alpha"); !slices.Equal(texts.IDs(), want) {
 		t.Errorf("views %v, want %v", texts.IDs(), want)
 	}
-	if want := []string{"needs-you", "next", "inbox", "focus", "fits-now", "waiting", "chase", "stalled", "in-loop", "approved", "projects", "review-projects", "snoozed", "someday", "done", "logbook", "outbox", "review",
+	if want := []string{"needs-you", "next", "inbox", "focus", "fits-now", "waiting", "chase", "stalled", "in-loop", "approved", "projects", "review-projects", "snoozed", "someday", "done", "logbook", "review",
 		"home-stalled", "decide-answer", "decide-approve-plan", "decide-send-draft", "decide-review-step", "decide-last-step", "decide-pick-someone", "decide-act"}; !slices.Equal(bundled.IDs(), want) {
 		t.Errorf("bundled views %v, want %v", bundled.IDs(), want)
 	}
@@ -331,7 +340,7 @@ func TestViewsKeepTheirDeclaredOrderAcrossLayers(t *testing.T) {
 	for _, st := range texts.Review {
 		steps = append(steps, st.View)
 	}
-	if want := []string{"inbox", "outbox", "waiting", "review-projects", "someday", "focus", "zeta", "alpha"}; !slices.Equal(steps, want) {
+	if want := []string{"inbox", "decide-send-draft", "waiting", "review-projects", "someday", "focus", "zeta", "alpha"}; !slices.Equal(steps, want) {
 		t.Errorf("steps %v, want %v", steps, want)
 	}
 }
@@ -714,103 +723,25 @@ func TestACopiedViewsFileFromTheLastReleaseLoads(t *testing.T) {
 	}
 }
 
-func draftFacetOf(d ViewsDef, id string) (FacetDef, bool) {
-	i := slices.IndexFunc(d.DraftFacets, func(f FacetDef) bool { return f.ID == id })
-	if i < 0 {
-		return FacetDef{}, false
-	}
-	return d.DraftFacets[i], true
-}
-
-func TestDraftFacetsLoad(t *testing.T) {
-	views, problems := loadFacets(t, "[draft_facets.kind]\nfact = \"draft.kind\"\nlabel = \"Kind\"\ngroup = true\n\n[draft_facets.age]\nfact = \"draft.created_at\"\nlabel = \"Age\"\nsort = \"time\"\n")
-	if len(problems) > 0 {
-		t.Fatal(problems.Error())
-	}
-	if f, ok := draftFacetOf(views, "kind"); !ok || f.Fact != "draft.kind" || !f.Group || !f.Menu || f.Label != "Kind" {
-		t.Errorf("kind: %+v", f)
-	}
-	if f, ok := draftFacetOf(views, "age"); !ok || f.Fact != "draft.created_at" || f.Label != "Age" || f.Sort != "time" {
-		t.Errorf("age: %+v", f)
-	}
-}
-
-func TestDraftFacetRejectsTaskFact(t *testing.T) {
-	views, problems := loadFacets(t, "[draft_facets.state]\nfact = \"task.state\"\nlabel = \"State\"\n\n[draft_facets.who]\nfact = \"draft.proposr\"\nlabel = \"Who\"\n\n[draft_facets.kind]\nfact = \"draft.kind\"\nlabel = \"Kind\"\nsort = \"time\"\n")
-	got := problems.Error()
-	for _, want := range []string{"draft_facets.state.fact: task.state names no draft fact", "draft.proposer", `did you mean "draft.proposer"?`, "draft_facets.kind.sort"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("problems lack %q:\n%s", want, got)
-		}
-	}
-	for _, id := range []string{"state", "who", "kind"} {
-		if _, ok := draftFacetOf(views, id); ok {
-			t.Errorf("draft facet %s with a problem is served", id)
-		}
-	}
-}
-
-func TestDraftFacetsSeparateFromTaskFacets(t *testing.T) {
-	user := "[draft_facets.where]\nfact = \"draft.where\"\nlabel = \"Place\"\n\n[facets.source]\nlabel = \"Origin\"\n"
-	bundled := "empty = \"x\"\ndefault_sort = \"y\"\n\n[facets.where]\nfact = \"task.placement\"\nlabel = \"Where\"\n\n[facets.source]\nfact = \"task.provider\"\nlabel = \"Source\"\n\n[draft_facets.where]\nfact = \"draft.where\"\nlabel = \"Where\"\n\n[draft_facets.source]\nfact = \"draft.provider\"\nlabel = \"Source\"\n"
-	texts, problems := loadListsWith(t, bundled, user)
-	if problems != "" {
-		t.Fatal(problems)
-	}
-	taskWhere, _ := facetOf(texts.ViewsDef, "where")
-	draftWhere, _ := draftFacetOf(texts.ViewsDef, "where")
-	taskSource, _ := facetOf(texts.ViewsDef, "source")
-	draftSource, _ := draftFacetOf(texts.ViewsDef, "source")
-	if taskWhere.Label != "Where" || taskWhere.Fact != "task.placement" || draftWhere.Label != "Place" || draftWhere.Fact != "draft.where" {
-		t.Errorf("where: task %+v, draft %+v", taskWhere, draftWhere)
-	}
-	if taskSource.Label != "Origin" || draftSource.Label != "Source" {
-		t.Errorf("source: task %q, draft %q", taskSource.Label, draftSource.Label)
-	}
-}
-
-func TestOutboxViewGroupsByDraftFact(t *testing.T) {
-	views, problems := loadFacets(t, "[views.outbox]\ngroup = \"draft.proposer\"\nsort = \"-draft.created_at\"\n")
-	if len(problems) > 0 {
-		t.Fatal(problems.Error())
-	}
-	if v, _ := views.View("outbox"); v.Group != "draft.proposer" || len(v.Sort) != 1 || v.Sort[0].Fact != "draft.created_at" || !v.Sort[0].Desc {
-		t.Errorf("outbox: group %q, sort %+v", v.Group, v.Sort)
-	}
-
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, ViewsFile), []byte("[views.outbox]\ngroup = \"task.state\"\nsort = \"gate.status\"\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	layers := []profile.Layer{{Name: "user", Dir: dir}}
-	_, _, ps := loadViews(layers, readerOf(os.DirFS("../../profiles/default")), nil)
-	got := ps.Error()
-	for _, want := range []string{"views.outbox.group", "task.state names no fact", "views.outbox.sort", "gate.status names no fact"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("problems lack %q:\n%s", want, got)
-		}
-	}
-}
-
-func TestPluginDraftKindLabel(t *testing.T) {
+func TestPluginDraftFieldWords(t *testing.T) {
 	plugin, user := t.TempDir(), t.TempDir()
 	write := func(dir, body string) {
 		if err := os.WriteFile(filepath.Join(dir, UIFile), []byte(body), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
-	write(plugin, "[drafts.note]\nlabel = \"Note\"\n\n[drafts.note.fields.body]\nlabel = \"Text\"\n")
-	write(user, "[drafts.note]\nlabel = \"Memo\"\n")
+	write(plugin, "[drafts.note]\ncomments = \"/comments\"\n\n[drafts.note.fields.body]\nlabel = \"Text\"\n")
+	write(user, "[drafts.note.fields.body]\nlabel = \"Memo\"\n")
 	layers := []profile.Layer{{Name: profile.PluginLayer("acme"), Dir: plugin}}
 	texts, problems := loadUI(layers, readerOf(nil))
 	if len(problems) > 0 {
 		t.Fatal(problems.Error())
 	}
-	if d := texts["acme"].Drafts["note"]; d.Label != "Note" || d.Fields["body"].Label != "Text" {
+	if d := texts["acme"].Drafts["note"]; d.Comments != "/comments" || d.Fields["body"].Label != "Text" {
 		t.Errorf("note: %+v", d)
 	}
 	texts, problems = loadUI(append(layers, profile.Layer{Name: "user:acme", Dir: user}), readerOf(nil))
-	if d := texts["acme"].Drafts["note"]; len(problems) > 0 || d.Label != "Memo" || d.Fields["body"].Label != "Text" {
+	if d := texts["acme"].Drafts["note"]; len(problems) > 0 || d.Comments != "/comments" || d.Fields["body"].Label != "Memo" {
 		t.Errorf("note over a user layer: %+v, %s", d, problems.Error())
 	}
 }
@@ -818,18 +749,18 @@ func TestPluginDraftKindLabel(t *testing.T) {
 // A view's opens names the view, and the decision kind narrowing it, that a
 // page of its own opens instead; it must name a view and a decision kind.
 func TestAViewOpensTheViewItNames(t *testing.T) {
-	texts, problems := loadListsWith(t, string(defaultLists()), "[views.outbox]\nopens = { view = \"inbox\" }\n")
+	texts, problems := loadListsWith(t, string(defaultLists()), "[views.waiting]\nopens = { view = \"inbox\" }\n")
 	if problems != "" {
 		t.Fatal(problems)
 	}
-	if v, _ := texts.View("outbox"); v.Opens != (ViewOpens{View: "inbox"}) {
-		t.Fatalf("outbox opens %+v, want the user's inbox", v.Opens)
+	if v, _ := texts.View("waiting"); v.Opens != (ViewOpens{View: "inbox"}) {
+		t.Fatalf("waiting opens %+v, want the user's inbox", v.Opens)
 	}
 	if v, _ := texts.View("inbox"); v.Opens != (ViewOpens{}) {
 		t.Fatalf("inbox opens %+v, want none", v.Opens)
 	}
-	_, problems = loadListsWith(t, string(defaultLists()), "[views.outbox]\nopens = { view = \"nowhere\", kind = \"sideways\" }\n")
-	for _, want := range []string{"views.outbox.opens.view: nowhere names no view", "views.outbox.opens.kind: sideways names no decision kind"} {
+	_, problems = loadListsWith(t, string(defaultLists()), "[views.waiting]\nopens = { view = \"nowhere\", kind = \"sideways\" }\n")
+	for _, want := range []string{"views.waiting.opens.view: nowhere names no view", "views.waiting.opens.kind: sideways names no decision kind"} {
 		if !strings.Contains(problems, want) {
 			t.Errorf("no %q in:\n%s", want, problems)
 		}

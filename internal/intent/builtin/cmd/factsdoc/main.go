@@ -44,7 +44,7 @@ var intentGroups = []group{
 
 // groupNotes are the sentences some intent groups carry under their heading.
 var groupNotes = map[string]string{
-	"A draft's facts (`draft.*`)": "A draft's action reads the facts of the `draft_action` slot; a draft facet of `views.toml`'s `[draft_facets]`, and the Outbox view's `group` and `sort`, read those of `draft_view`. `draft.proposer` and `draft.delivery` are in [the draft approval facts](#draft-approval-facts).",
+	"A draft's facts (`draft.*`)": "A draft's action reads the facts of the `draft_action` slot. `draft.proposer` and `draft.delivery` are in [the draft approval facts](#draft-approval-facts).",
 }
 
 // workflowGroups title the workflow facts' subsections, one per slot of

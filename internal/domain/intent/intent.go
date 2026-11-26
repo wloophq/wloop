@@ -32,18 +32,10 @@ const (
 	Act     Name = "act"
 )
 
-// Outbox is the head of an intent's group of drafts in the Outbox: a plural title, and one line on when the
-// intent drafts them.
-type Outbox struct {
-	Title, About string
-}
-
 type Def struct {
-	Name    Name
-	Label   string
-	Summary string
-	// Outbox is how the Outbox names the group of the drafts the intent's turns proposed.
-	Outbox     Outbox
+	Name       Name
+	Label      string
+	Summary    string
 	Key        string
 	Verb       string // the task verb its action fulfills; "" for none
 	UserFacing bool

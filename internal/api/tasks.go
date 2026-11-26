@@ -201,10 +201,10 @@ type TaskViewSpec struct {
 	RemoveClean  bool   `json:"remove_clean,omitempty"`
 	// Rail says whether the rail lists the view; a view only the home, a queue or search reads does not.
 	Rail bool `json:"rail"`
-	// Layout is how the cockpit draws the view: list, board, outbox or queue.
+	// Layout is how the cockpit draws the view: list, board or queue.
 	Layout string `json:"layout,omitempty"`
-	// Opens is the route a page of the view opens instead, "" for its own: the Outbox's opens the queue's view
-	// narrowed to the kind draft gates count as.
+	// Opens is the route a page of the view opens instead, "" for its own, such as the queue's view narrowed to
+	// the kind draft gates count as.
 	Opens string `json:"opens,omitempty"`
 	// Section is the rail section the view sits in, "" for the untitled top block; Uncounted says the rail draws
 	// no number for it.

@@ -8,7 +8,7 @@ import { net } from "../../state/api";
 import { applyTasksPage } from "../../state/loaders.svelte";
 import { closeOverlays, overlays } from "../../state/overlays.svelte";
 import { nav, readHash } from "../../state/route.svelte";
-import { catalog, collapsed, notice, outboxState, state, tasksState } from "../../state/store.svelte";
+import { catalog, collapsed, notice, state, tasksState } from "../../state/store.svelte";
 import { resetStore } from "../../testing/reset.svelte";
 import { fixture, task, useCatalogs } from "../rows/testdata/fixtures";
 import TaskViewPage from "./TaskViewPage.svelte";
@@ -178,7 +178,7 @@ describe("a view's head", () => {
     resetStore(NOW, "#view=waiting");
     tasksState.catalog = { views: [
       { id: "waiting", label: "Waiting", summary: "What others owe you.", empty: "Nobody owes you anything.", when: "task.owed_by != 'me'", group: "task.owed_by", sort: "-task.since_movement" },
-      { id: "outbox", label: "Outbox", over: "gates", summary: "Drafts to approve.", empty: "No drafts wait on you." },
+      { id: "held-drafts", label: "Held drafts", over: "gates", summary: "Drafts to approve.", empty: "No drafts wait on you." },
       { id: "review", label: "Review", summary: "The weekly review." },
     ] };
     tasksState.key = viewQueryKey("waiting", "", []);
@@ -192,8 +192,8 @@ describe("a view's head", () => {
     flushSync();
     expect(body(c).querySelector(".empty")!.textContent).toBe('Nothing here matches "zzz".');
     cleanup();
-    nav.hash = "#view=outbox";
-    tasksState.key = viewQueryKey("outbox", "", []);
+    nav.hash = "#view=held-drafts";
+    tasksState.key = viewQueryKey("held-drafts", "", []);
     expect(body(page()).querySelector(".empty")!.textContent).toBe("No drafts wait on you.");
   });
 

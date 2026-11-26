@@ -28,7 +28,7 @@ The leading glyph is the category of the task's state, drawn like OmniFocus's st
 | `done` | `done`, `reference` | filled `loop` circle with a check | finished or kept to read; the row goes `muted` |
 | `dropped` | `trash` | circle with a slash | dismissed |
 
-An agent's question, a draft in the Outbox and a proposal are **gates** on a task: the task keeps its glyph, and the gate shows on its page as a GateCard and in the views that list gates. A **project** is a task that is the parent of others; its glyph is its own state's.
+An agent's question, a draft waiting for approval and a proposal are **gates** on a task: the task keeps its glyph, and the gate shows on its page as a GateCard and in the views that list gates. A **project** is a task that is the parent of others; its glyph is its own state's.
 
 ## The task row
 
@@ -62,7 +62,7 @@ On the task's page each unit is one of its links: the unit's label opens it in t
 
 ## Lists and perspectives
 
-The lists are the profile's **views**, each a predicate over task facts with a label, an optional grouping and the key that jumps to it, in the order of `views.toml`. The client names none of them: it lists what the catalog serves, groups by the fact a view names (a state or a category groups in the order of the states), and binds each view's key. With the bundled profile they read Focus, Inbox, Outbox, Next, Waiting, Projects, Someday and Logbook; a profile adds its own (a Needs me over open gates and your next actions, say) with no client change.
+The lists are the profile's **views**, each a predicate over task facts with a label, an optional grouping and the key that jumps to it, in the order of `views.toml`. The client names none of them: it lists what the catalog serves, groups by the fact a view names (a state or a category groups in the order of the states), and binds each view's key. With the bundled profile they read Focus, Inbox, Next, Waiting, Projects, Someday and Logbook; a profile adds its own (a Needs me over open gates and your next actions, say) with no client change.
 
 - The **area switcher** sits at the top of the rail, as in Nirvana, and filters every view; the filter shows in the view's heading ("Next · work").
 - **Review** is a mode, not a list: a button above the lists that walks the profile's review steps, each a view, with the step chips across the top.

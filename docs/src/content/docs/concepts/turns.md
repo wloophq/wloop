@@ -89,7 +89,7 @@ In Claude Desktop, {{name}} creates the session headlessly, imports it into the 
 
 ## Headless turns
 
-A turn of an intent whose manifest's `runners` include `headless` runs as one read-only call of the agent, with no session and no workspace. It may read only the unit's checkout, proposes up to 3 drafts, which wait in the [Outbox](/concepts/tasks/#the-outbox). and its answer's `learned` is the record's. The bundled `act` intent runs this way. `headless.tier`, `headless.per_call_usd` (0.5) and `headless.per_day_usd` (5) cap these calls.
+A turn of an intent whose manifest's `runners` include `headless` runs as one read-only call of the agent, with no session and no workspace. It may read only the unit's checkout, proposes up to 3 drafts, which wait for you in Needs you (see [The Outbox](/concepts/approval/#the-outbox)), and its answer's `learned` is the record's. The bundled `act` intent runs this way. `headless.tier`, `headless.per_call_usd` (0.5) and `headless.per_day_usd` (5) cap these calls.
 
 The same caps count a call that is not a turn, so no turn row holds it: the omnibox's agent call. It reserves `headless.per_call_usd` while it runs and records its cost, or that cap when the agent reports none, as an `omnibox_call` event; the day's spend is the headless turns' plus those events, and a call the day's cap leaves no room for is refused.
 

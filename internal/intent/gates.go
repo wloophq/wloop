@@ -32,19 +32,14 @@ type GatesDef struct {
 	Approval GateApproval
 	// Effects are the sentences that say what each effect does when a draft is sent, by effect name.
 	Effects map[string]string
-	// Drafts are the words a draft's card and the Outbox read: gates.toml's [drafts].
+	// Drafts are the words a draft's card reads: gates.toml's [drafts].
 	Drafts DraftWords
 }
 
-// DraftWords name drafts to a person: ByHand and ByHandAbout head the Outbox's group of the drafts written
-// by hand, BySession and BySessionAbout that of the drafts a session wrote with no intent, Purposes name a
-// purpose, States a delivery state and Reasons why a dropped draft was withdrawn, by its id.
+// DraftWords name drafts to a person: Purposes name a purpose, States a delivery state and Reasons why a
+// dropped draft was withdrawn, by its id.
 type DraftWords struct {
-	ByHand, ByHandAbout       string
-	BySession, BySessionAbout string
 	Purposes, States, Reasons map[string]string
-	// Rules name an approval rule to a person, by the rule's name.
-	Rules map[string]string
 	// Quoted says a draft posted in the direct conversation of the person it is to quotes {conversation}.
 	Quoted string
 	// Stale says a draft was written against what its unit no longer is; Hold that no rule sends it.
@@ -97,8 +92,8 @@ func (d GatesDef) DefaultFor(k gate.Kind) (gate.Mode, time.Duration, string) {
 }
 
 // GateFacts are g's facts in slot gate, which a gates.toml rule and a
-// view over gates read; delivery is a draft gate's delivery state, as the
-// Outbox reads it from its draft, "" for any other gate.
+// view over gates read; delivery is a draft gate's delivery state, as read
+// from its draft, "" for any other gate.
 func GateFacts(g gate.Gate, delivery string) workflow.Facts {
 	return workflow.Facts{
 		builtin.GateSlot + ".kind":     string(g.Kind),
@@ -223,18 +218,13 @@ type mGatesFile struct {
 }
 
 type mDraftWords struct {
-	ByHand         *string           `toml:"by_hand"`
-	ByHandAbout    *string           `toml:"by_hand_about"`
-	BySession      *string           `toml:"by_session"`
-	BySessionAbout *string           `toml:"by_session_about"`
-	Quoted         *string           `toml:"quoted"`
-	Stale          *string           `toml:"stale"`
-	Hold           *string           `toml:"hold"`
-	Purposes       map[string]string `toml:"purposes"`
-	States         map[string]string `toml:"states"`
-	Reasons        map[string]string `toml:"reasons"`
-	Authors        map[string]string `toml:"authors"`
-	Rules          map[string]string `toml:"rules"`
+	Quoted   *string           `toml:"quoted"`
+	Stale    *string           `toml:"stale"`
+	Hold     *string           `toml:"hold"`
+	Purposes map[string]string `toml:"purposes"`
+	States   map[string]string `toml:"states"`
+	Reasons  map[string]string `toml:"reasons"`
+	Authors  map[string]string `toml:"authors"`
 }
 
 type mGate struct {
@@ -384,14 +374,12 @@ func mergeDraftWords(s *sheet, w *DraftWords, m *mDraftWords) {
 	for _, f := range []struct {
 		to   *string
 		from *string
-	}{{&w.ByHand, m.ByHand}, {&w.ByHandAbout, m.ByHandAbout}, {&w.BySession, m.BySession}, {&w.BySessionAbout, m.BySessionAbout},
-		{&w.Quoted, m.Quoted}, {&w.Stale, m.Stale}, {&w.Hold, m.Hold}} {
+	}{{&w.Quoted, m.Quoted}, {&w.Stale, m.Stale}, {&w.Hold, m.Hold}} {
 		if f.from != nil {
 			*f.to = strings.TrimSpace(*f.from)
 		}
 	}
 	w.Purposes = mergeWords(w.Purposes, m.Purposes, declared(s, "drafts.purposes", m.Purposes))
-	w.Rules = mergeWords(w.Rules, m.Rules, declared(s, "drafts.rules", m.Rules))
 	states := make([]string, len(draft.States))
 	for i, st := range draft.States {
 		states[i] = string(st)
