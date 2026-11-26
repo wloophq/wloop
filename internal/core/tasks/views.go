@@ -45,6 +45,9 @@ type ViewSort func(ctx context.Context, view string, ts []task.Task) error
 // for the pass.
 type Pass struct {
 	Tasks []task.Task
+	// all says Tasks are every stored task, as the service reads them; a pass built elsewhere, such as a sweep's
+	// over the open tasks, is not one the service reuses as all of them.
+	all bool
 
 	mu    sync.Mutex
 	facts map[task.ID]workflow.Facts
@@ -192,6 +195,69 @@ func Once[T any](ctx context.Context, key string, load func() (T, error)) (T, er
 		return zero, err
 	}
 	return v.(T), nil
+}
+
+type pageKey struct{}
+
+// WithPage is ctx serving one page of a read route, which writes nothing: PageOnce under it reads each key once
+// for the page.
+func WithPage(ctx context.Context) context.Context { return context.WithValue(ctx, pageKey{}, &Pass{}) }
+
+// InPage says whether ctx serves a page of a read route.
+func InPage(ctx context.Context) bool {
+	_, ok := ctx.Value(pageKey{}).(*Pass)
+	return ok
+}
+
+// PageOnce is the value of key, loaded once for the page ctx serves; outside a page, load reads it each time.
+func PageOnce[T any](ctx context.Context, key string, load func() (T, error)) (T, error) {
+	p, ok := ctx.Value(pageKey{}).(*Pass)
+	if !ok {
+		return load()
+	}
+	return Once(WithPass(ctx, p), key, load)
+}
+
+// PageTask is task id as the pass of the page ctx serves holds it; false outside a page or a pass, or when the
+// pass does not hold it, as for an alias of a merged task.
+func PageTask(ctx context.Context, id task.ID) (task.Task, bool) {
+	if !InPage(ctx) {
+		return task.Task{}, false
+	}
+	pass, ok := PassOf(ctx)
+	if !ok {
+		return task.Task{}, false
+	}
+	return pass.Task(id)
+}
+
+// PageTasksOf are the tasks of the pass of the page ctx serves that hold u or one of its items, held or resolved;
+// false outside a page or a pass.
+func PageTasksOf(ctx context.Context, u unit.Unit) ([]task.Task, bool) {
+	if !InPage(ctx) {
+		return nil, false
+	}
+	pass, ok := PassOf(ctx)
+	if !ok {
+		return nil, false
+	}
+	byUnit, _ := PageOnce(ctx, "tasks.of", func() (map[unit.Unit][]task.Task, error) {
+		out := map[unit.Unit][]task.Task{}
+		for _, e := range pass.Tasks {
+			seen := map[unit.Unit]bool{}
+			for _, h := range e.Units {
+				seen[h] = true
+			}
+			for _, r := range slices.Concat(e.Items, e.Resolved) {
+				seen[r.Unit] = true
+			}
+			for h := range seen {
+				out[h] = append(out[h], e)
+			}
+		}
+		return out, nil
+	})
+	return byUnit[u], true
 }
 
 // ItemsKey is the Once key of the items of every unit of a pass, a map[unit.Unit][]items.Item, which the facts
@@ -392,15 +458,13 @@ func (s *Service) hider() func(task.Task) bool {
 	}
 }
 
-// Stored are the stored tasks of ids, from the pass ctx carries, else the pass every reader shares; an id no
+// Stored are the stored tasks of ids, from the pass ctx carries when it holds every task, else the pass every
+// reader shares; an id no
 // stored task holds is left out.
 func (s *Service) Stored(ctx context.Context, ids []task.ID) (map[task.ID]task.Task, error) {
-	pass, ok := PassOf(ctx)
-	if !ok {
-		var err error
-		if pass, err = s.pass(ctx); err != nil {
-			return nil, err
-		}
+	pass, err := s.pass(ctx)
+	if err != nil {
+		return nil, err
 	}
 	out := make(map[task.ID]task.Task, len(ids))
 	for _, id := range ids {
@@ -477,9 +541,6 @@ func (s *Service) counts(ctx context.Context, area string, all []task.Task, keep
 				c.Contexts[cx]++
 			}
 		}
-	}
-	for _, v := range vs.Badge {
-		c.Badge += c.Views[v]
 	}
 	return c, nil
 }
@@ -590,6 +651,9 @@ func (n Snapshot) Open() []task.Task {
 func (n Snapshot) Held(units []unit.Unit) []unit.Unit {
 	return slices.DeleteFunc(slices.Clone(units), func(u unit.Unit) bool { return !n.pass.Holds(u) })
 }
+
+// Within is ctx carrying n's pass, so the reads under it share n.
+func (n Snapshot) Within(ctx context.Context) context.Context { return WithPass(ctx, n.pass) }
 
 // Counts are the counters of the profile's views over area, over the tasks of n.
 func (n Snapshot) Counts(ctx context.Context, area string) (task.Counters, error) {

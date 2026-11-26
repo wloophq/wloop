@@ -29,17 +29,19 @@ var errNoGates = errors.New("no gates service: the daemon runs the steps")
 type serviceGates struct{ e *Env }
 
 func (g serviceGates) Open(ctx context.Context, gt gate.Gate, p gates.Policy) (gate.Gate, error) {
-	if g.e.gates == nil {
+	svc, _ := g.e.builtGates()
+	if svc == nil {
 		return gate.Gate{}, errNoGates
 	}
-	return g.e.gates.Open(ctx, gt, p)
+	return svc.Open(ctx, gt, p)
 }
 
 func (g serviceGates) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {
-	if g.e.gateReader == nil {
+	_, reader := g.e.builtGates()
+	if reader == nil {
 		return nil, errNoGates
 	}
-	return g.e.gateReader.Where(ctx, q)
+	return reader.Where(ctx, q)
 }
 
 // gateOpenCheck holds while a gate of the step's name its workflow opened

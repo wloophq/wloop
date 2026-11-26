@@ -18,15 +18,9 @@ import (
 	intentload "github.com/wloophq/wloop/internal/intent"
 )
 
-func TestBadgeCountsTheProfilesViews(t *testing.T) {
+func TestTheBadgeNamesTheProfilesViewsAndTheyAreCounted(t *testing.T) {
 	t.Parallel()
 	r := newTasksRig(t, nil)
-	r.put(t, mixedTasks()...)
-	r.put(t, task.Task{ID: "t-9", State: "inbox", Category: task.CategoryInbox})
-	p := r.page(t, "view=inbox")
-	if c := p.Counters; c.Badge != c.Views["inbox"]+c.Views["needs-me"] || c.Badge == 0 {
-		t.Fatalf("the bundled badge %d, views %v", c.Badge, c.Views)
-	}
 	var cat api.ViewsCatalog
 	get(t, r.s, api.ViewsPath, &cat)
 	var badged []string
@@ -46,8 +40,8 @@ func TestBadgeCountsTheProfilesViews(t *testing.T) {
 	mine.put(t, task.Task{ID: "t-done", State: "done", Category: task.CategoryDone})
 	var c api.Counters
 	get(t, mine.s, api.CountersPath, &c)
-	if c.Badge != 2 || c.Badge != c.Views["someday"]+c.Views["logbook"] {
-		t.Fatalf("a profile's badge counts %d, views %v", c.Badge, c.Views)
+	if c.Views["someday"]+c.Views["logbook"] != 2 {
+		t.Fatalf("a profile's badge views counted %v", c.Views)
 	}
 }
 
@@ -128,8 +122,8 @@ func (o openTasks) Open(ctx context.Context, r coretasks.OpenRequest) (task.Task
 }
 
 // TestADraftOnAnUnheldUnitCountsOnlyInTheOutbox checks that a draft on a unit no task holds, whose gate opens a
-// capture task, counts once toward the badge: its task in the Inbox and not also in Needs me, its gate in the
-// Outbox, which the badge leaves out.
+// capture task, counts once: its task in the Inbox and not also in Needs me, its gate in the
+// Outbox.
 func TestADraftOnAnUnheldUnitCountsOnlyInTheOutbox(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
@@ -138,7 +132,7 @@ func TestADraftOnAnUnheldUnitCountsOnlyInTheOutbox(t *testing.T) {
 	r.o.Gates, r.s.deps.Gates = rigGates{svc, st}, svc
 	r.propose(t, r7u, "on a unit no task holds", draft.Wait)
 	c := r.page(t, "view=outbox").Counters
-	if c.Views["outbox"] != 1 || c.Views["inbox"] != 1 || c.Views["needs-me"] != 0 || c.Badge != 1 {
+	if c.Views["outbox"] != 1 || c.Views["inbox"] != 1 || c.Views["needs-me"] != 0 {
 		t.Fatalf("counters %+v", c)
 	}
 }

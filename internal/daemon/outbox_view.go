@@ -22,7 +22,7 @@ import (
 	intentload "github.com/wloophq/wloop/internal/intent"
 )
 
-const draftPrefix = "draft:"
+const draftPrefix = api.DraftTaskPrefix
 
 // gatesView serves the profile's views over gates, never stored: each gate in the view stands as a task, a
 // draft gate as its draft's own task, any other as the task it is on.
@@ -59,7 +59,9 @@ func (v gatesView) Tasks(ctx context.Context, q task.Query) ([]task.Task, error)
 // the task the gate is on; false for a gate on no task.
 func (s *Server) gateTask(ctx context.Context, g gateIn) (task.Task, bool, error) {
 	var on task.Task
-	if g.gate.Task != "" {
+	if e, held := coretasks.PageTask(ctx, g.gate.Task); held {
+		on = e
+	} else if g.gate.Task != "" {
 		var err error
 		on, err = s.deps.Tasks.Task(ctx, g.gate.Task)
 		if err != nil && !errors.Is(err, coretasks.ErrNoTask) {

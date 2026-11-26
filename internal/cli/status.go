@@ -15,7 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
-// runStatus lists the tasks of the views the badge counts, and the tracked
+// runStatus lists the tasks of the views the badge names, and the tracked
 // pull requests.
 func runStatus(ctx context.Context, e *Env, args []string) error {
 	fs := flag.NewFlagSet("status", flag.ContinueOnError)
@@ -70,7 +70,7 @@ func rowLine(r api.Row) statusLine {
 		since: r.Summary.Since, stalled: r.Summary.Stalled}
 }
 
-// daemonStatus lists the tasks of the views the badge counts, in the
+// daemonStatus lists the tasks of the views the badge names, in the
 // profile's order, then the tracked pull requests.
 func daemonStatus(ctx context.Context, e *Env, c *client.Client, t termfmt.Term) error {
 	cat, err := c.Views(ctx)

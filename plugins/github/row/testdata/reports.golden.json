@@ -187,6 +187,12 @@
           }
         },
         {
+          "name": "pr.commits",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
           "name": "pr.conflicting_for",
           "value": {
             "kind": 5
@@ -511,6 +517,12 @@
           "value": {
             "kind": 3,
             "string": "h1"
+          }
+        },
+        {
+          "name": "pr.commits",
+          "value": {
+            "kind": 4
           }
         },
         {
@@ -839,6 +851,12 @@
           "value": {
             "kind": 3,
             "string": "h1"
+          }
+        },
+        {
+          "name": "pr.commits",
+          "value": {
+            "kind": 4
           }
         },
         {
@@ -1178,6 +1196,12 @@
           }
         },
         {
+          "name": "pr.commits",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
           "name": "pr.conflicting_for",
           "value": {
             "kind": 5
@@ -1495,6 +1519,12 @@
           "value": {
             "kind": 3,
             "string": "h1"
+          }
+        },
+        {
+          "name": "pr.commits",
+          "value": {
+            "kind": 4
           }
         },
         {
@@ -1853,6 +1883,12 @@
           "value": {
             "kind": 3,
             "string": "h1"
+          }
+        },
+        {
+          "name": "pr.commits",
+          "value": {
+            "kind": 4
           }
         },
         {
@@ -2225,6 +2261,12 @@
           }
         },
         {
+          "name": "pr.commits",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
           "name": "pr.conflicting_for",
           "value": {
             "kind": 5
@@ -2583,6 +2625,12 @@
           }
         },
         {
+          "name": "pr.commits",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
           "name": "pr.conflicting_for",
           "value": {
             "kind": 5
@@ -2925,6 +2973,12 @@
           "value": {
             "kind": 3,
             "string": "h1"
+          }
+        },
+        {
+          "name": "pr.commits",
+          "value": {
+            "kind": 4
           }
         },
         {
@@ -3273,6 +3327,12 @@
           "value": {
             "kind": 3,
             "string": "h1"
+          }
+        },
+        {
+          "name": "pr.commits",
+          "value": {
+            "kind": 4
           }
         },
         {
@@ -3627,6 +3687,12 @@
           }
         },
         {
+          "name": "pr.commits",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
           "name": "pr.conflicting_for",
           "value": {
             "kind": 5
@@ -3900,6 +3966,12 @@
           }
         },
         {
+          "name": "pr.commits",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
           "name": "pr.conflicting_for",
           "value": {
             "kind": 5
@@ -4168,6 +4240,12 @@
           "value": {
             "kind": 3,
             "string": "h1"
+          }
+        },
+        {
+          "name": "pr.commits",
+          "value": {
+            "kind": 4
           }
         },
         {
@@ -4489,6 +4567,12 @@
           "value": {
             "kind": 3,
             "string": "h1"
+          }
+        },
+        {
+          "name": "pr.commits",
+          "value": {
+            "kind": 4
           }
         },
         {
@@ -4816,6 +4900,12 @@
           }
         },
         {
+          "name": "pr.commits",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
           "name": "pr.conflicting_for",
           "value": {
             "kind": 5
@@ -5137,6 +5227,12 @@
           "value": {
             "kind": 3,
             "string": "h1"
+          }
+        },
+        {
+          "name": "pr.commits",
+          "value": {
+            "kind": 4
           }
         },
         {
@@ -5464,6 +5560,12 @@
           "value": {
             "kind": 3,
             "string": "h1"
+          }
+        },
+        {
+          "name": "pr.commits",
+          "value": {
+            "kind": 4
           }
         },
         {
@@ -5801,6 +5903,12 @@
           "value": {
             "kind": 3,
             "string": "h1"
+          }
+        },
+        {
+          "name": "pr.commits",
+          "value": {
+            "kind": 4
           }
         },
         {
@@ -6144,6 +6252,12 @@
           }
         },
         {
+          "name": "pr.commits",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
           "name": "pr.conflicting_for",
           "value": {
             "kind": 5
@@ -6426,6 +6540,12 @@
           "value": {
             "kind": 3,
             "string": "h1"
+          }
+        },
+        {
+          "name": "pr.commits",
+          "value": {
+            "kind": 4
           }
         },
         {
@@ -6779,6 +6899,12 @@
           "value": {
             "kind": 3,
             "string": "h1"
+          }
+        },
+        {
+          "name": "pr.commits",
+          "value": {
+            "kind": 4
           }
         },
         {

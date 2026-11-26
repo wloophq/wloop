@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 	"sync"
 	"time"
 
@@ -328,6 +329,62 @@ func (s *Service) Decides(ctx context.Context, drafted gate.Gate) error {
 		return nil
 	}
 	return fmt.Errorf("%w: question gate %d decides draft gate %d: answer the question", ErrRefused, q.ID, drafted.ID)
+}
+
+// Pinned are the drafts an open message pins, by draft id, each with the id of the message that pins it. Such a
+// draft waits on that message's question: close refuses approving its own gate until the message closes, settled
+// after its answer, so the draft is no decision of its own until then.
+func (s *Service) Pinned(ctx context.Context) (map[int64]int64, error) {
+	if s.d.Options == nil {
+		return nil, nil
+	}
+	return s.d.Options.PinnedDrafts(ctx)
+}
+
+// Unpinned are gs but the draft gates whose draft pinned (Service.Pinned) holds, in gs's order.
+func Unpinned(gs []gate.Gate, pinned map[int64]int64) []gate.Gate {
+	out := make([]gate.Gate, 0, len(gs))
+	for _, g := range gs {
+		if g.Kind == gate.KindDraft {
+			if id, err := strconv.ParseInt(g.Subject, 10, 64); err == nil {
+				if _, ok := pinned[id]; ok {
+					continue
+				}
+			}
+		}
+		out = append(out, g)
+	}
+	return out
+}
+
+// Undelivered are the approved draft gates of the drafts failed names, whose delivery failed, by task: each waits on
+// a person to retry or discard its draft, as an open draft gate waits to be sent. A draft's newest approved gate
+// stands for it.
+func Undelivered(ctx context.Context, where func(context.Context, Query) ([]gate.Gate, error), failed []int64) (map[task.ID][]gate.Gate, error) {
+	out := map[task.ID][]gate.Gate{}
+	if len(failed) == 0 {
+		return out, nil
+	}
+	subjects := make([]string, len(failed))
+	for i, id := range failed {
+		subjects[i] = strconv.FormatInt(id, 10)
+	}
+	gs, err := where(ctx, Query{Kind: gate.KindDraft, Statuses: []gate.Status{gate.Approved}, Subjects: subjects})
+	if err != nil {
+		return nil, err
+	}
+	newest := map[string]gate.Gate{}
+	for _, g := range gs {
+		if cur, ok := newest[g.Subject]; !ok || g.ID > cur.ID {
+			newest[g.Subject] = g
+		}
+	}
+	for _, subject := range slices.Sorted(maps.Keys(newest)) {
+		if g := newest[subject]; g.Task != "" {
+			out[g.Task] = append(out[g.Task], g)
+		}
+	}
+	return out, nil
 }
 
 // Supersede closes open gate id as superseded by by, its subject gone or

@@ -1,6 +1,9 @@
 package api
 
-import "time"
+import (
+	"slices"
+	"time"
+)
 
 const (
 	// AdminTimings takes the days to look back in the query parameter since.
@@ -15,6 +18,22 @@ type Quantiles struct {
 	Count int   `json:"count"`
 	P50MS int64 `json:"p50_ms"`
 	P90MS int64 `json:"p90_ms"`
+}
+
+// QuantilesOf are the nearest-rank p50 and p90 of ds.
+func QuantilesOf(ds []time.Duration) Quantiles {
+	q := Quantiles{Count: len(ds)}
+	if len(ds) == 0 {
+		return q
+	}
+	s := slices.Clone(ds)
+	slices.Sort(s)
+	rank := func(p float64) int64 {
+		n := int(p*float64(len(s)) + 0.999999999)
+		return s[min(max(n, 1), len(s))-1].Milliseconds()
+	}
+	q.P50MS, q.P90MS = rank(0.5), rank(0.9)
+	return q
 }
 
 type TagCount struct {

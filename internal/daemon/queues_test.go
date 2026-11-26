@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/core/home"
 	"github.com/wloophq/wloop/internal/domain/decision"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -124,5 +125,27 @@ func TestAnOpenQuestionOnADoneTaskStaysInItsQueue(t *testing.T) {
 	var q api.Queue
 	if code := get(t, r.s, queuePath("answer"), &q); code != 200 || q.Total != 1 {
 		t.Fatalf("%d %+v", code, q)
+	}
+}
+
+func TestQueueItemsOfOneTasksUnitsInOneSituationNameTheirUnits(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	first, second := unit.Unit{Provider: "fake", Key: "dm-1"}, unit.Unit{Provider: "fake", Key: "dm-2"}
+	e := task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "answer the team", Units: []unit.Unit{first, second}}
+	r.put(t, e)
+	its := []home.Item{
+		{Task: e, Found: decision.Found{Kind: decision.Answer, Unit: first, Situation: "waits_on_viewer"}, Situation: "Waits on you"},
+		{Task: e, Found: decision.Found{Kind: decision.Answer, Unit: second, Situation: "waits_on_viewer"}, Situation: "Waits on you"},
+	}
+	got, err := r.s.queueItems(context.Background(), r.g, its)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].Situation == nil || got[1].Situation == nil {
+		t.Fatalf("items %+v", got)
+	}
+	if got[0].Situation.Unit != first.String() || got[1].Situation.Unit != second.String() {
+		t.Fatalf("situations %+v and %+v, want units %s and %s", *got[0].Situation, *got[1].Situation, first, second)
 	}
 }

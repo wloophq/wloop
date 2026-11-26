@@ -53,7 +53,7 @@ A plugin's views go under its own section of the rail, titled with the plugin's 
 
 - **Row views** (`rows: true`) use the shared row grammar. The plugin supplies the unit column's label, the facets the toolbar offers for grouping and sorting, the situations the Why column ranks, and the qualifiers the filter box accepts. The client draws them all the same way.
 - **Custom views** (`rows: false`, such as Backlog or Explore) render inside the view frame: the view heading, the toolbar slot, the content area and the empty state. The frame keeps the gutter, the type scale and the tokens; the content is the plugin's.
-- A plugin's view may carry badge counts in the rail only for attention (see Information architecture).
+- A plugin's view shows no count in the rail; the rail counts the profile's views (see Information architecture).
 
 ## Actions from the profile
 

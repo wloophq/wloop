@@ -180,11 +180,24 @@ type Notifications struct {
 
 // Window: Enabled shows the cockpit in the app's own window on macOS instead
 // of the browser; Hotkey is the global shortcut that opens the omnibox panel,
-// "" for none.
+// "" for none. Float turns the floating widget on, FloatHotkey shows and
+// hides it, FloatMorning is the local "HH:MM" a snooze until tomorrow ends
+// at, and FloatOverFullScreen lets the floating widget show over a
+// full-screen app.
 type Window struct {
-	Enabled bool   `json:"enabled"`
-	Hotkey  string `json:"hotkey"`
+	Enabled             bool   `json:"enabled"`
+	Hotkey              string `json:"hotkey"`
+	Float               string `json:"float"`
+	FloatHotkey         string `json:"float_hotkey"`
+	FloatMorning        string `json:"float_morning"`
+	FloatOverFullScreen bool   `json:"float_over_full_screen"`
 }
+
+// The values of window.float.
+const (
+	FloatOn  = "on"
+	FloatOff = "off"
+)
 
 // SinkConfig is one view sink's own settings.
 type SinkConfig struct {
@@ -467,7 +480,7 @@ func Defaults() Config {
 		Classify:      Classify{PerDay: 50},
 		Tasks:         Tasks{StaleWaitingDays: 2, CandidateWindow: Days(14 * 24 * time.Hour), CandidateCap: 5},
 		Notifications: Notifications{DigestAt: "09:00"},
-		Window:        Window{Enabled: true, Hotkey: "ctrl+option+space"},
+		Window:        Window{Enabled: true, Hotkey: "ctrl+option+space", Float: FloatOff, FloatHotkey: "cmd+option+.", FloatMorning: "09:00"},
 		Drafts:        Drafts{RepeatAfter: Days(7 * 24 * time.Hour), StaleAfterDays: 20, IgnoredReactions: []string{"eyes"}},
 		Headless:      Headless{Tier: turns.TierBalanced, PerCallUSD: 0.5, PerDayUSD: 5},
 		Turns:         Turns{PerDay: 20, PerUnitPerDay: DefaultPRDailyCap, NoStartWait: Days(2 * time.Hour), BlindBlockWait: Days(24 * time.Hour)},
@@ -588,6 +601,9 @@ func LoadBytes(file string, raw []byte, base Config) (Config, error) {
 	}
 	if err := c.validatePluginDrafts(); err != nil {
 		return base, fmt.Errorf("%s: %w", file, err)
+	}
+	if _, err := time.Parse("15:04", c.Window.FloatMorning); err != nil {
+		return base, fmt.Errorf("%s: window.float_morning %q is not HH:MM, such as 09:00", file, c.Window.FloatMorning)
 	}
 	return c, nil
 }

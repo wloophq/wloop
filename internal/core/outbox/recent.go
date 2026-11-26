@@ -17,9 +17,10 @@ type Recent interface {
 }
 
 // RecentBases are Bases whose Recent shares one read per publisher, unit and kind among every caller within
-// Fresh: the read in flight, else the last one while it is fresh, else a new one. A read runs past the
-// caller that started it, bounded by ReadTimeout, so the next caller finds its answer; a caller waits for it
-// only until its own context ends.
+// Fresh, and starts a new one once Fresh passed. A caller takes the answer of the last read that gave one,
+// failed or not, at once, even while a newer read is on its way, for at most Fresh and ReadTimeout after that
+// read started; it waits, only until its own context ends, only for a key no read answered within that time. A read runs past the caller that started it, bounded by
+// ReadTimeout, so the next caller finds its answer.
 type RecentBases struct {
 	Bases Bases
 	Clock port.Clock
@@ -32,7 +33,7 @@ type RecentBases struct {
 	Log func(format string, args ...any)
 
 	mu    sync.Mutex
-	reads map[string]*basisRead
+	reads map[string]*basisReads
 }
 
 var (
@@ -48,12 +49,27 @@ type basisRead struct {
 	at   time.Time
 }
 
+func (r *basisRead) answered() bool {
+	select {
+	case <-r.done:
+		return true
+	default:
+		return false
+	}
+}
+
+// basisReads are a key's newest read and the newest one that answered.
+type basisReads struct{ newest, answered *basisRead }
+
 func (b *RecentBases) Live(ctx context.Context, publisher unit.ProviderID, u unit.Unit, kind string) (string, error) {
 	return b.Bases.Live(ctx, publisher, u, kind)
 }
 
 func (b *RecentBases) Recent(ctx context.Context, publisher unit.ProviderID, u unit.Unit, kind string) (string, error) {
-	r := b.read(publisher, u, kind)
+	r, answer := b.read(publisher, u, kind)
+	if answer != nil {
+		return answer.live, answer.err
+	}
 	select {
 	case <-r.done:
 		return r.live, r.err
@@ -62,10 +78,12 @@ func (b *RecentBases) Recent(ctx context.Context, publisher unit.ProviderID, u u
 	}
 }
 
-func (b *RecentBases) read(publisher unit.ProviderID, u unit.Unit, kind string) *basisRead {
-	r, started := b.shared(string(publisher)+"\x00"+u.String()+"\x00"+kind, b.Clock.Now())
+// read is the key's newest read, started now when none is on its way or fresh, and the newest that answered,
+// nil when none has.
+func (b *RecentBases) read(publisher unit.ProviderID, u unit.Unit, kind string) (newest, answer *basisRead) {
+	r, answer, started := b.shared(string(publisher)+"\x00"+u.String()+"\x00"+kind, b.Clock.Now())
 	if !started {
-		return r
+		return r, answer
 	}
 	run := func() {
 		ctx, cancel := context.WithTimeout(context.Background(), b.ReadTimeout)
@@ -78,23 +96,40 @@ func (b *RecentBases) read(publisher unit.ProviderID, u unit.Unit, kind string) 
 	}
 	if b.Reads == nil {
 		run()
-	} else {
-		b.Reads.Go(run)
+		return r, r
 	}
-	return r
+	b.Reads.Go(run)
+	return r, answer
 }
 
-// shared is the read of key in flight or fresh at now, else a new one, started true, that its caller runs.
-func (b *RecentBases) shared(key string, now time.Time) (r *basisRead, started bool) {
+// shared is the read of key on its way or fresh at now, else a new one, started true, that its caller runs, with
+// the newest read of key that answered. Every other key whose newest read answered and serves no caller any more,
+// Fresh and ReadTimeout after it started, is let go.
+func (b *RecentBases) shared(key string, now time.Time) (r, answer *basisRead, started bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if r, ok := b.reads[key]; ok && now.Sub(r.at) < b.Fresh {
-		return r, false
-	}
 	if b.reads == nil {
-		b.reads = map[string]*basisRead{}
+		b.reads = map[string]*basisReads{}
 	}
-	r = &basisRead{done: make(chan struct{}), at: now}
-	b.reads[key] = r
-	return r, true
+	for k, rs := range b.reads {
+		if k != key && rs.newest.answered() && now.Sub(rs.newest.at) >= b.Fresh+b.ReadTimeout {
+			delete(b.reads, k)
+		}
+	}
+	rs := b.reads[key]
+	if rs == nil {
+		rs = &basisReads{}
+		b.reads[key] = rs
+	}
+	if rs.newest != nil && rs.newest.answered() {
+		rs.answered = rs.newest
+	}
+	if rs.answered != nil && now.Sub(rs.answered.at) >= b.Fresh+b.ReadTimeout {
+		rs.answered = nil
+	}
+	if rs.newest != nil && (!rs.newest.answered() || now.Sub(rs.newest.at) < b.Fresh) {
+		return rs.newest, rs.answered, false
+	}
+	rs.newest = &basisRead{done: make(chan struct{}), at: now}
+	return rs.newest, rs.answered, true
 }

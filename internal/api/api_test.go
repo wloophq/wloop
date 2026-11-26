@@ -48,25 +48,26 @@ func TestMergeKeepsEveryNotice(t *testing.T) {
 	}
 }
 
-func TestMergeOrsThePlanAndGatesFlags(t *testing.T) {
+func TestMergeOrsThePlanGatesAndTurnsFlags(t *testing.T) {
 	c := Change{Type: "changed", Epoch: "e", Rev: 2}
 	c.Merge(Change{Type: "changed", Epoch: "e", Rev: 2, Plan: true})
 	c.Merge(Change{Type: "changed", Epoch: "e", Rev: 2, Gates: true})
+	c.Merge(Change{Type: "changed", Epoch: "e", Rev: 2, Turns: true})
 	c.Merge(Change{Type: "changed", Epoch: "e", Rev: 3})
-	if !c.Plan || !c.Gates || c.Health || c.All {
+	if !c.Plan || !c.Gates || !c.Turns || c.Health || c.All {
 		t.Fatalf("merged %+v", c)
 	}
 }
 
 func TestMergeKeepsTheNewestCounters(t *testing.T) {
 	c := Change{Type: "changed", Epoch: "e", Rev: 2}
-	c.Merge(Change{Type: "changed", Epoch: "e", Rev: 2, Counters: &Counters{Badge: 1}})
+	c.Merge(Change{Type: "changed", Epoch: "e", Rev: 2, Counters: &Counters{Views: map[string]int{"inbox": 1}}})
 	c.Merge(Change{Type: "changed", Epoch: "e", Rev: 3})
-	if c.Counters == nil || c.Counters.Badge != 1 {
+	if c.Counters == nil || c.Counters.Views["inbox"] != 1 {
 		t.Fatalf("a later change without counters dropped them: %+v", c.Counters)
 	}
-	c.Merge(Change{Type: "changed", Epoch: "e", Rev: 3, Counters: &Counters{Badge: 2}})
-	if c.Counters.Badge != 2 {
+	c.Merge(Change{Type: "changed", Epoch: "e", Rev: 3, Counters: &Counters{Views: map[string]int{"inbox": 2}}})
+	if c.Counters.Views["inbox"] != 2 {
 		t.Fatalf("kept older counters: %+v", c.Counters)
 	}
 }

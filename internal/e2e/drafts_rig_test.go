@@ -105,13 +105,19 @@ const draftsNode = `{"number":7,"title":"Add x","state":"OPEN","isDraft":false,"
  "commits":{"nodes":[{"commit":{"oid":"c2","committedDate":"2026-10-08T10:00:00Z","parents":{"totalCount":1}}}]},
  "reviews":{"nodes":[]},"comments":{"nodes":[]},"reviewRequests":{"nodes":[{"requestedReviewer":{"login":"me"}}]},"timelineItems":{"nodes":[]},"headCommit":{"nodes":[]}}`
 
-// ghAPI is the GitHub the real plugin reads in the scenarios: pull request acme/api#7, open at head c2, and
-// the viewer; any write, or any other read, fails.
-type ghAPI struct{}
+// ghAPI is the GitHub the real plugin reads in the scenarios: pull request acme/api#7, open at the head pub
+// reads, c2 until a push, and the viewer; any write, or any other read, fails.
+type ghAPI struct{ pub *ghPublisher }
+
+// atHead is answer, which reads acme/api#7 at c2, at the head pub reads now.
+func (a ghAPI) atHead(answer string) []byte {
+	head, _ := a.pub.Live(context.Background(), draftsPR, "")
+	return []byte(strings.ReplaceAll(answer, `"c2"`, strconv.Quote(head)))
+}
 
 const draftsBasics = `{"data":{"pr":{"pullRequest":{"number":7,"title":"Add x","state":"OPEN","headRefName":"feat/x","headRefOid":"c2","repository":{"nameWithOwner":"acme/api"}}}}}`
 
-func (ghAPI) Run(_ context.Context, args ...string) ([]byte, error) {
+func (a ghAPI) Run(_ context.Context, args ...string) ([]byte, error) {
 	if len(args) >= 2 && args[0] == "auth" && args[1] == "status" {
 		return nil, nil
 	}
@@ -120,9 +126,9 @@ func (ghAPI) Run(_ context.Context, args ...string) ([]byte, error) {
 		switch {
 		case strings.Contains(q, "mutation"):
 		case strings.Contains(q, "pr: repository"):
-			return []byte(draftsBasics), nil
+			return a.atHead(draftsBasics), nil
 		case fullRead.MatchString(q):
-			return []byte(fmt.Sprintf(`{"data":{"rateLimit":{"cost":1,"remaining":4900,"limit":5000,"resetAt":"2026-10-20T13:00:00Z"},"viewer":{"login":"me"},%q:{"pullRequest":%s}}}`,
+			return a.atHead(fmt.Sprintf(`{"data":{"rateLimit":{"cost":1,"remaining":4900,"limit":5000,"resetAt":"2026-10-20T13:00:00Z"},"viewer":{"login":"me"},%q:{"pullRequest":%s}}}`,
 				fullRead.FindStringSubmatch(q)[1], draftsNode)), nil
 		case strings.Contains(q, "viewer"):
 			return []byte(`{"data":{"viewer":{"login":"me"}}}`), nil
@@ -155,12 +161,20 @@ func newDraftsRig(t *testing.T) *draftsRig {
 	now := func() time.Time { return draftsNow.Add(time.Duration(r.elapsed.Load())) }
 	r.d = cli.ServeForTest(t, cli.TestOptions{Now: now, Publishers: map[unit.ProviderID]port.Effects{unit.GitHub: r.pub},
 		Repos: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}, Git: checkout{},
-		Plugins: map[string]src.Source{string(unit.GitHub): &ghplugin.Plugin{API: apitest.Options(ghAPI{}), GH: ghAPI{}, Git: branches{}, Now: now}}})
+		Plugins: map[string]src.Source{string(unit.GitHub): &ghplugin.Plugin{API: apitest.Options(ghAPI{r.pub}), GH: ghAPI{r.pub}, Git: branches{}, Now: now}}})
 	r.c = r.d.Client()
 	return r
 }
 
 func (r *draftsRig) review() { r.s = r.d.Start(r.t, draftsPR, "review") }
+
+// refresh reads the pull request in full into the store, as a sweep that sees it changed does.
+func (r *draftsRig) refresh() {
+	r.t.Helper()
+	if _, err := r.d.Action(r.ctx, draftsPR, ghplugin.ActionRefresh); err != nil {
+		r.t.Fatalf("reading %s in full: %v", draftsPR.Label(), err)
+	}
+}
 
 // resumed follows the session to the pull request's newest turn, a resume or a round a workflow reopened.
 func (r *draftsRig) resumed() {
@@ -243,6 +257,32 @@ func (r *draftsRig) pinned(id int64) api.Draft {
 		}
 		if time.Now().After(deadline) {
 			r.t.Fatalf("draft %d is served as no open question's: %+v", id, d)
+		}
+	}
+}
+
+// unpinned waits until the daemon serves draft id as pinned by no open question, which it reads again within a
+// second; it fails the test when that never comes.
+func (r *draftsRig) unpinned(id int64) api.Draft {
+	r.t.Helper()
+	for deadline := time.Now().Add(time.Minute); ; time.Sleep(10 * time.Millisecond) {
+		d := r.draft(id)
+		if d.PinnedBy == 0 {
+			return d
+		}
+		if time.Now().After(deadline) {
+			r.t.Fatalf("draft %d is still served as pinned by question %d", id, d.PinnedBy)
+		}
+	}
+}
+
+// questionCloses waits until the pull request has no open question gate, which the daemon closes after the turn
+// that replaces its round is recorded; it fails the test when that never comes.
+func (r *draftsRig) questionCloses() {
+	r.t.Helper()
+	for deadline := time.Now().Add(time.Minute); r.questionOpen(); time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			r.t.Fatal("the question pinning the stale draft is still open")
 		}
 	}
 }
@@ -361,5 +401,29 @@ func (r *draftsRig) sweepPastTheWindow(turns int) dturn.Book {
 		if b := r.book(); len(b.Turns) >= turns || time.Now().After(deadline) {
 			return b
 		}
+	}
+}
+
+// sweepWithoutRound runs the workflows past the plan gate's window, as sweepPastTheWindow does, and fails the test
+// when workflow plans a run on the pull request or its book holds other than turns turns.
+func (r *draftsRig) sweepWithoutRound(workflow string, turns int) {
+	r.t.Helper()
+	for range 2 {
+		if err := r.d.Sweep(r.ctx); err != nil {
+			r.t.Fatalf("sweep: %v", err)
+		}
+		r.advance(2 * time.Minute)
+	}
+	plan, err := r.c.Plan(r.ctx, api.PlanQuery{Unit: draftsPR.String()})
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	for _, it := range plan.Items {
+		if it.Workflow == workflow && (it.Decision == "run" || it.Decision == "pending") {
+			r.t.Fatalf("%s plans a run again: %+v", workflow, it)
+		}
+	}
+	if b := r.book(); len(b.Turns) != turns {
+		r.t.Fatalf("turns %+v, want %d", b.Turns, turns)
 	}
 }

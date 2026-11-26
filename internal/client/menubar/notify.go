@@ -39,21 +39,25 @@ func (c *Controller) draftButtons() []string {
 }
 
 // notify posts the attention of the tasks that are new, and withdraws the
-// notifications of tasks that left the Inbox and of drafts that left the
-// Outbox. A held task's id holds its day, so it is posted once a day.
+// notifications of what no longer waits on the user. A daily one's id holds
+// its day, so it is posted once a day.
 func (c *Controller) notify() {
 	today := c.cfg.Now().Local().Format(time.DateOnly)
 	postedDaily := false
 	live := map[string]bool{}
 	notes := map[string]posted{}
 	buttons := c.draftButtons()
+	mute := c.muteNeeds()
 	for _, e := range c.notifying() {
+		if mute && Category(e.Attention.Category) == api.CategoryNeeds {
+			continue
+		}
 		n, p := notification(e, buttons)
 		if _, dup := notes[n.ID]; dup {
 			continue
 		}
 		notes[n.ID] = p
-		held := Category(e.Attention.Category) == api.CategoryHeld
+		held := e.Attention.Daily
 		c.mu.Lock()
 		inSent, spent := c.sent[n.ID], c.daily[n.ID]
 		c.mu.Unlock()
@@ -121,7 +125,7 @@ func notification(e api.TaskView, draftButtons []string) (Notification, posted) 
 		p.options = m.Options
 	}
 	for _, x := range a.Actions {
-		if Category(a.Category) == api.CategoryOutbox && !slices.Contains(draftButtons, x.ID) {
+		if isDraft(e.ID) && !slices.Contains(draftButtons, x.ID) {
 			continue
 		}
 		if x.Basis != "" {
@@ -133,11 +137,11 @@ func notification(e api.TaskView, draftButtons []string) (Notification, posted) 
 	return n, p
 }
 
-// displayCategory is the category macOS shows n's buttons under: a question
-// keeps its own, any other gets one per set of buttons, since a category
-// shows the buttons last registered for it on every notification it holds.
+// displayCategory is the category macOS shows n's buttons under: one per set
+// of buttons, since a category shows the buttons last registered for it on
+// every notification it holds.
 func displayCategory(cat Category, actions []NotificationAction) Category {
-	if _, question := cat.Record(); question || len(actions) == 0 {
+	if len(actions) == 0 {
 		return cat
 	}
 	h := fnv.New64a()
@@ -160,14 +164,14 @@ func (c *Controller) Respond(ctx context.Context, r Response) {
 	}
 	var err error
 	switch {
-	case r.Action == ActionOpen || r.Action == ActionServed && cat == api.CategoryOutbox && r.Identifier == "open":
+	case r.Action == ActionOpen || r.Action == ActionServed && isDraft(task) && r.Identifier == "open":
 		err = c.open(c.routeOf(cat, task))
 	case r.Action == ActionAnswer:
 		err = c.answer(ctx, r, task)
 	case r.Action == ActionReply:
 		err = c.reply(ctx, r, task)
 	case r.Action == ActionServed:
-		err = c.served(ctx, r, cat, task)
+		err = c.served(ctx, r, task)
 	}
 	if err != nil {
 		c.cfg.Log("%s %s: %v", r.Action, task, err)
@@ -240,9 +244,9 @@ func (c *Controller) reply(ctx context.Context, r Response, task string) error {
 	return nil
 }
 
-func (c *Controller) served(ctx context.Context, r Response, cat Category, task string) error {
+func (c *Controller) served(ctx context.Context, r Response, task string) error {
 	var err error
-	if verb, ok := strings.CutPrefix(r.Identifier, api.TaskActionPrefix); ok && cat == api.CategoryOutbox && !slices.Contains(c.draftButtons(), r.Identifier) {
+	if verb, ok := strings.CutPrefix(r.Identifier, api.TaskActionPrefix); ok && isDraft(task) && !slices.Contains(c.draftButtons(), r.Identifier) {
 		err = notOffered{action: r.Identifier}
 	} else if ok {
 		var args map[string]string
@@ -356,15 +360,15 @@ func (c *Controller) postNote(n Notification) {
 	}
 }
 
-// forgetSent drops the held tasks marked as posted, which the start has
-// just cleared from the notification center, so today's is posted again;
-// today's digest stays posted.
+// forgetSent drops the daily notifications marked as posted, which the start
+// has just cleared from the notification center, so today's are posted
+// again; today's digest stays posted.
 func (c *Controller) forgetSent() {
 	c.mu.Lock()
 	clear(c.sent)
 	n := len(c.daily)
 	for id := range c.daily {
-		if cat, _, _ := api.ParseNotificationID(id); cat == api.CategoryHeld {
+		if cat, _, _ := api.ParseNotificationID(id); cat != api.CategoryDigest {
 			delete(c.daily, id)
 		}
 	}
@@ -434,13 +438,16 @@ func (c *Controller) saveSent(today string) {
 	}
 }
 
-// dailyOn says whether id is a held task's or the digest's of day.
+// dailyOn says whether id is a daily notification's or the digest's of day.
 func dailyOn(id, day string) bool {
 	cat, _, ok := api.ParseNotificationID(id)
-	return ok && (cat == api.CategoryHeld || cat == api.CategoryDigest) && strings.HasSuffix(id, "|"+day)
+	return ok && (cat == api.CategoryNeeds || cat == api.CategoryDigest) && strings.HasSuffix(id, "|"+day)
 }
 
-// mayPost reports whether a notification would be shown, so a held task or
+// isDraft says whether task is a draft's, whose notification offers only draftButtons.
+func isDraft(task string) bool { return strings.HasPrefix(task, api.DraftTaskPrefix) }
+
+// mayPost reports whether a notification would be shown, so a daily one or
 // the digest, announced once a day, is not spent while notifications are
 // off.
 func (c *Controller) mayPost() bool {

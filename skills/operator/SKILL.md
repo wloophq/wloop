@@ -93,8 +93,9 @@ and the menu bar list; among the bundled ones:
 | `snoozed` | asleep until a date, an event or a condition |
 | `outbox` | drafts waiting on approval, and approved ones whose delivery is under way or failed |
 
-The menu bar's badge adds up the views the profile's `[badge]` names, Inbox
-and Needs me by default. A user's `views.toml` changes the bundled views or adds its own.
+The profile's `[badge]` names the views whose tasks the menu bar notifies,
+the daily digest counts and `status` lists, Inbox and Needs me by default;
+the menu bar's title counts Needs you. A user's `views.toml` changes the bundled views or adds its own.
 
 ## Diagnosing
 

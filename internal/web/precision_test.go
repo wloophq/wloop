@@ -30,27 +30,41 @@ func motionCSS(t *testing.T) string {
 
 func TestMotionStopsUnderReducedMotion(t *testing.T) {
 	css := motionCSS(t)
-	if !regexp.MustCompile(`@media \(prefers-reduced-motion: reduce\)\s*\{\s*:root\s*\{\s*--motion-fast:\s*0ms;\s*\}`).MatchString(css) {
-		t.Error("the token region does not set --motion-fast to 0ms under prefers-reduced-motion: reduce")
+	still, _, _ := strings.Cut(css[strings.Index(css, "@media (prefers-reduced-motion: reduce)")+1:], "}")
+	var durations, eases []string
+	for _, m := range designTokens(t).Motion.Tokens {
+		if strings.HasSuffix(m.Name, "-ease") {
+			eases = append(eases, "var(--"+m.Name+")")
+			continue
+		}
+		durations = append(durations, "var(--"+m.Name+")")
+		if !regexp.MustCompile(`--` + m.Name + `:\s*0ms;`).MatchString(still) {
+			t.Errorf("the token region does not set --%s to 0ms under prefers-reduced-motion: reduce", m.Name)
+		}
+	}
+	reads := func(part string, tokens []string) bool {
+		return slices.ContainsFunc(tokens, func(tok string) bool { return strings.Contains(part, tok) })
 	}
 	if strings.Contains(css, "@keyframes") || regexp.MustCompile(`(^|[;{\s])animation(-[a-z-]+)?\s*:`).MatchString(css) {
-		t.Error("a stylesheet declares an animation; motion is a transition on the motion token, in answer to an action")
+		t.Error("a stylesheet declares an animation; motion is a transition on a motion token, in answer to an action")
 	}
 	decl := regexp.MustCompile(`(?:^|;)\s*transition(-[a-z-]+)?\s*:([^;]*)`)
 	moving := map[string]bool{}
 	for _, r := range cssRules(css) {
 		for _, m := range decl.FindAllStringSubmatch(r[1], -1) {
 			for _, part := range strings.Split(m[2], ",") {
-				if m[1] != "" || !strings.Contains(part, "var(--motion-fast)") || !strings.Contains(part, "var(--motion-ease)") {
-					t.Errorf("%s: transition%s %q does not read var(--motion-fast) var(--motion-ease)", r[0], m[1], strings.TrimSpace(part))
+				if m[1] != "" || !reads(part, durations) || !reads(part, eases) {
+					t.Errorf("%s: transition%s %q does not read a motion duration and a motion easing", r[0], m[1], strings.TrimSpace(part))
 				}
 			}
 			moving[r[0]] = true
 		}
 	}
 	// The rules that move answer an action: opening the detail or the palette, resolving a decision card,
-	// and hover, focus or press on a control. A class live data toggles moves nothing.
-	want := []string{"#detail", ".pal-back", ".d-gate, .d-draft", ".outbox .d-draft", ".find", ".views .nav", ".opt", ".tab", ".seg button", ".tools .pill"}
+	// and hover, focus or press on a control. The one exception is the float's peek, whose arrival and leave
+	// announce a decision that just arrived, once per burst. Any other class live data toggles moves nothing.
+	want := []string{"#detail", ".pal-back", ".d-gate, .d-draft", ".outbox .d-draft", ".find", ".views .nav", ".opt", ".tab", ".seg button", ".tools .pill",
+		".fl-flyout", `.fl-flyout[data-state="leaving"]`}
 	var got []string
 	for s := range moving {
 		got = append(got, s)
@@ -65,9 +79,51 @@ func TestMotionStopsUnderReducedMotion(t *testing.T) {
 			t.Errorf("%s moves: only an action's answer moves, add it here once it answers one", s)
 		}
 	}
-	for _, s := range []string{"#detail", ".pal-back"} {
+	for _, s := range []string{"#detail", ".pal-back", ".fl-flyout"} {
 		if !regexp.MustCompile(`@starting-style\s*\{\s*` + regexp.QuoteMeta(s) + `\s*\{`).MatchString(css) {
 			t.Errorf("%s has no @starting-style to open from", s)
 		}
+	}
+}
+
+// The float's window is sized to what its page draws, so the page must not
+// draw at the window's size: a root bounded by the viewport measures one
+// pixel past it on each resize and grows the window a pixel a frame.
+func TestTheFloatsRootSizesToItsContentNotToItsWindow(t *testing.T) {
+	b, err := files.ReadFile("static/app.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range cssRules(string(b)) {
+		if strings.TrimSpace(r[0]) == ".fl" {
+			if !regexp.MustCompile(`(^|;)\s*width:\s*max-content\s*(;|$)`).MatchString(r[1]) {
+				t.Fatalf(".fl is %q, want width: max-content", r[1])
+			}
+			return
+		}
+	}
+	t.Fatal("no .fl rule")
+}
+
+// The peek's card moves toward and away from the tab on whichever side of
+// the panel's window the host put it.
+func TestThePeekMovesFromTheTabsSide(t *testing.T) {
+	b, err := files.ReadFile("static/app.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{
+		`.fl[data-side="left"] .fl-flyout`:  "--fl-peek-x: 1",
+		`.fl[data-side="right"] .fl-flyout`: "--fl-peek-x: -1",
+		`.fl[data-side="above"] .fl-flyout`: "--fl-peek-y: 1",
+		`.fl[data-side="below"] .fl-flyout`: "--fl-peek-y: -1",
+	}
+	for _, r := range cssRules(string(b)) {
+		if decl, ok := want[strings.TrimSpace(r[0])]; ok && strings.Contains(r[1], decl) {
+			delete(want, strings.TrimSpace(r[0]))
+		}
+	}
+	for sel, decl := range want {
+		t.Errorf("no %s { %s }", sel, decl)
 	}
 }

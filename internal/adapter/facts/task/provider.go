@@ -65,7 +65,8 @@ type Deps struct {
 	Items Items
 	// Cards are the facts of the tasks' units; nil: none.
 	Cards coretasks.Facts
-	// Drafts are read for task.settled_at; nil: always zero.
+	// Drafts are read for task.settled_at and for the failed deliveries task.decisions counts; nil: always zero,
+	// and none.
 	Drafts Drafts
 	// Enabled says whether a provider's plugin is enabled; nil: every one is.
 	Enabled  func(unit.ProviderID) bool
@@ -99,6 +100,9 @@ type Deps struct {
 	// Decisions is how the profile maps gates, situations and signals to decision kinds, for task.decisions;
 	// nil: none.
 	Decisions func() decision.Map
+	// Pinned are the drafts an open message pins (gates.Service.Pinned), whose draft gates task.decisions leaves
+	// out; nil: none.
+	Pinned func(ctx context.Context) (map[int64]int64, error)
 	// Extraction is when the oldest message of units still waiting to be extracted arrived, as their plugins'
 	// extraction health says, for task.extraction_lag; zero when none waits, and nil none ever does.
 	Extraction func(ctx context.Context, units []unit.Unit) (time.Time, error)
@@ -390,7 +394,11 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		sources = nil
 	}
 	if p.d.Decisions != nil {
-		if found := p.d.Decisions().Of(gs, sources); len(found) > 0 {
+		w, err := p.waiting(ctx, e.ID, gs)
+		if err != nil {
+			return nil, err
+		}
+		if found := w.Of(p.d.Decisions(), e.ID, sources); len(found) > 0 {
 			f["task.decisions"], f["task.decision_since"] = decision.Names(found), found[0].Since
 		}
 	}
@@ -812,18 +820,24 @@ func (p *Provider) gates(ctx context.Context, id task.ID) ([]gate.Gate, error) {
 		return nil, nil
 	}
 	if _, ok := coretasks.PassOf(ctx); ok {
-		open, err := coretasks.Once(ctx, passGates, func() (map[task.ID][]gate.Gate, error) {
-			gs, err := p.d.Gates.Where(ctx, gates.Query{Statuses: []gate.Status{gate.Open}})
-			out := map[task.ID][]gate.Gate{}
-			for _, g := range gs {
-				out[g.Task] = append(out[g.Task], g)
-			}
-			return out, err
-		})
+		open, err := outbox.OpenGates(ctx, p.d.Gates.Where)
 		return open[id], err
 	}
 	gs, err := p.d.Gates.OfTask(ctx, id)
 	return slices.DeleteFunc(gs, func(g gate.Gate) bool { return g.Status != gate.Open }), err
+}
+
+// waiting is what the gates and the drafts make task id, whose open gates are open, wait on; in a pass, read once
+// for every task.
+func (p *Provider) waiting(ctx context.Context, id task.ID, open []gate.Gate) (outbox.Waiting, error) {
+	var r outbox.WaitingReads
+	if p.d.Gates != nil {
+		r.Where, r.Pinned = p.d.Gates.Where, p.d.Pinned
+		if p.d.Drafts != nil {
+			r.Drafts = p.d.Drafts
+		}
+	}
+	return outbox.ReadWaitingOf(ctx, r, id, open)
 }
 
 // wake is task id's wake; in a pass, every task's is read once.
@@ -835,7 +849,6 @@ func (p *Provider) wake(ctx context.Context, id task.ID) (wake.Wake, bool, error
 const (
 	passOpenTurns = "facts.open_turns"
 	passTurns     = "facts.turns"
-	passGates     = "facts.gates"
 	passSettled   = "facts.settled."
 	passTask      = "facts.task."
 )

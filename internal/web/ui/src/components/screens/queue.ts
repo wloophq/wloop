@@ -2,6 +2,7 @@ import { t } from "../../lib/i18n.svelte";
 import { readRoute, unitPath, HOME, type Unit } from "../../lib/routes";
 import { safeURL, type J } from "../../lib/util";
 import { act } from "../../state/actions.svelte";
+import { taskAct } from "../../state/verbs";
 import { setNotice } from "../../state/actions.svelte";
 import { getJSON } from "../../state/api";
 import { queueLoad, queueShown } from "../../state/loaders.svelte";
@@ -53,11 +54,16 @@ function sourceLink(e: J): string {
   return (c && safeURL(c.card.link)) || "";
 }
 
+// unitLink is the link of unit u of task e from its card, else the task's first unit's; empty when no card links it.
+export function unitLink(e: J, u: Unit | null): string {
+  const card = ((e && e.cards) || []).find((x: J) => x.card && u && sameUnit(x.card.unit, u));
+  return (card && safeURL(card.card.link)) || sourceLink(e);
+}
+
 // openTaskSource opens unit u of task e at its source, else the task's first unit's; the unit's detail when no
 // card links it.
 export function openTaskSource(e: J, u: Unit | null): void {
-  const card = ((e && e.cards) || []).find((x: J) => x.card && u && sameUnit(x.card.unit, u));
-  const link = (card && safeURL(card.card.link)) || sourceLink(e);
+  const link = unitLink(e, u);
   if (link) queueDeps.open(link);
   else if (u) writeHash({ pr: u.provider + ":" + u.key, task: "" });
 }
@@ -68,9 +74,29 @@ export function queueDraftAction(item: J, key: string): DraftAction | null {
   return draftActions(item.task, queueDraftOf(item.gate)).find((a) => a.key === key) || null;
 }
 
+// QueueRefused is a primary the item's card turns off, as its card offers it.
+export class QueueRefused extends Error {
+  constructor(public action: DraftAction) {
+    super(t("{action}: {reason}", { action: action.label, reason: action.reason || action.title || "" }));
+  }
+}
+
 // queueRefused says why the card refuses action a.
 function queueRefused(a: DraftAction): void {
-  setNotice(t("{action}: {reason}", { action: a.label, reason: a.reason || a.title || "" }), true);
+  setNotice(new QueueRefused(a).message, true);
+}
+
+// queueResolve resolves item's gate with intent as its card does: a draft's primary through the card's own action,
+// refusing one the card turns off (a stale draft) with QueueRefused, any other intent of a draft's at the rev it
+// shows, and any other gate's with option.
+export async function queueResolve(item: J, intent: string, option?: string): Promise<unknown> {
+  const g = item.gate;
+  const p = item.primary || {};
+  if (!queueDraft(g)) return resolveGate(item.task, g, intent, option);
+  const card = intent === p.id ? queueDraftAction(item, "queue:primary") : null;
+  if (card && !card.enabled) throw new QueueRefused(card);
+  if (card) return card.run();
+  return resolveDraft(queueDraftOf(g), intent, p.label || intent, {});
 }
 
 // queueAct runs item's primary: its gate's intent as the card does, its unit's catalog action, its unit's source,
@@ -82,23 +108,26 @@ export async function queueAct(item: J): Promise<void> {
   queueState.busy = true;
   queueState.error = "";
   try {
-    const g = item.gate;
-    const card = p.kind === "gate" && queueDraft(g) ? queueDraftAction(item, "queue:primary") : null;
-    if (card && !card.enabled) return queueRefused(card);
-    if (card) await card.run();
-    else if (p.kind === "gate" && queueDraft(g)) await resolveDraft(queueDraftOf(g), p.id, p.label || p.id, {});
-    else if (p.kind === "gate") await resolveGate(item.task, g, p.id);
+    if (p.kind === "gate") await queueResolve(item, p.id);
     else if (p.kind === "action") {
       const u = queueUnit(item);
       if (u && (await queueDeps.act(u, p.id)) === false) throw new Error(t("{action} failed", { action: p.id }));
     } else if (p.kind === "open") openTaskSource(item.task, queueUnit(item));
     else if (p.kind === "task") writeHash({ task: item.task.id, pr: "" });
+    else if (p.kind === "verb") await queueVerb(item);
   } catch (err) {
+    if (err instanceof QueueRefused) return queueRefused(err.action);
     queueState.error = t("{action} failed: {error}", { action: p.label || p.id, error: (err as Error).message });
   } finally {
     queueState.busy = false;
   }
-  if (p.kind === "gate" || p.kind === "action") await queueLoad(queueRoute());
+  if (p.kind === "gate" || p.kind === "action" || p.kind === "verb") await queueLoad(queueRoute());
+}
+
+// queueVerb runs item's verb primary, a failed delivery's retry, on the task it names with its args.
+export async function queueVerb(item: J): Promise<void> {
+  const p = item.primary || {};
+  if (!(await taskAct({ id: p.task, title: item.task.title }, p.id, p.args || {}))) throw new Error(t("{action} failed", { action: p.label || p.id }));
 }
 
 // queueDraftKey runs the action of item's draft card that key names, then reloads the queue; false when the card

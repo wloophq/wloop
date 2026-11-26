@@ -13,7 +13,7 @@ import (
 )
 
 // handleDigest serves the daily digest of the query parameter day: the counters, and the tasks of the views the
-// profile's badge counts that moved since the previous digest, at notifications.digest_at local time (midnight
+// profile's badge names that moved since the previous digest, at notifications.digest_at local time (midnight
 // when off).
 func (s *Server) handleDigest(w http.ResponseWriter, r *http.Request) {
 	g, ok := s.tasks(w)
@@ -34,11 +34,18 @@ func (s *Server) handleDigest(w http.ResponseWriter, r *http.Request) {
 	d := api.Digest{Day: day, Title: s.notice(builtin.NoticeDigestTitle, nil)}
 	def := s.loaded().Views
 	var counts []string
-	c, err := g.Counts(ctx, "")
+	snap, err := g.Snapshot(ctx)
 	if err != nil {
 		writeTasksError(w, err)
 		return
 	}
+	ctx = snap.Within(ctx)
+	c, err := snap.Counts(ctx, "")
+	if err != nil {
+		writeTasksError(w, err)
+		return
+	}
+	s.queueCounted(ctx, g, &c, nil)
 	d.Counts = wireCounters(c)
 	for _, id := range def.Badge {
 		v, _ := def.View(id)

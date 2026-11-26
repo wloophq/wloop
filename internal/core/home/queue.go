@@ -6,6 +6,7 @@ import (
 
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/decision"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -15,6 +16,7 @@ const (
 	ActionGate   = "gate"   // resolve the item's gate with the intent ID
 	ActionAction = "action" // run the catalog action ID on the item's unit
 	ActionOpen   = "open"   // open the item's unit at its source
+	ActionRetry  = "retry"  // retry the delivery of the draft of the item's gate, which a person approved already
 )
 
 // Queue is a decision kind's items, the oldest decision first, and View, the view its items are drawn as rows of.
@@ -26,12 +28,15 @@ type Queue struct {
 }
 
 // Item is one decision: a task's open gate (Found.Gate), or a state of one of its units (Found.Unit, with
-// Situation how the unit's situation reads).
+// Situation how the unit's situation reads). Word is what one such decision is, as the counters word it, and
+// Tone its kind's.
 type Item struct {
 	Task      task.Task
 	Found     decision.Found
 	Situation string
 	Primary   Action
+	Word      string
+	Tone      string
 }
 
 // Action is an item's primary action.
@@ -47,12 +52,8 @@ func (s Service) Queue(ctx context.Context, k decision.Kind, keep coretasks.Keep
 		return Queue{}, err
 	}
 	q := Queue{Kind: k, View: kw.View, Title: kw.Queue, Empty: kw.Empty}
-	ds, err := s.decisions(ctx, k, sets[kw.View])
-	if err != nil {
+	if q.Items, err = s.items(ctx, k, sets[kw.View]); err != nil {
 		return Queue{}, err
-	}
-	for _, d := range ds {
-		q.Items = append(q.Items, s.item(kw, d.task, d.found))
 	}
 	slices.SortStableFunc(q.Items, func(a, b Item) int { return a.Found.Since.Compare(b.Found.Since) })
 	if p, ok := onePlugin(q.Items); ok {
@@ -64,14 +65,28 @@ func (s Service) Queue(ctx context.Context, k decision.Kind, keep coretasks.Keep
 	return q, nil
 }
 
-type taskDecision struct {
-	task  task.Task
-	found decision.Found
+// QueueAll is the items of every kind that keep takes (every one when nil): the kinds in order, a kind order
+// leaves out after the listed ones, each kind's items as its Queue lists them.
+func (s Service) QueueAll(ctx context.Context, order []decision.Kind, sort decision.Sort, keep coretasks.Keep) ([]Item, error) {
+	var out []Item
+	for _, k := range decision.Ordered(order) {
+		q, err := s.Queue(ctx, k, keep)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, q.Items...)
+	}
+	if sort == decision.SortNewest {
+		slices.SortStableFunc(out, func(a, b Item) int { return b.Found.Since.Compare(a.Found.Since) })
+	}
+	return out, nil
 }
 
-// decisions are the decisions of kind k ts wait on, in ts's order: what a queue lists and its home counter counts.
-func (s Service) decisions(ctx context.Context, k decision.Kind, ts []task.Task) ([]taskDecision, error) {
-	var out []taskDecision
+// items are the items of the decisions of kind k ts wait on that Serves keeps, in ts's order: what a queue lists
+// and its home counter counts.
+func (s Service) items(ctx context.Context, k decision.Kind, ts []task.Task) ([]Item, error) {
+	kw := s.Words.Kind(k)
+	var out []Item
 	for _, e := range ts {
 		found, err := s.Decisions.Of(ctx, e)
 		if err != nil {
@@ -79,15 +94,22 @@ func (s Service) decisions(ctx context.Context, k decision.Kind, ts []task.Task)
 		}
 		for _, f := range found {
 			if f.Kind == k {
-				out = append(out, taskDecision{e, f})
+				out = append(out, s.item(kw, e, f))
 			}
 		}
 	}
-	return out, nil
+	if s.Serves == nil || len(out) == 0 {
+		return out, nil
+	}
+	return s.Serves.Servable(ctx, out)
 }
 
 func (s Service) item(kw KindWords, e task.Task, f decision.Found) Item {
-	it := Item{Task: e, Found: f}
+	it := Item{Task: e, Found: f, Word: s.noun(f.Unit.Provider, kw.Noun).For(s.Words.Form(1)), Tone: kw.Tone}
+	if f.Gate != nil && f.Gate.Status != gate.Open {
+		it.Primary = Action{Kind: ActionRetry}
+		return it
+	}
 	if f.Gate != nil {
 		it.Primary = Action{Kind: ActionGate, ID: primaryIntent(kw.Primary, f.Gate.Intents)}
 		return it

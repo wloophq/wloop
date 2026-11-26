@@ -114,3 +114,36 @@ func TestATasksPlacementIsItsPlacementOverride(t *testing.T) {
 		}
 	}
 }
+
+// countedFacts are endedFacts that count their reads.
+type countedFacts struct {
+	endedFacts
+	reads *int
+}
+
+func (f countedFacts) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, error) {
+	*f.reads++
+	return f.endedFacts.Facts(ctx, u)
+}
+
+func TestAPassReadsAUnitsPluginFactsOnceForItsEndAndPlacement(t *testing.T) {
+	post := slackThreadUnit("T000AAA", "C000AAA", "1.1")
+	var reads int
+	mods := []pluginModule{{ID: slackPlugin, Facts: countedFacts{endedFacts{fact: "slack.ended", ended: map[unit.Unit]bool{post: true}}, &reads}}}
+	ended, repo := unitsEnded(mods), unitsPlacement(mods, config.Defaults, nil)
+	ctx := coretasks.WithPass(context.Background(), &coretasks.Pass{})
+	for range 2 {
+		if got, err := ended(ctx, post); err != nil || !got {
+			t.Fatalf("ended %t, %v", got, err)
+		}
+		if _, err := repo(ctx, post); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if reads != 1 {
+		t.Errorf("%d reads of a unit's plugin facts for its end and placement in a pass, want 1", reads)
+	}
+	if _, err := ended(context.Background(), post); err != nil || reads != 2 {
+		t.Errorf("outside a pass: %d reads, %v, want a read", reads, err)
+	}
+}

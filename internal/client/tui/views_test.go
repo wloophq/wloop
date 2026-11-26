@@ -113,7 +113,7 @@ func viewTasks() map[string][]api.TaskView {
 
 func viewCounters() api.Counters {
 	return api.Counters{Views: map[string]int{"focus": 1, "inbox": 2, "outbox": 1, "next": 4, "waiting": 4, "projects": 0, "someday": 0, "logbook": 12},
-		Areas: map[string]int{}, Contexts: map[string]int{}, Badge: 3}
+		Areas: map[string]int{}, Contexts: map[string]int{}}
 }
 
 func TestTUIListsOnlyRailViews(t *testing.T) {
@@ -618,7 +618,7 @@ func TestPaletteAndHelp(t *testing.T) {
 	}
 
 	press(m, Key{Rune: '?'})
-	screen = squash(screenOf(m, 120, 80))
+	screen = squash(screenOf(m, 120, 90))
 	for _, want := range []string{"Keys", "Everywhere", "g i Inbox", "On the selection", "x to Next", "In a question", "1 the gate's intent 1"} {
 		if !strings.Contains(screen, want) {
 			t.Errorf("help lacks %q:\n%s", want, screen)

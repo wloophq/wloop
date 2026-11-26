@@ -2,11 +2,13 @@ package cli
 
 import (
 	"context"
+	"maps"
 	"slices"
 	"sync"
 
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -31,7 +33,16 @@ func (b openPRBooks) BookOf(ctx context.Context, k turns.Key) (turn.Book, bool, 
 	return b.books.BookOf(ctx, k)
 }
 
+// Books are the books of units; in a page, the book of one unit is read once.
 func (b openPRBooks) Books(ctx context.Context, units ...unit.Unit) (map[unit.Unit]turn.Book, error) {
+	if len(units) != 1 {
+		return b.read(ctx, units...)
+	}
+	books, err := coretasks.PageOnce(ctx, "books."+units[0].String(), func() (map[unit.Unit]turn.Book, error) { return b.read(ctx, units...) })
+	return maps.Clone(books), err
+}
+
+func (b openPRBooks) read(ctx context.Context, units ...unit.Unit) (map[unit.Unit]turn.Book, error) {
 	books, err := b.books.Books(ctx, units...)
 	if err != nil {
 		return nil, err

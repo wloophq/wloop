@@ -259,7 +259,7 @@ What needs you, by view, and the tracked pull requests.
 {{command}} status [--color auto|always|never]
 ```
 
-List the tasks of the views the badge counts, such as Inbox and Needs me, then the pull requests you track. Piped, it prints one tab-separated line per task or pull request and view.
+List the tasks of the views the badge names, such as Inbox and Needs me, then the pull requests you track. Piped, it prints one tab-separated line per task or pull request and view.
 
 | Flag | Description |
 | --- | --- |

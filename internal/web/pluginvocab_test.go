@@ -49,7 +49,7 @@ var sourceDebts = map[string]map[string]int{
 	"lib/catalog.ts":                         {"review": 1},
 	"lib/lens.ts":                            {"age": 1, "all": 1, "author": 2, "due": 6, "is": 5, "lane": 1, "tag": 4, "waits-on": 1, "where": 1},
 	"lib/palette.ts":                         {"merged": 1},
-	"lib/routes.ts":                          {"dash": 1, "explore": 1},
+	"lib/routes.ts":                          {"dash": 1, "explore": 1, "kind": 1},
 	"lib/tasks.ts":                           {"draft": 1},
 	"state/loaders.svelte.ts":                {"closed": 1, "review": 1},
 	"state/sync.svelte.ts":                   {"all": 1, "closed": 1},

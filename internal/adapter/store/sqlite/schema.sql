@@ -96,6 +96,7 @@ CREATE TABLE turns (
 );
 CREATE INDEX turns_unit ON turns(provider, unit_key, seq);
 CREATE INDEX turns_sent_at ON turns(sent_at);
+CREATE INDEX turns_ended_at ON turns(ended_at);
 CREATE INDEX turns_turn_id ON turns(turn_id, seq);
 CREATE INDEX turns_session ON turns(session, seq);
 CREATE INDEX turns_sent_to ON turns(sent_to, seq);

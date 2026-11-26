@@ -85,3 +85,27 @@ func TestOpenCockpitShowsTheHomeInTheWindow(t *testing.T) {
 	it.Action()
 	waitFor(t, func() bool { mu.Lock(); defer mu.Unlock(); return slices.Equal(shown, []string{window.HomeRoute}) })
 }
+
+// The floating widget shows at launch only when it is on; it is off unless
+// the configuration turns it on.
+func TestTheFloatShowsAtLaunchOnlyWhenOn(t *testing.T) {
+	for _, on := range []bool{false, true} {
+		r := newRig(t)
+		var mu sync.Mutex
+		shown := 0
+		r.c.cfg.Float = on
+		r.c.cfg.ShowFloat = func() error { mu.Lock(); shown++; mu.Unlock(); return nil }
+		ctx, cancel := context.WithCancel(context.Background())
+		done := make(chan error, 1)
+		go func() { done <- r.c.Run(ctx) }()
+		waitFor(t, func() bool { r.d.mu.Lock(); defer r.d.mu.Unlock(); return len(r.d.app) > 0 })
+		cancel()
+		<-done
+		mu.Lock()
+		got := shown
+		mu.Unlock()
+		if want := map[bool]int{false: 0, true: 1}[on]; got != want {
+			t.Errorf("float on %v: shown %d times, want %d", on, got, want)
+		}
+	}
+}

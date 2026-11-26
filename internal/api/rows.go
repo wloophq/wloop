@@ -46,6 +46,7 @@ func (into *Change) Merge(c Change) {
 	into.Health = into.Health || c.Health
 	into.Plan = into.Plan || c.Plan
 	into.Gates = into.Gates || c.Gates
+	into.Turns = into.Turns || c.Turns
 	into.Notices = append(into.Notices, c.Notices...)
 	if c.Counters != nil {
 		into.Counters = c.Counters

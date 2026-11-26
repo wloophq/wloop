@@ -74,9 +74,24 @@ type fakeDaemon struct {
 	digests     map[string]api.Digest
 	digestDays  []string
 	digestErr   error
-	strings     *api.Strings // nil: English
+	digestHeld  chan struct{} // Digest waits on it when set
+	strings     *api.Strings  // nil: English
 	stringsErr  error
 	stringsN    int
+	queue       *api.Queue // nil: Needs you with no item
+	queueErr    error      // QueueAll answers it
+}
+
+func (f *fakeDaemon) QueueAll(context.Context, string) (api.Queue, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := cmp.Or(f.err, f.queueErr); err != nil {
+		return api.Queue{}, err
+	}
+	if f.queue == nil {
+		return api.Queue{Title: "Needs you", View: "needs-you", Items: []api.QueueItem{}}, nil
+	}
+	return *f.queue, nil
 }
 
 func (f *fakeDaemon) Strings(context.Context) (api.Strings, error) {
@@ -165,6 +180,12 @@ func (f *fakeDaemon) TaskDo(_ context.Context, id, verb string, req api.TaskRequ
 }
 
 func (f *fakeDaemon) Digest(_ context.Context, day string) (api.Digest, error) {
+	f.mu.Lock()
+	held := f.digestHeld
+	f.mu.Unlock()
+	if held != nil {
+		<-held
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.digestDays = append(f.digestDays, day)
@@ -638,7 +659,7 @@ func TestMenuShowsBeforeThePermissionIsAnswered(t *testing.T) {
 	r := newRig(t)
 	r.notes.block = make(chan struct{})
 	r.d.rows["loop"] = []api.Row{reviewRow(2)}
-	r.d.counters = api.Counters{Badge: 1}
+	r.d.queue = needsYou(plainTask(1))
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- r.c.Run(ctx) }()

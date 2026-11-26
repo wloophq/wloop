@@ -107,6 +107,7 @@ func FactsOf(in Input) []src.Fact {
 	add("pr.draft", src.Bool(p.IsDraft))
 	add("pr.changed_files", src.Int(int64(p.ChangedFiles)))
 	add("pr.head", src.String(p.HeadOid))
+	add("pr.commits", src.List(commits(in)...))
 	if p.Mergeable == "CONFLICTING" && !p.MergeableAt.IsZero() {
 		add("pr.conflicting_for", src.Since(p.MergeableAt))
 	} else {
@@ -141,6 +142,42 @@ func FactsOf(in Input) []src.Fact {
 		add("pr.silent_days", src.Int(int64(calendarDays(at, in.Now, in.Location))))
 	}
 	return out
+}
+
+// commits are the oids of in's stored pushes, then those of its full read's commits not among them, merges
+// included: the commits the store has read on the pull request, up to its stored head. A push or a full read's
+// commit after the stored head is left out: the store has not recorded the head moving to it yet.
+func commits(in Input) []string {
+	var pushes, read []string
+	for _, e := range in.Events {
+		if e.Kind == pr.KindPush && e.Key != "" {
+			pushes = append(pushes, e.Key)
+		}
+	}
+	if in.Detail != nil {
+		for _, c := range in.Detail.Commits {
+			if c.Oid != "" {
+				read = append(read, c.Oid)
+			}
+		}
+	}
+	out := []string{}
+	for _, oid := range slices.Concat(upTo(pushes, in.PR.HeadOid), upTo(read, in.PR.HeadOid)) {
+		if !slices.Contains(out, oid) {
+			out = append(out, oid)
+		}
+	}
+	return out
+}
+
+// upTo are oids through the last that is head; all of them when none is.
+func upTo(oids []string, head string) []string {
+	for i := len(oids) - 1; i >= 0; i-- {
+		if oids[i] == head {
+			return oids[:i+1]
+		}
+	}
+	return oids
 }
 
 // stale says the stored detail of an open pull request is older than the

@@ -7,6 +7,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -234,5 +235,89 @@ func TestHomeNamesNoProvider(t *testing.T) {
 				return true
 			})
 		}
+	}
+}
+
+func TestAQueueSectionListsTheQueueOfEveryKindInOrder(t *testing.T) {
+	w := words()
+	w.profile.Order = []decision.Kind{decision.LastStep, decision.Answer}
+	w.profile.Sections = []home.Section{{ID: "needs-you", View: "needs-you", Label: "Needs you", Limit: 2, Queue: true}}
+	asked, stuck := tasks("a", 2), tasks("l", 1)
+	lists := &fakeLists{sets: map[task.View][]task.Task{"decide-answer": asked, "decide-last-step": stuck, "needs-you": tasks("x", 9)}}
+	d := fakeDecisions{"a-0": foundAt(decision.Answer, "", t0.Add(time.Hour)), "a-1": foundAt(decision.Answer, "", t0), "l-0": found(decision.LastStep, "alpha")}
+	h, err := service(lists, d, w).Home(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := h.Sections[0]
+	if len(s.Tasks) != 0 || s.Total != 3 || len(s.Items) != 2 || s.Items[0].Task.ID != "l-0" || s.Items[1].Task.ID != "a-1" {
+		t.Fatalf("section %+v, want the first two items of the queue of every kind, last-step first, then the oldest question", s)
+	}
+}
+
+func TestAQueueCounterCountsTheQueuesItemsReadOnceWithItsSection(t *testing.T) {
+	w := words()
+	w.profile.Order = []decision.Kind{decision.Answer, decision.LastStep}
+	w.profile.Counters = []home.Counter{{ID: "needs-you", View: "needs-you", Queue: true, Noun: plural("task", "tasks"), Clause: plural("{counter} needs you", "{counter} need you")}}
+	w.profile.Sections = []home.Section{{ID: "needs-you", View: "needs-you", Label: "Needs you", Limit: 1, Queue: true}}
+	twice := tasks("a", 1)
+	lists := &fakeLists{sets: map[task.View][]task.Task{"decide-answer": twice, "needs-you": tasks("x", 9)}}
+	d := fakeDecisions{"a-0": append(foundAt(decision.Answer, "", t0), foundAt(decision.Answer, "", t0.Add(time.Hour))...)}
+	h, err := service(lists, d, w).Home(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c := h.Counts[0]; c.N != 2 || c.Label != "2 tasks" || h.Sections[0].Total != 2 {
+		t.Fatalf("counter %+v, section total %d: want both to count the queue's two items", c, h.Sections[0].Total)
+	}
+	if n := len(lists.asked); n != len(decision.Ordered(w.profile.Order)) {
+		t.Fatalf("Sets called %d times, want once per kind of one queue read and no read of the queue's own view", n)
+	}
+}
+
+func TestTheQueueOfEveryKindSortedNewestListsItsItemsNewestFirstAcrossKinds(t *testing.T) {
+	w := words()
+	w.profile.Order = []decision.Kind{decision.LastStep, decision.Answer}
+	w.profile.Sort = decision.SortNewest
+	w.profile.Sections = []home.Section{{ID: "needs-you", View: "needs-you", Label: "Needs you", Limit: 3, Queue: true}}
+	lists := &fakeLists{sets: map[task.View][]task.Task{"decide-answer": tasks("a", 2), "decide-last-step": tasks("l", 1), "needs-you": tasks("x", 9)}}
+	d := fakeDecisions{"a-0": foundAt(decision.Answer, "", t0.Add(2*time.Hour)), "a-1": foundAt(decision.Answer, "", t0), "l-0": foundAt(decision.LastStep, "alpha", t0.Add(time.Hour))}
+	h, err := service(lists, d, w).Home(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, it := range h.Sections[0].Items {
+		got = append(got, string(it.Task.ID))
+	}
+	if !slices.Equal(got, []string{"a-0", "l-0", "a-1"}) {
+		t.Fatalf("items %v, want the newest decision first whatever its kind", got)
+	}
+}
+
+// dropping serves every item but those of task id.
+type dropping task.ID
+
+func (d dropping) Servable(_ context.Context, items []home.Item) ([]home.Item, error) {
+	return slices.DeleteFunc(slices.Clone(items), func(it home.Item) bool { return it.Task.ID == task.ID(d) }), nil
+}
+
+func TestEveryCountOfTheHomeCountsTheItemsItServes(t *testing.T) {
+	w := words()
+	w.profile.Counters = []home.Counter{{ID: "answer", Kind: decision.Answer}, {ID: "needs-you", View: "needs-you", Queue: true, Noun: plural("thing", "things")}}
+	w.profile.Sections = []home.Section{{ID: "needs-you", View: "needs-you", Limit: 5, Queue: true}}
+	d := fakeDecisions{"q-0": found(decision.Answer, "alpha"), "q-1": found(decision.Answer, "alpha")}
+	s := service(&fakeLists{sets: map[task.View][]task.Task{"decide-answer": tasks("q", 2)}}, d, w)
+	s.Serves = dropping("q-1")
+	h, err := s.Home(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if kind, all, sec := h.Counts[0], h.Counts[1].N, h.Sections[0]; kind.N != 1 || len(kind.Nouns) != 1 || kind.Nouns[0].N != 1 || all != 1 || sec.Total != 1 || len(sec.Items) != 1 {
+		t.Fatalf("answer counter %+v, queue counter %d, section %d of %d items; want each to count the 1 item served", kind, all, len(sec.Items), sec.Total)
+	}
+	q, err := s.Queue(context.Background(), decision.Answer, nil)
+	if err != nil || len(q.Items) != 1 || q.Items[0].Task.ID != "q-0" {
+		t.Fatalf("queue %+v, %v; want the served item alone", q.Items, err)
 	}
 }

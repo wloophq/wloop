@@ -348,7 +348,7 @@ func TestRegisteredViewSource(t *testing.T) {
 	if es, err := r.svc.Tasks(ctx, task.Query{View: "drafts"}); err != nil || len(es) != 0 {
 		t.Fatalf("outbox without a source: %v %v", es, err)
 	}
-	if c, err := r.svc.Counts(ctx, ""); err != nil || c.Views["drafts"] != 0 || c.Badge != 1 {
+	if c, err := r.svc.Counts(ctx, ""); err != nil || c.Views["drafts"] != 0 || c.Views["inbox"] != 1 {
 		t.Fatalf("counts without a source: %+v %v", c, err)
 	}
 	if _, err := r.svc.Task(ctx, "draft:7"); !errors.Is(err, coretasks.ErrNoTask) {
@@ -365,7 +365,7 @@ func TestRegisteredViewSource(t *testing.T) {
 	if _, err := r.svc.Task(ctx, "draft:9"); !errors.Is(err, coretasks.ErrNoTask) {
 		t.Fatalf("draft:9: %v", err)
 	}
-	if c, err := r.svc.Counts(ctx, ""); err != nil || c.Views["drafts"] != 2 || c.Badge != 3 {
+	if c, err := r.svc.Counts(ctx, ""); err != nil || c.Views["drafts"] != 2 || c.Views["inbox"] != 1 {
 		t.Fatalf("counts: %+v %v", c, err)
 	}
 	var ran []string

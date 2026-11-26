@@ -244,6 +244,7 @@ func LoadIn(locale string, layers []profile.Layer, bundled fs.FS, base *template
 			decisions, decisionProblems := loadDecisions(layers, r)
 			stringProblems = append(stringProblems, decisionProblems...)
 			stringProblems = append(stringProblems, decisions.check(views, gates, actions, l.offered)...)
+			stringProblems = append(stringProblems, decisions.queueViews(&views, tasks)...)
 			l.Decisions = decisions.def
 			home, homeProblems := loadHome(layers, r)
 			stringProblems = append(append(stringProblems, homeProblems...), home.check(views)...)

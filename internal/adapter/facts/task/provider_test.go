@@ -64,6 +64,8 @@ type env struct {
 	links map[unit.Unit]facttask.Link
 	// decisions maps gates, situations and signals to decision kinds.
 	decisions decision.Map
+	// pins are the drafts the open messages pin, each with the message that pins it.
+	pins map[int64]int64
 	// unextracted are when each unit's oldest message not yet extracted arrived.
 	unextracted map[unit.Unit]time.Time
 	// reads counts the store reads by what they read.
@@ -132,8 +134,24 @@ func (c countingGates) OfTask(ctx context.Context, id task.ID) ([]gate.Gate, err
 
 func (c countingGates) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {
 	c.e.reads["gates"]++
+	if q.Kind == "" && len(q.Subjects) == 0 {
+		c.e.reads["every open gate"]++
+	}
 	return c.GateStore.Where(ctx, q)
 }
+
+// envPins report the drafts the open messages pin, as e.pins holds them.
+type envPins struct{ e *env }
+
+func (p envPins) OptionDraft(context.Context, gate.Gate, gates.Resolution) (gate.Gate, int64, bool, error) {
+	return gate.Gate{}, 0, false, nil
+}
+
+func (p envPins) Pinning(context.Context, gate.Gate) (gate.Gate, string, int64, bool, error) {
+	return gate.Gate{}, "", 0, false, nil
+}
+
+func (p envPins) PinnedDrafts(context.Context) (map[int64]int64, error) { return p.e.pins, nil }
 
 func newEnv(t *testing.T) *env {
 	t.Helper()
@@ -143,7 +161,8 @@ func newEnv(t *testing.T) *env {
 	}
 	t.Cleanup(func() { db.Close() })
 	e := &env{t: t, db: db, clock: &clock{now: monday}, s: facttask.Settings{StaleDays: 2, RenudgeAfter: 72 * time.Hour}, ended: map[unit.Unit]bool{}, turns: map[unit.Unit]int{}, repos: map[unit.Unit]string{}, links: map[unit.Unit]facttask.Link{},
-		unextracted: map[unit.Unit]time.Time{}, reads: map[string]int{}}
+		unextracted: map[unit.Unit]time.Time{}, reads: map[string]int{}, pins: map[int64]int64{}}
+	pinning := gates.New(gates.Deps{Options: envPins{e}})
 	e.p = facttask.New(facttask.Deps{
 		Tasks: db.Tasks(), Items: countingItems{db.Items(), e}, Drafts: countingDrafts{db.Drafts(), e},
 		Cards:    coretasks.CardFacts{Cards: countingCards{db.Cards(), e}},
@@ -179,6 +198,7 @@ func newEnv(t *testing.T) *env {
 			return e.links[u], nil
 		},
 		Decisions: func() decision.Map { return e.decisions },
+		Pinned:    pinning.Pinned,
 		Extraction: func(_ context.Context, us []unit.Unit) (time.Time, error) {
 			var oldest time.Time
 			for _, u := range us {

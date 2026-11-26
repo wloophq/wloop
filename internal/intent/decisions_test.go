@@ -3,6 +3,7 @@ package intent_test
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -199,5 +200,110 @@ func TestBundledDecisionViewsCoverEveryKind(t *testing.T) {
 		if v, _ := l.Views.View(id); !v.Rail {
 			t.Errorf("%s left the rail", id)
 		}
+	}
+}
+
+func TestDecisionsOrderTheQueueOfEveryKind(t *testing.T) {
+	l, problems := loadProfile(t, "en", nil)
+	if len(problems) > 0 {
+		t.Fatalf("problems: %v", problems)
+	}
+	d := l.Decisions
+	want := []decision.Kind{"answer", "send-draft", "approve-plan", "review-step", "act", "pick-someone", "last-step"}
+	if !slices.Equal(d.Order, want) || d.QueueAll != "Needs you" || d.EmptyAll != "Nothing needs you." {
+		t.Fatalf("order %v, queue_all %q, empty_all %q", d.Order, d.QueueAll, d.EmptyAll)
+	}
+	pt, _ := loadProfile(t, "pt-BR", nil)
+	if pt.Decisions.QueueAll != "Precisa de você" {
+		t.Fatalf("queue_all in pt-BR = %q", pt.Decisions.QueueAll)
+	}
+}
+
+func TestDecisionsOrderRefusesUnknownAndRepeatedKinds(t *testing.T) {
+	l, problems := loadProfile(t, "en", map[string]string{"decisions.toml": "order = [\"act\", \"anwser\", \"act\"]\n"})
+	if _, ok := problemAt(problems, "order[1]", "answer"); !ok {
+		t.Fatalf("no did-you-mean on the kind: %v", problems)
+	}
+	if _, ok := problemAt(problems, "order[2]", "already"); !ok {
+		t.Fatalf("a repeated kind passes: %v", problems)
+	}
+	if !slices.Equal(l.Decisions.Order, []decision.Kind{decision.Act}) {
+		t.Fatalf("order = %v", l.Decisions.Order)
+	}
+}
+
+func TestDecisionsKindToneIsADesignTokenMeByDefault(t *testing.T) {
+	l, problems := loadProfile(t, "en", map[string]string{"decisions.toml": "[kinds.act]\ntone = \"muted\"\n"})
+	if len(problems) > 0 {
+		t.Fatalf("problems: %v", problems)
+	}
+	k := l.Decisions.Kinds
+	if k[decision.ApprovePlan].Tone != "late" || k[decision.Act].Tone != "muted" || k[decision.Answer].Tone != "me" {
+		t.Fatalf("tones plan %q act %q answer %q, want late, muted and the default me", k[decision.ApprovePlan].Tone, k[decision.Act].Tone, k[decision.Answer].Tone)
+	}
+	_, problems = loadProfile(t, "en", map[string]string{"decisions.toml": "[kinds.act]\ntone = \"amber\"\n"})
+	if _, ok := problemAt(problems, "kinds.act.tone", "amber"); !ok {
+		t.Fatalf("a tone that is no design token loads: %v", problems)
+	}
+}
+
+func TestUIDraftFieldTonesAreDesignTokens(t *testing.T) {
+	l, problems := loadProfile(t, "en", nil)
+	if len(problems) > 0 {
+		t.Fatalf("problems: %v", problems)
+	}
+	tones := l.UI["github"].Drafts["review"].Fields["event"].Tones
+	if tones["REQUEST_CHANGES"] != "err" || tones["APPROVE"] != "loop" || tones["COMMENT"] != "muted" {
+		t.Fatalf("review verdict tones %v", tones)
+	}
+	_, problems = loadProfile(t, "en", map[string]string{"plugins/github/ui.toml": "[drafts.review.fields.event.tones]\nAPPROVE = \"green\"\n"})
+	if _, ok := problemAt(problems, "drafts.review.fields.event.tones.APPROVE", "green"); !ok {
+		t.Fatalf("a field tone that is no design token loads: %v", problems)
+	}
+}
+
+func TestTheQueueViewListsTheTasksOfTheKindsViews(t *testing.T) {
+	union := func(l *intentload.Loaded) string {
+		var parts []string
+		for _, k := range decision.Kinds {
+			v, _ := l.Views.View(l.Decisions.Kinds[k].View)
+			parts = append(parts, "("+v.WhenText+")")
+		}
+		return strings.Join(parts, " || ")
+	}
+	l, problems := loadProfile(t, "en", nil)
+	if len(problems) > 0 {
+		t.Fatal(problems)
+	}
+	if v, _ := l.Views.View("needs-you"); v.When == nil || v.WhenText != union(l) {
+		t.Fatalf("needs-you lists %q, want the union of the kinds' views %q", v.WhenText, union(l))
+	}
+	edited, problems := loadProfile(t, "en", map[string]string{"views.toml": "[views.decide-answer]\nwhen = \"'answer' in task.decisions && task.owed_by == 'me'\"\n"})
+	if len(problems) > 0 {
+		t.Fatal(problems)
+	}
+	if v, _ := edited.Views.View("needs-you"); !strings.Contains(v.WhenText, "('answer' in task.decisions && task.owed_by == 'me')") || v.WhenText != union(edited) {
+		t.Fatalf("needs-you lists %q after the user edited decide-answer, want it to follow", v.WhenText)
+	}
+	own, problems := loadProfile(t, "en", map[string]string{"views.toml": "[views.needs-you]\nwhen = \"task.gates_open > 0\"\n"})
+	if len(problems) > 0 {
+		t.Fatal(problems)
+	}
+	if v, _ := own.Views.View("needs-you"); v.WhenText != "task.gates_open > 0" {
+		t.Fatalf("needs-you lists %q, want the when the user set", v.WhenText)
+	}
+}
+
+func TestDecisionsSortTheQueueOfEveryKindByKindUnlessSetToNewest(t *testing.T) {
+	l, problems := loadProfile(t, "en", nil)
+	if len(problems) > 0 || l.Decisions.Sort != decision.SortKind {
+		t.Fatalf("default sort %q, problems %v", l.Decisions.Sort, problems)
+	}
+	l, problems = loadProfile(t, "en", map[string]string{"decisions.toml": "sort = \"newest\"\n"})
+	if len(problems) > 0 || l.Decisions.Sort != decision.SortNewest {
+		t.Fatalf("sort %q, problems %v", l.Decisions.Sort, problems)
+	}
+	if _, problems = loadProfile(t, "en", map[string]string{"decisions.toml": "sort = \"newset\"\n"}); len(problems) == 0 {
+		t.Fatal("an unknown sort passes")
 	}
 }

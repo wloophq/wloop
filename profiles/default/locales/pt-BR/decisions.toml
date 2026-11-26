@@ -1,5 +1,8 @@
 open = "Abrir na origem"
 
+queue_all = "Precisa de você"
+empty_all = "Nada precisa de você."
+
 [kinds.answer]
 noun   = { one = "pergunta", other = "perguntas" }
 clause = "o agente tem {counter} para você"

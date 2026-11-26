@@ -1,4 +1,4 @@
-import { applyCatalog, applyPlugins, isCoreView, REVIEW, specsStale, viewLabel } from "../lib/catalog";
+import { applyCatalog, applyPlugins, isCoreView, isQueueView, REVIEW, specsStale, viewLabel, viewSpec } from "../lib/catalog";
 import { isOutboxView } from "../lib/drafts";
 import { t } from "../lib/i18n.svelte";
 import { fieldOf, viewQueryKey } from "../lib/lens";
@@ -6,7 +6,7 @@ import { keyUnit, PLAN, QUEUE_LIST, readRoute, RECENT, type Route, unitPath, EXP
 import { isSet, unitKey, type J } from "../lib/util";
 import { APIError, getJSON, postJSON } from "./api";
 import { reconcile } from "./reconcile";
-import { currentHash, readHash, viewHash, type Hash } from "./route.svelte";
+import { currentHash, hashString, readHash, replaceHash, viewHash, type Hash } from "./route.svelte";
 import {
   catalog, detailState, homeState, outboxState, queueState, reviewState, state, taskState, tasksState, gateState,
 } from "./store.svelte";
@@ -139,14 +139,26 @@ export async function loadHome(): Promise<void> {
   }
 }
 
-// queueKey names a queue route's items: a kind and its lens query, or the tasks a list names.
-export function queueKey(route: Pick<Route, "queue" | "ids" | "q">): string {
-  return route.queue === QUEUE_LIST ? QUEUE_LIST + ":" + route.ids.join(",") : route.queue + "?" + (route.q || "");
+// QUEUE_ALL_PATH serves the queue of every decision kind.
+export const QUEUE_ALL_PATH = "/api/queue";
+
+// queueKind is the decision kind route's queue lists, "" for every kind: a queue route's, or the kind a view drawn
+// as the queue is narrowed to.
+function queueKind(route: Route): string {
+  return route.view === QUEUE ? route.queue : route.kind;
 }
 
-// queueURL is the API path of a kind's queue narrowed by its lens query.
-export function queueURL(route: Pick<Route, "queue" | "q">): string {
-  return "/api/queues/" + encodeURIComponent(route.queue) + (route.q ? "?q=" + encodeURIComponent(route.q) : "");
+// queueKey names a queue route's items: a kind, or every kind on a view drawn as the queue, and its lens query,
+// or the tasks a list names.
+export function queueKey(route: Route): string {
+  if (route.view === QUEUE && route.queue === QUEUE_LIST) return QUEUE_LIST + ":" + route.ids.join(",");
+  return (route.view === QUEUE ? "" : route.view + ":") + queueKind(route) + "?" + (route.q || "");
+}
+
+// queueURL is the API path of route's queue, of a kind or of every kind, narrowed by its lens query.
+export function queueURL(route: Route): string {
+  const kind = queueKind(route);
+  return (kind ? "/api/queues/" + encodeURIComponent(kind) : QUEUE_ALL_PATH) + (route.q ? "?q=" + encodeURIComponent(route.q) : "");
 }
 
 // listQueue is the queue of the tasks ids name, in their order, each opened by its own detail.
@@ -163,7 +175,7 @@ export async function queueLoad(route: Route): Promise<void> {
   const key = queueKey(route);
   const same = queueState.key === key;
   try {
-    const queue = route.queue === QUEUE_LIST
+    const queue = route.view === QUEUE && route.queue === QUEUE_LIST
       ? listQueue((await Promise.all(route.ids.map((id) => getJSON("/api/tasks/" + encodeURIComponent(id)).catch(() => null)))).filter(Boolean))
       : await getJSON(queueURL(route));
     if (queueKey(readRoute(currentHash())) !== key) return;
@@ -182,13 +194,13 @@ export async function queueLoad(route: Route): Promise<void> {
 
 // queueShown is the loaded queue when it is route's, else null: a queue loaded for another route never shows nor
 // runs.
-export function queueShown(route: Pick<Route, "queue" | "ids" | "q">): J {
+export function queueShown(route: Route): J {
   return queueState.key === queueKey(route) ? queueState.queue : null;
 }
 
 export async function loadQueue(): Promise<void> {
   const route = readRoute(currentHash());
-  if (route.view === QUEUE) await queueLoad(route);
+  if (route.view === QUEUE || isQueueView(route.view)) await queueLoad(route);
 }
 
 export const OUTBOX_PATH = "/api/outbox";
@@ -321,6 +333,12 @@ export async function loadTasks(given?: Hash, units?: string[]): Promise<void> {
 }
 
 async function loadTaskList(route: Hash): Promise<void> {
+  const opens = (viewSpec(route.view) || {}).opens;
+  if (opens) {
+    const to = readRoute(opens);
+    replaceHash(hashString({ view: to.view, kind: to.kind, area: route.area, ctx: route.ctx, q: route.q }));
+    return loadQueue();
+  }
   if (route.view === REVIEW) return loadReview();
   if (!isCoreView(route.view)) {
     try {
@@ -344,7 +362,6 @@ async function loadTaskList(route: Hash): Promise<void> {
     tasksState.error = t("Could not load the {view} list: {error}", { view: route.view, error: (err as Error).message });
     return;
   }
-  if (isOutboxView(route.view)) await loadOutbox(route.view);
   if (page.specs && page.specs !== (tasksState.catalog || {}).version) await readViews();
 }
 
