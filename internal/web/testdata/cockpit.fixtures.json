@@ -3925,6 +3925,17 @@
     "layout": "queue"
    },
    {
+    "id": "next",
+    "label": "Next actions",
+    "summary": "Your tasks whose next step is yours, with nothing waiting on a decision.",
+    "empty": "No next action of yours.",
+    "when": "task.owed_by == 'me' \u0026\u0026 task.category in ['ready', 'active', 'waiting'] \u0026\u0026 task.gates_open == 0",
+    "sort": "-task.sequential_next",
+    "over": "tasks",
+    "rail": false,
+    "layout": "list"
+   },
+   {
     "id": "inbox",
     "label": "Inbox",
     "summary": "What nobody has clarified yet; once clarified, a task leaves for good.",
@@ -3935,12 +3946,22 @@
     "layout": "list"
    },
    {
-    "id": "needs-me",
-    "label": "Needs me",
-    "summary": "Tasks whose next step is yours: a gate to answer or your own next action.",
-    "empty": "Nothing waits on you.",
-    "when": "task.owed_by == 'me' \u0026\u0026 task.category != 'inbox' \u0026\u0026 (task.gates_open \u003e 0 || task.category in ['ready', 'active', 'waiting'])",
-    "sort": "-task.sequential_next",
+    "id": "focus",
+    "label": "Focus",
+    "summary": "The tasks you marked to focus on.",
+    "empty": "Nothing in focus: mark a task to focus on it.",
+    "when": "task.prop.focus == 'on' \u0026\u0026 !(task.category in ['done', 'dropped'])",
+    "over": "tasks",
+    "rail": false,
+    "layout": "list"
+   },
+   {
+    "id": "fits-now",
+    "label": "Fits now",
+    "summary": "Your next steps that take half an hour or less.",
+    "empty": "Nothing of yours fits in half an hour.",
+    "when": "task.owed_by == 'me' \u0026\u0026 task.category in ['ready', 'active'] \u0026\u0026 task.prop.size \u003e duration('0s') \u0026\u0026 task.prop.size \u003c= duration('30m')",
+    "sort": "task.prop.size",
     "over": "tasks",
     "rail": false,
     "layout": "list"
@@ -3968,29 +3989,6 @@
     "layout": "list"
    },
    {
-    "id": "fits-now",
-    "label": "Fits now",
-    "summary": "Your next steps that take half an hour or less.",
-    "empty": "Nothing of yours fits in half an hour.",
-    "when": "task.owed_by == 'me' \u0026\u0026 task.category in ['ready', 'active'] \u0026\u0026 task.prop.size \u003e duration('0s') \u0026\u0026 task.prop.size \u003c= duration('30m')",
-    "sort": "task.prop.size",
-    "over": "tasks",
-    "rail": false,
-    "layout": "list"
-   },
-   {
-    "id": "blocked-by-me",
-    "label": "Blocked by me",
-    "summary": "Asks that wait on you, grouped by who asked, the oldest first.",
-    "empty": "Nobody is blocked by you.",
-    "when": "task.owed_by == 'me' \u0026\u0026 size(task.askers) \u003e 0 \u0026\u0026 !(task.category in ['deferred', 'done', 'dropped'])",
-    "sort": "-task.ask_age",
-    "over": "tasks",
-    "group": "task.asker_names",
-    "rail": false,
-    "layout": "list"
-   },
-   {
     "id": "stalled",
     "label": "Stalled",
     "summary": "Tasks waiting too long: a source says they stalled, or their check date passed with nothing moving.",
@@ -4002,7 +4000,7 @@
    },
    {
     "id": "in-loop",
-    "label": "In loop",
+    "label": "In the loop",
     "summary": "Tasks an agent is working on right now.",
     "empty": "No agent is working on anything.",
     "when": "task.link_signal.in_loop || task.turns_running \u003e 0",
@@ -4021,31 +4019,31 @@
     "layout": "list"
    },
    {
-    "id": "snoozed",
-    "label": "Snoozed",
-    "summary": "Tasks asleep until a date, an event or a condition.",
-    "empty": "Nothing is snoozed.",
-    "when": "task.wake_until \u003e timestamp(0) || task.wake_when != '' || task.state == 'scheduled'",
-    "over": "tasks",
-    "rail": false,
-    "layout": "list"
-   },
-   {
-    "id": "focus",
-    "label": "Focus",
-    "summary": "The tasks you marked to focus on.",
-    "empty": "Nothing in focus: mark a task to focus on it.",
-    "when": "task.prop.focus == 'on' \u0026\u0026 !(task.category in ['done', 'dropped'])",
-    "over": "tasks",
-    "rail": false,
-    "layout": "list"
-   },
-   {
     "id": "projects",
     "label": "Projects",
     "summary": "Your open projects.",
     "empty": "No open projects.",
     "when": "task.prop.kind == 'project' \u0026\u0026 !(task.category in ['done', 'dropped'])",
+    "over": "tasks",
+    "rail": false,
+    "layout": "list"
+   },
+   {
+    "id": "review-projects",
+    "label": "Projects to review",
+    "summary": "Projects past their review, or with no next action of yours and not in Someday.",
+    "empty": "Every project has a next action and is reviewed.",
+    "when": "task.prop.kind == 'project' \u0026\u0026 !(task.category in ['done', 'dropped']) \u0026\u0026 (task.review_due || (!task.children_mine \u0026\u0026 task.state != 'someday'))",
+    "over": "tasks",
+    "rail": false,
+    "layout": "list"
+   },
+   {
+    "id": "snoozed",
+    "label": "Snoozed",
+    "summary": "Tasks asleep until a date, an event or a condition.",
+    "empty": "Nothing is snoozed.",
+    "when": "task.wake_until \u003e timestamp(0) || task.wake_when != '' || task.state == 'scheduled'",
     "over": "tasks",
     "rail": false,
     "layout": "list"
@@ -4061,22 +4059,22 @@
     "layout": "list"
    },
    {
+    "id": "done",
+    "label": "Done",
+    "summary": "Finished tasks that still hold a workspace on disk, to remove.",
+    "empty": "No finished task holds a workspace.",
+    "when": "task.category == 'done' \u0026\u0026 task.link_signal.workspace",
+    "over": "tasks",
+    "rail": false,
+    "layout": "list"
+   },
+   {
     "id": "logbook",
     "label": "Logbook",
     "summary": "What you finished, the latest first.",
     "empty": "Nothing finished yet.",
     "when": "task.category == 'done'",
     "sort": "task.since_movement",
-    "over": "tasks",
-    "rail": false,
-    "layout": "list"
-   },
-   {
-    "id": "done",
-    "label": "Done",
-    "summary": "Finished tasks that still hold a workspace on disk, to remove.",
-    "empty": "No finished task holds a workspace.",
-    "when": "task.category == 'done' \u0026\u0026 task.link_signal.workspace",
     "over": "tasks",
     "rail": false,
     "layout": "list"
@@ -4094,31 +4092,10 @@
     "layout": "outbox"
    },
    {
-    "id": "review-projects",
-    "label": "Projects to review",
-    "summary": "Projects past their review, or with no next action of yours and not in Someday.",
-    "empty": "Every project has a next action and is reviewed.",
-    "when": "task.prop.kind == 'project' \u0026\u0026 !(task.category in ['done', 'dropped']) \u0026\u0026 (task.review_due || (!task.children_mine \u0026\u0026 task.state != 'someday'))",
-    "over": "tasks",
-    "rail": false,
-    "layout": "list"
-   },
-   {
     "id": "review",
     "label": "Review",
     "summary": "The weekly review: walk each step until the lists are clean.",
     "empty": "Nothing in Review right now.",
-    "over": "tasks",
-    "rail": false,
-    "layout": "list"
-   },
-   {
-    "id": "home-blocked",
-    "label": "Blocked by you",
-    "summary": "Tasks that wait on you: a gate to decide or someone's ask, the longest owed first.",
-    "empty": "Nothing in Blocked by you right now.",
-    "when": "task.owed_by == 'me' \u0026\u0026 (task.gates_open \u003e 0 || size(task.askers) \u003e 0) \u0026\u0026 !(task.category in ['inbox', 'deferred', 'done', 'dropped'])",
-    "sort": "task.owed_since",
     "over": "tasks",
     "rail": false,
     "layout": "list"

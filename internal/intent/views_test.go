@@ -128,16 +128,41 @@ func TestEveryVerbAndViewIsWorded(t *testing.T) {
 }
 
 func TestListTextsComeFromTheProfile(t *testing.T) {
-	texts, problems := loadListsWith(t, string(defaultLists()), "[verbs.done]\nsummary = \"Close it\"\n\n[views.needs-me]\nlabel = \"Now\"\n")
+	texts, problems := loadListsWith(t, string(defaultLists()), "[verbs.done]\nsummary = \"Close it\"\n\n[views.next]\nlabel = \"Now\"\n")
 	if problems != "" {
 		t.Fatal(problems)
 	}
 	if got := texts.Verbs["done"]; got.Label != "Done" || got.Summary != "Close it" {
 		t.Errorf("done: %+v", got)
 	}
-	if got := texts.label("needs-me"); got != "Now" {
-		t.Errorf("needs-me view: %q", got)
+	if got := texts.label("next"); got != "Now" {
+		t.Errorf("next view: %q", got)
 	}
+}
+
+// The views the rail by question removed are gone with no alias: a user layer that names one gets the error of a
+// view the profile never declared.
+func TestARemovedViewIsUnknownToAUserProfile(t *testing.T) {
+	for _, id := range []string{"needs-me", "blocked-by-me", "home-blocked"} {
+		if _, ok := mustBundledViews(t).View(id); ok {
+			t.Errorf("the bundled profile still declares %s", id)
+		}
+		_, problems := loadListsWith(t, string(defaultLists()), "[views."+id+"]\nlabel = \"Mine\"\n\n[badge]\nviews = [\""+id+"\"]\n")
+		for _, want := range []string{"views." + id + ".summary: is required", "badge.views[0]: names no view of views.toml"} {
+			if !strings.Contains(problems, want) {
+				t.Errorf("%s: no %q in:\n%s", id, want, problems)
+			}
+		}
+	}
+}
+
+func mustBundledViews(t *testing.T) ViewsDef {
+	t.Helper()
+	v, problems := BundledViews(os.DirFS("../../profiles/default"))
+	if len(problems) > 0 {
+		t.Fatalf("%v", problems)
+	}
+	return v
 }
 
 func TestAUserVerbAndViewNeedTheirLabels(t *testing.T) {
@@ -230,10 +255,10 @@ func TestTheReviewStepsAreWordedByTheProfile(t *testing.T) {
 }
 
 func TestAReviewStepNamesAView(t *testing.T) {
-	texts, problems := loadListsWith(t, string(defaultLists()), "[review.inbx]\nlabel = \"x\"\n\n[badge]\nviews = [\"inbox\", \"neds-me\"]\n")
+	texts, problems := loadListsWith(t, string(defaultLists()), "[review.inbx]\nlabel = \"x\"\n\n[badge]\nviews = [\"inbox\", \"nxt\"]\n")
 	for _, want := range []string{
 		"review.inbx: names no view of views.toml; did you mean \"inbox\"?",
-		"badge.views[1]: names no view of views.toml; did you mean \"needs-me\"?",
+		"badge.views[1]: names no view of views.toml; did you mean \"next\"?",
 	} {
 		if !strings.Contains(problems, want) {
 			t.Errorf("no %q in:\n%s", want, problems)
@@ -298,8 +323,8 @@ func TestViewsKeepTheirDeclaredOrderAcrossLayers(t *testing.T) {
 	if want := append(bundled.IDs(), "zeta", "alpha"); !slices.Equal(texts.IDs(), want) {
 		t.Errorf("views %v, want %v", texts.IDs(), want)
 	}
-	if want := []string{"needs-you", "inbox", "needs-me", "waiting", "chase", "fits-now", "blocked-by-me", "stalled", "in-loop", "approved", "snoozed", "focus", "projects", "someday", "logbook", "done", "outbox", "review-projects", "review",
-		"home-blocked", "home-stalled", "decide-answer", "decide-approve-plan", "decide-send-draft", "decide-review-step", "decide-last-step", "decide-pick-someone", "decide-act"}; !slices.Equal(bundled.IDs(), want) {
+	if want := []string{"needs-you", "next", "inbox", "focus", "fits-now", "waiting", "chase", "stalled", "in-loop", "approved", "projects", "review-projects", "snoozed", "someday", "done", "logbook", "outbox", "review",
+		"home-stalled", "decide-answer", "decide-approve-plan", "decide-send-draft", "decide-review-step", "decide-last-step", "decide-pick-someone", "decide-act"}; !slices.Equal(bundled.IDs(), want) {
 		t.Errorf("bundled views %v, want %v", bundled.IDs(), want)
 	}
 	var steps []string

@@ -341,9 +341,9 @@ func TestGChordsSwitchViews(t *testing.T) {
 	if m.view != 0 || m.views[0].ID != "needs-me" {
 		t.Fatalf("g g: view %d", m.view)
 	}
-	chord(m, "gx")
-	if m.view != 0 || m.status != "g x: no such key" {
-		t.Fatalf("g x: view %d, status %q", m.view, m.status)
+	chord(m, "gy")
+	if m.view != 0 || m.status != "g y: no such key" {
+		t.Fatalf("g y: view %d, status %q", m.view, m.status)
 	}
 	if press(m, Key{Rune: 'V'}); m.prompt == nil || m.prompt.action != "review" {
 		t.Fatalf("the key after a cancelled chord is not a key again: %+v", m.prompt)

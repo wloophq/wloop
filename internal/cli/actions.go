@@ -171,7 +171,7 @@ func runOpen(ctx context.Context, e *Env, args []string) error {
 	fs := flag.NewFlagSet("open", flag.ContinueOnError)
 	fs.SetOutput(e.Err)
 	printURL := fs.Bool("print", false, "print the cockpit URL with its token instead of opening it")
-	view := fs.String("view", "", "the cockpit view, by its id, such as needs-me")
+	view := fs.String("view", "", "the cockpit view, by its id, such as next")
 	pos, err := parseInterspersed(fs, args)
 	if err != nil {
 		return err

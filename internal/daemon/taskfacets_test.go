@@ -153,7 +153,7 @@ func TestAListPageReadsTheRowsOnce(t *testing.T) {
 		got, _, _, err := r.s.readModel().ReadMany(ctx, units)
 		return got, err
 	}
-	p := r.page(t, "view=needs-me")
+	p := r.page(t, "view=next")
 	if len(p.Tasks) != n {
 		t.Fatalf("%d tasks on the page", len(p.Tasks))
 	}
@@ -173,7 +173,7 @@ func TestAListPageComputesEachTasksFactsOnce(t *testing.T) {
 	const n = 40
 	r.withFacetRows(manyTasks(t, r, n))
 	r.factReads.Store(0)
-	p := r.page(t, "view=needs-me")
+	p := r.page(t, "view=next")
 	if len(p.Tasks) != n {
 		t.Fatalf("%d tasks on the page", len(p.Tasks))
 	}
@@ -208,7 +208,7 @@ func BenchmarkTasksPage(b *testing.B) {
 	h := r.s.Handler()
 	for b.Loop() {
 		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, apiRequest("GET", api.TasksPath+"?view=needs-me", nil))
+		h.ServeHTTP(rec, apiRequest("GET", api.TasksPath+"?view=next", nil))
 		if rec.Code != 200 {
 			b.Fatalf("%d: %s", rec.Code, rec.Body)
 		}
@@ -274,8 +274,8 @@ func TestAFilteredCountReadsEachTasksFactsAndRowsOnce(t *testing.T) {
 	if code := get(t, r.s, api.CountersPath+"?"+url.Values{api.CountersQuery: {"where:acme/api"}}.Encode(), &c); code != 200 {
 		t.Fatalf("%d", code)
 	}
-	if c.Views["needs-me"] != n {
-		t.Fatalf("counts %v, want %d in needs-me", c.Views, n)
+	if c.Views["next"] != n {
+		t.Fatalf("counts %v, want %d in next", c.Views, n)
 	}
 	if got := r.factReads.Load(); got != n {
 		t.Errorf("%d facts reads for %d tasks, want %d", got, n, n)

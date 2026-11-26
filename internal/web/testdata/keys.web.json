@@ -427,6 +427,14 @@
       "summary": "What waits on you, one decision at a time: questions first, then drafts to send, plans, steps and the rest."
     },
     {
+      "key": "g x",
+      "action": "nav:next",
+      "context": "global",
+      "owner": "core",
+      "help": "Next actions",
+      "summary": "Your tasks whose next step is yours, with nothing waiting on a decision."
+    },
+    {
       "key": "g i",
       "action": "nav:inbox",
       "context": "global",
@@ -435,12 +443,20 @@
       "summary": "What nobody has clarified yet; once clarified, a task leaves for good."
     },
     {
-      "key": "g m",
-      "action": "nav:needs-me",
+      "key": "g f",
+      "action": "nav:focus",
       "context": "global",
       "owner": "core",
-      "help": "Needs me",
-      "summary": "Tasks whose next step is yours: a gate to answer or your own next action."
+      "help": "Focus",
+      "summary": "The tasks you marked to focus on."
+    },
+    {
+      "key": "g n",
+      "action": "nav:fits-now",
+      "context": "global",
+      "owner": "core",
+      "help": "Fits now",
+      "summary": "Your next steps that take half an hour or less."
     },
     {
       "key": "g w",
@@ -459,22 +475,6 @@
       "summary": "Tasks someone else owes whose check date passed with nothing moving: time to nudge."
     },
     {
-      "key": "g n",
-      "action": "nav:fits-now",
-      "context": "global",
-      "owner": "core",
-      "help": "Fits now",
-      "summary": "Your next steps that take half an hour or less."
-    },
-    {
-      "key": "g b",
-      "action": "nav:blocked-by-me",
-      "context": "global",
-      "owner": "core",
-      "help": "Blocked by me",
-      "summary": "Asks that wait on you, grouped by who asked, the oldest first."
-    },
-    {
       "key": "g t",
       "action": "nav:stalled",
       "context": "global",
@@ -487,7 +487,7 @@
       "action": "nav:in-loop",
       "context": "global",
       "owner": "core",
-      "help": "In loop",
+      "help": "In the loop",
       "summary": "Tasks an agent is working on right now."
     },
     {
@@ -499,28 +499,20 @@
       "summary": "Work a source says is approved and ready to land."
     },
     {
-      "key": "g z",
-      "action": "nav:snoozed",
-      "context": "global",
-      "owner": "core",
-      "help": "Snoozed",
-      "summary": "Tasks asleep until a date, an event or a condition."
-    },
-    {
-      "key": "g f",
-      "action": "nav:focus",
-      "context": "global",
-      "owner": "core",
-      "help": "Focus",
-      "summary": "The tasks you marked to focus on."
-    },
-    {
       "key": "g p",
       "action": "nav:projects",
       "context": "global",
       "owner": "core",
       "help": "Projects",
       "summary": "Your open projects."
+    },
+    {
+      "key": "g z",
+      "action": "nav:snoozed",
+      "context": "global",
+      "owner": "core",
+      "help": "Snoozed",
+      "summary": "Tasks asleep until a date, an event or a condition."
     },
     {
       "key": "g d",

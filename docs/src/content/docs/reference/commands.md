@@ -269,7 +269,7 @@ Examples:
 
 ```sh
 {{command}} status
-{{command}} status | grep needs-me
+{{command}} status | grep next
 ```
 
 See [Cockpit, terminal client and menu bar](/concepts/surfaces/).
@@ -306,7 +306,7 @@ Open the workspace of a pull request in Claude Desktop or Orca, or the pull requ
 | Flag | Description |
 | --- | --- |
 | `--print` | Print the cockpit URL with its token instead of opening it |
-| `--view <view>` | The cockpit view, by its id, such as needs-me or mine |
+| `--view <view>` | The cockpit view, by its id, such as next or inbox |
 
 Examples:
 
@@ -314,8 +314,8 @@ Examples:
 {{command}} open
 {{command}} open https://github.com/acme/api/pull/7
 {{command}} open '#queue=answer'
-{{command}} open {{command}}://open/#view=needs-me
-{{command}} open --print --view needs-me
+{{command}} open {{command}}://open/#view=next
+{{command}} open --print --view next
 ```
 
 See [Cockpit, terminal client and menu bar](/concepts/surfaces/).

@@ -146,8 +146,8 @@ func TestAViewsKeyIsTheOneItsCatalogServes(t *testing.T) {
 	if keyed == 0 {
 		t.Fatalf("no served view has a key: %+v", cat.Views)
 	}
-	if i := slices.IndexFunc(cat.Views, func(v api.TaskViewSpec) bool { return v.ID == "needs-me" }); i < 0 || cat.Views[i].When == "" || cat.Views[i].Sort != "-task.sequential_next" {
-		t.Errorf("needs-me's rule as the profile writes it: %+v", cat.Views)
+	if i := slices.IndexFunc(cat.Views, func(v api.TaskViewSpec) bool { return v.ID == "next" }); i < 0 || cat.Views[i].When == "" || cat.Views[i].Sort != "-task.sequential_next" {
+		t.Errorf("next's rule as the profile writes it: %+v", cat.Views)
 	}
 }
 

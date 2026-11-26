@@ -382,6 +382,15 @@ sort          = "task.decision_since"
 layout        = "queue"
 hide_disabled = true
 
+[views.next]
+label         = "Next actions"
+summary       = "Your tasks whose next step is yours, with nothing waiting on a decision."
+empty         = "No next action of yours."
+key           = "g x"
+when          = "task.owed_by == 'me' && task.category in ['ready', 'active', 'waiting'] && task.gates_open == 0"
+sort          = "-task.sequential_next"
+hide_disabled = true
+
 [views.inbox]
 label         = "Inbox"
 summary       = "What nobody has clarified yet; once clarified, a task leaves for good."
@@ -390,13 +399,21 @@ key           = "g i"
 when          = "task.category == 'inbox'"
 hide_disabled = true
 
-[views.needs-me]
-label         = "Needs me"
-summary       = "Tasks whose next step is yours: a gate to answer or your own next action."
-empty         = "Nothing waits on you."
-key           = "g m"
-when          = "task.owed_by == 'me' && task.category != 'inbox' && (task.gates_open > 0 || task.category in ['ready', 'active', 'waiting'])"
-sort          = "-task.sequential_next"
+[views.focus]
+label         = "Focus"
+summary       = "The tasks you marked to focus on."
+empty         = "Nothing in focus: mark a task to focus on it."
+key           = "g f"
+when          = "task.prop.focus == 'on' && !(task.category in ['done', 'dropped'])"
+hide_disabled = true
+
+[views.fits-now]
+label         = "Fits now"
+summary       = "Your next steps that take half an hour or less."
+empty         = "Nothing of yours fits in half an hour."
+key           = "g n"
+when          = "task.owed_by == 'me' && task.category in ['ready', 'active'] && task.prop.size > duration('0s') && task.prop.size <= duration('30m')"
+sort          = "task.prop.size"
 hide_disabled = true
 
 [views.waiting]
@@ -416,25 +433,6 @@ when          = "task.category in ['ready', 'active', 'waiting'] && task.owed_by
 group         = "task.owed_by"
 hide_disabled = true
 
-[views.fits-now]
-label         = "Fits now"
-summary       = "Your next steps that take half an hour or less."
-empty         = "Nothing of yours fits in half an hour."
-key           = "g n"
-when          = "task.owed_by == 'me' && task.category in ['ready', 'active'] && task.prop.size > duration('0s') && task.prop.size <= duration('30m')"
-sort          = "task.prop.size"
-hide_disabled = true
-
-[views.blocked-by-me]
-label         = "Blocked by me"
-summary       = "Asks that wait on you, grouped by who asked, the oldest first."
-empty         = "Nobody is blocked by you."
-key           = "g b"
-when          = "task.owed_by == 'me' && size(task.askers) > 0 && !(task.category in ['deferred', 'done', 'dropped'])"
-group         = "task.asker_names"
-sort          = "-task.ask_age"
-hide_disabled = true
-
 [views.stalled]
 label         = "Stalled"
 summary       = "Tasks waiting too long: a source says they stalled, or their check date passed with nothing moving."
@@ -444,7 +442,7 @@ when          = "task.link_signal.stalled || (!('stalled' in task.link_signals) 
 hide_disabled = true
 
 [views.in-loop]
-label         = "In loop"
+label         = "In the loop"
 summary       = "Tasks an agent is working on right now."
 empty         = "No agent is working on anything."
 key           = "g u"
@@ -459,22 +457,6 @@ when          = "task.link_signal.ready"
 hide_disabled = true
 remove_clean  = true
 
-[views.snoozed]
-label         = "Snoozed"
-summary       = "Tasks asleep until a date, an event or a condition."
-empty         = "Nothing is snoozed."
-key           = "g z"
-when          = "task.wake_until > timestamp(0) || task.wake_when != '' || task.state == 'scheduled'"
-hide_disabled = true
-
-[views.focus]
-label         = "Focus"
-summary       = "The tasks you marked to focus on."
-empty         = "Nothing in focus: mark a task to focus on it."
-key           = "g f"
-when          = "task.prop.focus == 'on' && !(task.category in ['done', 'dropped'])"
-hide_disabled = true
-
 [views.projects]
 label         = "Projects"
 summary       = "Your open projects."
@@ -483,18 +465,27 @@ key           = "g p"
 when          = "task.prop.kind == 'project' && !(task.category in ['done', 'dropped'])"
 hide_disabled = true
 
+[views.review-projects]
+label         = "Projects to review"
+summary       = "Projects past their review, or with no next action of yours and not in Someday."
+empty         = "Every project has a next action and is reviewed."
+when          = "task.prop.kind == 'project' && !(task.category in ['done', 'dropped']) && (task.review_due || (!task.children_mine && task.state != 'someday'))"
+hide_disabled = true
+
+
+[views.snoozed]
+label         = "Snoozed"
+summary       = "Tasks asleep until a date, an event or a condition."
+empty         = "Nothing is snoozed."
+key           = "g z"
+when          = "task.wake_until > timestamp(0) || task.wake_when != '' || task.state == 'scheduled'"
+hide_disabled = true
+
 [views.someday]
 label         = "Someday"
 summary       = "Tasks you might do some day, out of the way until then."
 when          = "task.state == 'someday'"
 hide_disabled = true
-
-[views.logbook]
-label         = "Logbook"
-summary       = "What you finished, the latest first."
-empty         = "Nothing finished yet."
-when          = "task.category == 'done'"
-sort          = "task.since_movement"
 
 [views.done]
 label         = "Done"
@@ -504,6 +495,13 @@ key           = "g d"
 when          = "task.category == 'done' && task.link_signal.workspace"
 hide_disabled = true
 remove_clean  = true
+
+[views.logbook]
+label         = "Logbook"
+summary       = "What you finished, the latest first."
+empty         = "Nothing finished yet."
+when          = "task.category == 'done'"
+sort          = "task.since_movement"
 
 [views.outbox]
 label         = "Outbox"
@@ -518,30 +516,15 @@ opens         = { view = "needs-you", kind = "send-draft" }
 group         = "draft.proposer"
 sort          = "draft.created_at"
 
-[views.review-projects]
-label         = "Projects to review"
-summary       = "Projects past their review, or with no next action of yours and not in Someday."
-empty         = "Every project has a next action and is reviewed."
-when          = "task.prop.kind == 'project' && !(task.category in ['done', 'dropped']) && (task.review_due || (!task.children_mine && task.state != 'someday'))"
-hide_disabled = true
-
 # The review lists nothing itself: the clients walk its steps.
 [views.review]
 label         = "Review"
 summary       = "The weekly review: walk each step until the lists are clean."
 key           = "g r"
 
-# The home's sections and each decision kind's view, which Needs you
+# The home's section and each decision kind's view, which Needs you
 # walks one kind after another. The rail leaves them out;
 # decisions.toml names each kind's view.
-[views.home-blocked]
-label         = "Blocked by you"
-summary       = "Tasks that wait on you: a gate to decide or someone's ask, the longest owed first."
-when          = "task.owed_by == 'me' && (task.gates_open > 0 || size(task.askers) > 0) && !(task.category in ['inbox', 'deferred', 'done', 'dropped'])"
-sort          = "task.owed_since"
-rail          = false
-hide_disabled = true
-
 [views.home-stalled]
 label         = "Stalled the longest"
 summary       = "Open tasks no agent is working on, the longest unmoved first."
@@ -625,4 +608,4 @@ label = "Someday"
 label = "Prune Focus"
 
 [badge]
-views = ["inbox", "needs-me"]
+views = ["inbox", "next", "needs-you"]

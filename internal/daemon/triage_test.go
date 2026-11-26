@@ -39,7 +39,7 @@ func TestExtractionLagShowsOnTheLens(t *testing.T) {
 		task.Task{ID: "t-caught", State: "next", Category: task.CategoryReady, Title: "Read the thread", Units: []unit.Unit{caught}})
 
 	byID := map[string]api.TaskView{}
-	for _, v := range r.page(t, "view=needs-me").Tasks {
+	for _, v := range r.page(t, "view=next").Tasks {
 		byID[v.ID] = v
 	}
 	if got := byID["t-behind"]; got.ExtractionLag != "12m0s" || !slices.Equal(got.Askers, []string{"slack:U0BRUNO"}) || got.OwedBy != "me" {
@@ -47,8 +47,5 @@ func TestExtractionLagShowsOnTheLens(t *testing.T) {
 	}
 	if got, ok := byID["t-caught"]; !ok || got.ExtractionLag != "" {
 		t.Errorf("the task caught up: %+v, %v; want no lag", got, ok)
-	}
-	if got := taskIDs(r.page(t, "view=blocked-by-me").Tasks); !slices.Equal(got, []string{"t-behind"}) {
-		t.Errorf("blocked by me lists %v", got)
 	}
 }

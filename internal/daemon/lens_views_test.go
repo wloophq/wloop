@@ -29,7 +29,7 @@ func TestTheBadgeNamesTheProfilesViewsAndTheyAreCounted(t *testing.T) {
 			badged = append(badged, v.ID)
 		}
 	}
-	if !slices.Equal(badged, []string{"inbox", "needs-me"}) {
+	if !slices.Equal(badged, []string{"needs-you", "next", "inbox"}) {
 		t.Fatalf("the catalog's badge views %v", badged)
 	}
 
@@ -54,7 +54,7 @@ func TestCountersRepushOnGatesAndWakes(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := nextChange(t, sub)
-	if c.Counters.Views["needs-me"] != 2 {
+	if c.Counters.Views["needs-you"] != 1 {
 		t.Fatalf("after a gate opened on a done task: %+v", c.Counters)
 	}
 	if err := r.db.Wakes().Put(context.Background(), wake.Wake{Task: "t-next", Until: tasksNow.Add(time.Hour), Return: "next"}); err != nil {
@@ -65,7 +65,7 @@ func TestCountersRepushOnGatesAndWakes(t *testing.T) {
 	}
 }
 
-func TestNeedsMeOrdersASequentialProjectsNextActionFirst(t *testing.T) {
+func TestNextActionsOrdersASequentialProjectsNextActionFirst(t *testing.T) {
 	t.Parallel()
 	r := newTasksRig(t, nil)
 	r.serveProjects()
@@ -76,13 +76,13 @@ func TestNeedsMeOrdersASequentialProjectsNextActionFirst(t *testing.T) {
 		task.Task{ID: "t-a2", State: "next", Category: task.CategoryReady, Parent: "t-p", Position: 2, Created: at(-40), Updated: at(-40)},
 		task.Task{ID: "t-a1", State: "next", Category: task.CategoryReady, Parent: "t-p", Position: 1, Created: at(-30), Updated: at(-30)},
 	)
-	if got := taskIDs(r.page(t, "view=needs-me").Tasks); !slices.Equal(got, []string{"t-a1", "t-x", "t-p", "t-a2"}) {
+	if got := taskIDs(r.page(t, "view=next").Tasks); !slices.Equal(got, []string{"t-a1", "t-x", "t-p", "t-a2"}) {
 		t.Fatalf("needs me %v", got)
 	}
 	if rec := post(t, r.s, api.TaskPath("t-a1", "done"), `{"source":"cockpit"}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	if got := taskIDs(r.page(t, "view=needs-me").Tasks); !slices.Equal(got, []string{"t-a2", "t-x", "t-p"}) {
+	if got := taskIDs(r.page(t, "view=next").Tasks); !slices.Equal(got, []string{"t-a2", "t-x", "t-p"}) {
 		t.Fatalf("after the first action: %v", got)
 	}
 }
@@ -132,7 +132,7 @@ func TestADraftOnAnUnheldUnitCountsOnlyInTheOutbox(t *testing.T) {
 	r.o.Gates, r.s.deps.Gates = rigGates{svc, st}, svc
 	r.propose(t, r7u, "on a unit no task holds", draft.Wait)
 	c := r.page(t, "view=outbox").Counters
-	if c.Views["outbox"] != 1 || c.Views["inbox"] != 1 || c.Views["needs-me"] != 0 {
+	if c.Views["outbox"] != 1 || c.Views["inbox"] != 1 || c.Views["next"] != 0 {
 		t.Fatalf("counters %+v", c)
 	}
 }

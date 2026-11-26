@@ -232,10 +232,10 @@ label = "Inbox"
 summary = "O que ninguém esclareceu ainda; depois de esclarecida, a tarefa sai de vez."
 empty = "Inbox zerada: tudo está esclarecido."
 
-[views.needs-me]
-label = "Precisa de mim"
-summary = "Tarefas cujo próximo passo é seu: uma decisão a tomar ou uma próxima ação sua."
-empty = "Nada espera por você."
+[views.next]
+label = "Próximas ações"
+summary = "Suas tarefas cujo próximo passo é seu, sem nada esperando uma decisão."
+empty = "Nenhuma próxima ação sua."
 
 [views.waiting]
 label = "Aguardando"
@@ -251,11 +251,6 @@ empty = "Nada a cobrar: ninguém está atrasado."
 label = "Cabe agora"
 summary = "Seus próximos passos que levam meia hora ou menos."
 empty = "Nada seu cabe em meia hora."
-
-[views.blocked-by-me]
-label = "Bloqueado por mim"
-summary = "Pedidos que esperam por você, agrupados por quem pediu, os mais antigos primeiro."
-empty = "Ninguém está bloqueado por você."
 
 [views.stalled]
 label = "Paradas"
@@ -315,10 +310,6 @@ label = "Revisão"
 summary = "A revisão semanal: percorra cada passo até as listas ficarem limpas."
 
 # The home's sections and the decision queues.
-[views.home-blocked]
-label = "Bloqueado por você"
-summary = "Tarefas que esperam por você: uma decisão a tomar ou um pedido de alguém, as devidas há mais tempo primeiro."
-
 [views.home-stalled]
 label = "Paradas há mais tempo"
 summary = "Tarefas abertas em que nenhum agente está trabalhando, as paradas há mais tempo primeiro."

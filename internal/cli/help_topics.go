@@ -113,7 +113,7 @@ func helpGroups(manager string) []helpGroup {
 				About: "List the tasks of the views the badge names, such as Inbox and Needs me, then the pull requests you track. " +
 					"Piped, it prints one tab-separated line per task or pull request and view.",
 				Flags:    []helpFlag{colorFlag},
-				Examples: []string{"status", "status | grep needs-me"},
+				Examples: []string{"status", "status | grep next"},
 				Docs:     "concepts/surfaces",
 			},
 			{
@@ -135,9 +135,9 @@ func helpGroups(manager string) []helpGroup {
 					"With --print, print the cockpit URL with its token instead of opening it.",
 				Flags: []helpFlag{
 					{"--print", "Print the cockpit URL with its token instead of opening it"},
-					{"--view <view>", "The cockpit view, by its id, such as needs-me or mine"},
+					{"--view <view>", "The cockpit view, by its id, such as next or inbox"},
 				},
-				Examples: []string{"open", "open " + pr, "open '#queue=answer'", "open " + brand.URLScheme() + "://open/#view=needs-me", "open --print --view needs-me"},
+				Examples: []string{"open", "open " + pr, "open '#queue=answer'", "open " + brand.URLScheme() + "://open/#view=next", "open --print --view next"},
 				Docs:     "concepts/surfaces",
 			},
 			{

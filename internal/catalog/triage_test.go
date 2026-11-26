@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -86,7 +87,7 @@ func TestFitsNowFiltersByAttentionSize(t *testing.T) {
 	}
 }
 
-func TestBlockedByMeGroupsByWhoAsked(t *testing.T) {
+func TestAnAskThatWaitsOnMeIsANextActionGroupedByWhoAsked(t *testing.T) {
 	l := bundled(t)
 	for name, c := range map[string]struct {
 		c    task.Category
@@ -94,15 +95,16 @@ func TestBlockedByMeGroupsByWhoAsked(t *testing.T) {
 		want bool
 	}{
 		"Bruno asked me":           {task.CategoryReady, workflow.Facts{"task.link_owes": []string{"me"}, "task.askers": []string{"slack:U0BRUNO"}}, true},
-		"mine, nobody asked":       {task.CategoryReady, workflow.Facts{"task.askers": []string{}}, false},
 		"Bruno asked, Ana owes it": {task.CategoryWaiting, workflow.Facts{"task.link_owes": []string{"slack:U0ANA"}, "task.askers": []string{"slack:U0BRUNO"}}, false},
 		"Bruno asked, snoozed":     {task.CategoryDeferred, workflow.Facts{"task.link_owes": []string{"me"}, "task.askers": []string{"slack:U0BRUNO"}}, false},
+		"Bruno asked, a gate open": {task.CategoryReady, workflow.Facts{"task.link_owes": []string{"me"}, "task.askers": []string{"slack:U0BRUNO"}, "task.gates_open": 1}, false},
 	} {
-		if got := inView(t, l, "blocked-by-me", lensFacts(t, l, c.c, c.f)); got != c.want {
-			t.Errorf("%s: in blocked-by-me %v, want %v", name, got, c.want)
+		if got := inView(t, l, "next", lensFacts(t, l, c.c, c.f)); got != c.want {
+			t.Errorf("%s: in next %v, want %v", name, got, c.want)
 		}
 	}
-	if g := viewDef(t, l, "blocked-by-me").Group; g != "task.asker_names" {
-		t.Errorf("blocked-by-me groups by %q, want by who asked", g)
+	i := slices.IndexFunc(l.Views.Facets, func(f intentload.FacetDef) bool { return f.ID == "asked-by" })
+	if i < 0 || !l.Views.Facets[i].Group || l.Views.Facets[i].Fact != "task.asker_names" {
+		t.Errorf("no asked-by facet to group Next actions by who asked: %+v", l.Views.Facets)
 	}
 }

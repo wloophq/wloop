@@ -5,6 +5,9 @@ other = "Em outros lugares"
 label = "Precisa de você"
 
 [[search.groups]]
+label = "Próximas ações"
+
+[[search.groups]]
 label = "Esperando outras pessoas"
 
 [[search.groups]]

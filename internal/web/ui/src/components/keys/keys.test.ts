@@ -98,7 +98,7 @@ describe("keys_test.go", () => {
     await k.press("g"); await k.press("g");
     await k.press("g"); k.tick(1001); await k.press("i");
     await k.press("g"); k.tick(1001);
-    await k.press("g"); await k.press("x");
+    await k.press("g"); await k.press("y");
     expect(k.log.nav).toEqual(["inbox", "needs-me"]);
     expect(k.log.posts).toEqual([]);
   });
@@ -259,8 +259,8 @@ describe("keys_test.go", () => {
   test("TestNavigatingToAProviderOpensItsFirstView", async () => {
     const views = [...viewsFixture, { id: "issues", provider: "linear", order: 2 }, { id: "triage", provider: "linear", order: 1 }];
     const k = harness({ views, providers: ["github", "slack", "linear", "wiki"] });
-    k.keys.setBindings([...BINDINGS, { key: "g l", action: "nav:linear", context: "global", owner: "linear" }, { key: "g x", action: "nav:wiki", context: "global", owner: "wiki" }]);
-    for (const c of ["g", "g", "g", "l", "g", "x", "g", "o"]) await k.press(c);
+    k.keys.setBindings([...BINDINGS, { key: "g l", action: "nav:linear", context: "global", owner: "linear" }, { key: "g y", action: "nav:wiki", context: "global", owner: "wiki" }]);
+    for (const c of ["g", "g", "g", "l", "g", "y", "g", "o"]) await k.press(c);
     expect(k.log.nav).toEqual(["needs-me", "triage", "outbox"]);
   });
 
