@@ -182,6 +182,7 @@ func (f *slackFacts) of(u unit.Unit, es []task.Task, its []items.Item) workflow.
 		"slack.live_task": slices.ContainsFunc(es, func(e task.Task) bool {
 			return e.Open() && e.Category != task.CategoryDeferred && slices.Contains(e.Units, u)
 		}),
+		"slack.open_task":                 slices.ContainsFunc(es, func(e task.Task) bool { return e.Open() && slices.Contains(e.Units, u) }),
 		"slack.items_open":                open,
 		"slack.items_resolved":            resolved,
 		"slack.items_unowned":             orphans,

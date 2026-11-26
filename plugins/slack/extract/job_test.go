@@ -645,6 +645,18 @@ func TestAClosureUnwatchesAThreadWithNoItemAtOnce(t *testing.T) {
 	}
 }
 
+func TestAPostedClosureUnwatchesAThreadWithNoItem(t *testing.T) {
+	r := newRig(t)
+	r.facts.post(jChan, ts(50), "", jOther, "deploy went fine, closing this", jT0)
+	r.asker.reply = func(int, host.Ask) ([]byte, error) {
+		return answerJSON(t, nil, nil, nil, obj{"closure_posted": true}), nil
+	}
+	r.run(jT0.Add(2 * time.Minute))
+	if want := []watchCall{{obj: slack.ObjectRef{Conversation: jChan, TS: ts(50)}, off: true}}; !slices.Equal(r.watch.calls, want) {
+		t.Fatalf("watch calls %+v, want the thread with no item unwatched once a closure was read", r.watch.calls)
+	}
+}
+
 func postUnits(r *rig, n int) {
 	for i := range n {
 		r.facts.post(jChan, ts(1+i), "", jOther, fmt.Sprintf("ask %d", i), jT0)

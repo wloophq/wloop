@@ -158,7 +158,7 @@ A draft has a purpose (nudge, close, ask_owner, or any label its author names), 
 | Effect | What it does once the draft is sent |
 |---|---|
 | `task.nudged` | stamps the last nudge of the draft's task, or of every live waiting task of its unit |
-| `unit.closed` | records the unit's closure through its plugin, which on Slack lets the thread go unwatched after its warm period whatever later extraction passes say, at once when no item came from it, and takes it out of the Slack view while none of its items is open; then ends the open tasks that hold the unit |
+| `unit.closed` | records the unit's closure through its plugin, which on Slack lets the thread go unwatched after its warm period whatever later extraction passes say, at once when no item came from it, and takes it out of the Slack view while none of its items is open and nobody else posted after it; then ends the open tasks that hold the unit |
 | `pr.nudged` | records the nudge on the pull request, which the next nudge's refusal reads |
 
 A draft's card in the cockpit says what sending it does in the words of `gates.toml`'s `[effects]`, one sentence per effect name, which a profile or a plugin's layer may reword; a key that names no effect fails to load.

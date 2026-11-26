@@ -31,15 +31,15 @@ Spend is capped: $0.10 per call, $3.00 and 500 calls per local day; a day's cap 
 
 ## Closing a conversation
 
-A conversation is closed when a closure was posted there, as the extraction reads it, or marked by `unit.closed`, the effect a sent closing draft, the `effects.apply` step of a workflow and the **Close** action apply. A closure ends the tasks that hold the conversation and makes it ended (`slack.ended`). While none of its items is open, a closed conversation leaves the Slack view, its row, card and facts kept for its tasks and the Logbook; an item that opens there brings it back, as it watches the conversation again.
+A conversation is closed when a closure was posted there, as the extraction reads it, or marked by `unit.closed`, the effect a sent closing draft, the `effects.apply` step of a workflow and the **Close** action apply. A closure ends the tasks that hold the conversation and makes it ended (`slack.closure_posted`, `slack.ended`). A marked closure holds until someone other than you posts in the conversation after it: your own message keeps it closed, theirs reopens it, and its facts read it open again. While none of its items is open, a closed conversation leaves the Slack view, its row, card and facts kept for its tasks and the Logbook; a message that reopens it, or an item that opens there, brings it back, and an open item watches it again. A row offers **Close** while it is in the Slack view.
 
-The plugin stops watching a closed conversation once its items resolved and stayed so for `items.heat.warm_for`, so a late follow-up still comes in; one no item ever came from is unwatched at once. A conversation of a DM is its open segments: it is unwatched only when every one of them is closed and none holds an item. A thread you follow (`{{command}} slack follow`) or a session watches stays watched.
+The plugin stops watching a closed conversation once its items resolved and stayed so for `items.heat.warm_for`, so a late follow-up still comes in; one no item ever came from is unwatched at once, when it is marked closed or the extraction reads a closure posted there. A conversation of a DM is its open segments: it is unwatched only when every one of them is closed and none holds an item. A thread you follow (`{{command}} slack follow`) or a session watches stays watched.
 
 Three paths close a conversation without a message, none of them waiting for your approval, since none posts:
 
 - **Close** on a conversation's row applies `unit.closed` at once;
 - `slack-closure-quiet` closes a thread you started once its items resolved, nobody's newest message there is to you and the extraction read its newest message;
-- `slack-ended-empty` closes a conversation no item came from once it ended, quiet for `plugins.slack.ended_after` (7 days), whoever started it, once the extraction read its newest message (`!slack.closure_posted && slack.ended && slack.items_open == 0 && slack.items_resolved == 0 && slack.extracted`).
+- `slack-ended-empty` closes a conversation no item came from once it ended, quiet for `plugins.slack.ended_after` (7 days), whoever started it, once the extraction read its newest message, unless an open task holds it, a snoozed one included, so a task you attached to it to follow up is never ended for you (`!slack.closure_posted && slack.ended && slack.items_open == 0 && slack.items_resolved == 0 && !slack.open_task && slack.extracted`).
 
 `slack-closure`, off by default, closes with a message instead; sending it applies the same effect.
 

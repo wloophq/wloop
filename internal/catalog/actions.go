@@ -28,7 +28,8 @@ const (
 )
 
 // UnitClose is the built-in action that records a unit's closure with no message: the unit.closed effect, applied
-// as a workflow's effects.apply step applies it.
+// as a workflow's effects.apply step applies it. A row offers it while it is in one of its plugin's views, which
+// a closed unit leaves.
 const UnitClose = "unit.close"
 
 // unitBuiltins are the built-in actions a row of a provider other than GitHub may offer.
@@ -156,7 +157,7 @@ var builtinActions = []builtinAction{
 		return on("untrack")
 	}},
 	{api.ActionSpec{ID: UnitClose, Group: "control", Surfaces: []string{SurfaceRow, SurfaceDetail, SurfaceTUI, SurfaceMenubar}}, func(f Facts) (api.ActionState, bool) {
-		if !f.PR.IsZero() || f.Row.Unit.IsZero() || !f.Open || !f.Closes {
+		if !f.PR.IsZero() || f.Row.Unit.IsZero() || len(f.Row.Views) == 0 || !f.Closes {
 			return absent()
 		}
 		return on(UnitClose)

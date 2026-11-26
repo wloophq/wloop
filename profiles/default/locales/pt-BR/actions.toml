@@ -34,7 +34,7 @@ summary = "Parar de seguir este pull request por você ter pedido para acompanh�
 
 ["unit.close"]
 label = "Encerrar"
-summary = "Encerrar esta conversa sem mensagem: as tarefas que a seguram terminam e, enquanto nenhum item dela estiver aberto, ela deixa de ser acompanhada e sai da sua visão, até um item se abrir de novo."
+summary = "Encerrar sem mensagem: a origem registra o encerramento, que termina as tarefas que o contêm e o tira da sua visão."
 
 [open]
 label = "Abrir"

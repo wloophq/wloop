@@ -695,6 +695,11 @@ func (j *Job) apply(ctx context.Context, k unit.Unit, p *pend, team string, in I
 	if _, err := j.watch(ctx, cfg, k, obj, units, state, now, true); err != nil {
 		j.logf("slack extraction %s: watch: %v", k, err)
 	}
+	if state.ClosurePosted && len(units) > 0 {
+		if err := j.Closed(ctx, units[0]); err != nil {
+			j.logf("slack extraction %s: unwatch a closed conversation: %v", k, err)
+		}
+	}
 	return len(ops), nil
 }
 
@@ -958,13 +963,9 @@ func (j *Job) Closed(ctx context.Context, u unit.Unit) error {
 	if j.Ledger == nil {
 		return nil
 	}
-	key, err := slack.ParseUnit(u)
-	if err != nil {
-		return err
-	}
-	k := u
-	if key.Segment != "" {
-		k = unit.Unit{Provider: u.Provider, Key: key.Team + "/" + key.Conversation}
+	k, ok := targetFor(u)
+	if !ok {
+		return fmt.Errorf("not a unit of a conversation: %s", u)
 	}
 	obj, units, err := j.objectOf(ctx, k)
 	if err != nil {

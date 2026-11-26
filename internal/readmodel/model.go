@@ -215,7 +215,8 @@ func withIntents(base Base, u unit.Unit, row api.Row) api.Row {
 	if row.Actions != nil || base.Intents == nil {
 		return row
 	}
-	row.Actions = catalog.UnitStates(catalog.Facts{Row: row, Tracked: true, Open: !row.Summary.Closed, Asked: base.Asked, Intents: base.Intents})
+	closes := base.Closes != nil && base.Closes(u.Provider)
+	row.Actions = catalog.UnitStates(catalog.Facts{Row: row, Tracked: true, Open: !row.Summary.Closed, Closes: closes, Asked: base.Asked, Intents: base.Intents})
 	row.SpecsVersion = base.SpecsVersion
 	return row
 }

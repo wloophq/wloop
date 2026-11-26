@@ -94,7 +94,7 @@
      "status": ""
     }
    },
-   "specs_version": "51ccbd5fee10",
+   "specs_version": "cebd8fec8e2f",
    "summary": {
     "closed": false,
     "line": "",
@@ -206,7 +206,7 @@
      "status": ""
     }
    },
-   "specs_version": "51ccbd5fee10",
+   "specs_version": "cebd8fec8e2f",
    "summary": {
     "closed": false,
     "line": "",
@@ -3093,7 +3093,7 @@
     "label": "Close",
     "scope": "unit",
     "source": "builtin",
-    "summary": "Close this conversation without a message: it ends the tasks that hold it and, while none of its items is open, it stops being watched and leaves its view, until an item opens again.",
+    "summary": "Close it without a message: its source records the closure, which ends the tasks that hold it and takes it out of its view.",
     "surfaces": [
      "row",
      "detail",
@@ -3308,7 +3308,7 @@
     ]
    }
   ],
-  "version": "51ccbd5fee10"
+  "version": "cebd8fec8e2f"
  },
  "stringsEn": {
   "\"state\" to wait until the situation changes": "\"state\" to wait until the situation changes",

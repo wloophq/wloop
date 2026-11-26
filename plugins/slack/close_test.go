@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	src "github.com/wloophq/wloop/pkg/plugin/source"
+	dslack "github.com/wloophq/wloop/plugins/slack/domain"
 	"github.com/wloophq/wloop/plugins/slack/items"
 	slackrows "github.com/wloophq/wloop/plugins/slack/rows"
 	"github.com/wloophq/wloop/plugins/slack/unit"
@@ -61,5 +62,40 @@ func TestUnitClosedUnwatchesAConversationWithNoItem(t *testing.T) {
 	}
 	if o, _ := f.object(t, object); o.Watched {
 		t.Error("the closed thread with no item stays watched")
+	}
+}
+
+// reply stores a reply of user at ts(n) in the fixture's thread.
+func (f *fixture) reply(t *testing.T, user string, n int) {
+	t.Helper()
+	f.seed(t, dslack.Facts{
+		Conversations: []dslack.Conversation{{ID: chan1, Name: "general", Kind: dslack.KindChannel, IsMember: true}},
+		Threads: []dslack.Thread{{Conversation: chan1, TS: ts(1), LatestReply: ts(n), ReplyCount: n - 1, Messages: []dslack.Message{
+			{TS: ts(n), ThreadTS: ts(1), User: user, Text: "one more thing"}}}},
+	})
+}
+
+// TestSomeoneElsesMessageAfterTheClosureReopensTheConversation: a marked closure holds until someone else posts
+// after it, which brings the conversation back to the Slack view and its closure fact back to false; your own
+// message after it does not.
+func TestSomeoneElsesMessageAfterTheClosureReopensTheConversation(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t)
+	f.login(t)
+	f.people(t)
+	u := f.thread(t)
+	if err := f.db.Extraction().MarkClosed(context.Background(), u, tsAt(5)); err != nil {
+		t.Fatal(err)
+	}
+	f.reply(t, me, 6)
+	if f.inSlackView(t, u) {
+		t.Fatal("your own message after the closure brought the conversation back")
+	}
+	f.reply(t, other, 7)
+	if !f.inSlackView(t, u) {
+		t.Fatal("someone else's message after the closure does not bring the conversation back")
+	}
+	if got, _ := f.facts(t, u); got["slack.closure_posted"] != false {
+		t.Errorf("after a new message: closure_posted %v, want false", got["slack.closure_posted"])
 	}
 }

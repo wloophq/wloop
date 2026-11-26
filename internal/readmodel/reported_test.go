@@ -292,3 +292,12 @@ func TestARowOffersCloseWhenItsPluginClosesWithNoMessage(t *testing.T) {
 		t.Errorf("close %+v offered on a unit nothing closes", st)
 	}
 }
+
+func TestARowWithNoActionsOffersCloseWhenItsPluginClosesWithNoMessage(t *testing.T) {
+	u := acmeUnit("one")
+	base := readmodel.Base{Intents: acmeRole(t), Closes: func(p unit.ProviderID) bool { return p == "acme" }}
+	row := readmodel.WithIntents(base, u, api.Row{Views: []string{"asks"}})
+	if !slices.ContainsFunc(row.Actions, func(st api.ActionState) bool { return st.ID == catalog.UnitClose && st.Enabled }) {
+		t.Errorf("actions %+v, want close", row.Actions)
+	}
+}

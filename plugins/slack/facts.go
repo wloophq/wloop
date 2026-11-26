@@ -45,7 +45,7 @@ func unitFacts(u unit.Unit, in *slackrows.Input, tasks []src.Task, endedAfter ti
 			next = at
 		}
 	}
-	closure := st.ClosurePosted || st.ClosureMarked
+	closure := in.Closed()
 	ended := src.After(dslack.TSTime(newest), endedAfter-time.Nanosecond, src.Calendar)
 	if closure {
 		ended = src.Bool(true)
@@ -57,6 +57,7 @@ func unitFacts(u unit.Unit, in *slackrows.Input, tasks []src.Task, endedAfter ti
 		{Name: "slack.closure_posted", Value: src.Bool(closure)},
 		{Name: "slack.ended", Value: ended},
 		{Name: "slack.live_task", Value: src.Bool(slices.ContainsFunc(tasks, func(t src.Task) bool { return liveOn(t, u) }))},
+		{Name: "slack.open_task", Value: src.Bool(slices.ContainsFunc(tasks, func(t src.Task) bool { return openOn(t, u) }))},
 		{Name: "slack.items_open", Value: src.Int(int64(open))},
 		{Name: "slack.items_resolved", Value: src.Int(int64(resolved))},
 		{Name: "slack.items_unowned", Value: src.Int(int64(orphans))},
@@ -110,7 +111,12 @@ func conversationOf(k dslack.Key, stored string) string {
 // liveOn says whether t is a task attached to u that is open and awake: a
 // deferred task sleeps under its wake, as a muted or snoozed one does.
 func liveOn(t src.Task, u unit.Unit) bool {
-	return !slices.Contains([]string{"done", "dropped", "deferred"}, t.Category) && slices.Contains(t.Units, u.Wire())
+	return t.Category != "deferred" && openOn(t, u)
+}
+
+// openOn says whether t is open, neither done nor dropped, and attached to u.
+func openOn(t src.Task, u unit.Unit) bool {
+	return !slices.Contains([]string{"done", "dropped"}, t.Category) && slices.Contains(t.Units, u.Wire())
 }
 
 // unowned says whether it is open with no assignee, nobody waited on and no

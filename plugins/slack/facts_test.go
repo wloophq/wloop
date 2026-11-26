@@ -116,6 +116,18 @@ func resolve(t *testing.T, v src.Value, now time.Time) any {
 	return nil
 }
 
+func TestSlackOpenTaskCountsASnoozedTask(t *testing.T) {
+	t.Parallel()
+	f := newFactsFixture(t)
+	f.listed(t, factsThread, factsOther)
+	f.host.SetTasks(hostTask("t-01", "deferred", factsThread), hostTask("t-02", "done", factsOther), hostTask("t-03", "dropped", factsOther))
+	for u, want := range map[unit.Unit]bool{factsThread: true, factsOther: false} {
+		if got, _ := f.facts(t, u); got["slack.open_task"] != want {
+			t.Errorf("%s open_task %v, want %v", u, got["slack.open_task"], want)
+		}
+	}
+}
+
 func TestSlackLiveTaskReadsTheHostsTasks(t *testing.T) {
 	t.Parallel()
 	f := newFactsFixture(t)

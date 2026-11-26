@@ -290,6 +290,26 @@ func (in *Input) Messages() []store.MessageRow { return in.msgs }
 // State is the unit's last extraction; false before any.
 func (in *Input) State() (store.ExtractionState, bool) { return in.state, in.hasState }
 
+// Closed says a closure ended the unit: the extraction read one posted, or a unit.closed marked it and nobody
+// but the viewer posted since.
+func (in *Input) Closed() bool {
+	if in.state.ClosurePosted {
+		return true
+	}
+	if !in.state.ClosureMarked {
+		return false
+	}
+	if in.state.ClosedAt.IsZero() {
+		return true
+	}
+	for _, m := range slices.Backward(in.msgs) {
+		if m.User != in.viewer || in.viewer == "" {
+			return !dslack.TSTime(m.TS).After(in.state.ClosedAt)
+		}
+	}
+	return true
+}
+
 // Items are the unit's items in the host's ledger.
 func (in *Input) Items() []items.Item { return in.items }
 

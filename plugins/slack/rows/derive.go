@@ -151,7 +151,7 @@ func waitingWho(summary string) []string {
 
 func payload(in *Input) Payload {
 	pl := Payload{Conversation: in.key.Conversation, Viewer: in.viewer, Topic: in.state.Topic, Verdict: in.state.Verdict,
-		StartedByViewer: in.state.StartedByViewer, ClosurePosted: in.state.ClosurePosted || in.state.ClosureMarked,
+		StartedByViewer: in.state.StartedByViewer, ClosurePosted: in.Closed(),
 		Followed: slices.Contains(in.object.Reasons, string(dslack.ReasonUserFollow))}
 	if !in.hasState {
 		pl.StartedByViewer = in.key.Segment == "" && len(in.msgs) > 0 && in.msgs[0].TS == in.key.TS &&

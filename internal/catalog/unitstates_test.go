@@ -62,13 +62,19 @@ func TestUnitStatesOfferCloseOnAnOpenUnitThatClosesWithNoMessage(t *testing.T) {
 		}
 		return UnitStates(f)[i], true
 	}
-	if st, ok := closeOf(Facts{Row: api.Row{Unit: slack}, Open: true, Closes: true}); !ok || !st.Enabled {
-		t.Errorf("close on an open Slack row that closes: %+v %v, want enabled", st, ok)
+	inView := api.Row{Unit: slack, Views: []string{"slack"}}
+	for name, f := range map[string]Facts{
+		"open row":     {Row: inView, Open: true, Closes: true},
+		"resolved row": {Row: inView, Closes: true},
+	} {
+		if st, ok := closeOf(f); !ok || !st.Enabled {
+			t.Errorf("close on a %s in a view: %+v %v, want enabled", name, st, ok)
+		}
 	}
 	for name, f := range map[string]Facts{
-		"no silent closure": {Row: api.Row{Unit: slack}, Open: true},
-		"closed row":        {Row: api.Row{Unit: slack}, Closes: true},
-		"pull request":      {Row: api.Row{Unit: pr}, PR: pr, Open: true, Closes: true},
+		"no silent closure": {Row: inView, Open: true},
+		"row in no view":    {Row: api.Row{Unit: slack, Views: []string{}}, Open: true, Closes: true},
+		"pull request":      {Row: api.Row{Unit: pr, Views: []string{"slack"}}, PR: pr, Open: true, Closes: true},
 	} {
 		if st, ok := closeOf(f); ok {
 			t.Errorf("%s: close offered %+v", name, st)

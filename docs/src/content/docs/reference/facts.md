@@ -345,6 +345,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `slack.started_by_me` | bool | The viewer started the thread. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `slack.closure_posted` | bool | A closure was posted on the unit, or closed without a message, by the extraction or a draft's unit.closed. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `slack.live_task` | bool | A live task is attached to the unit: neither done, in the trash nor deferred, as a snoozed or muted task is. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `slack.open_task` | bool | An open task is attached to the unit: neither done nor in the trash, a snoozed or muted one included. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `slack.items_open` | int | Open items whose unit is this unit. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `slack.items_resolved` | int | Resolved items whose unit is this unit. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `slack.items_unowned` | int | Open items of the unit with no assignee, nobody waited on and no basis. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
