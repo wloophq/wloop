@@ -194,6 +194,21 @@ func Once[T any](ctx context.Context, key string, load func() (T, error)) (T, er
 	return v.(T), nil
 }
 
+type pageKey struct{}
+
+// WithPage is ctx serving one page of a read route, which writes nothing: PageOnce under it reads each key once
+// for the page.
+func WithPage(ctx context.Context) context.Context { return context.WithValue(ctx, pageKey{}, &Pass{}) }
+
+// PageOnce is the value of key, loaded once for the page ctx serves; outside a page, load reads it each time.
+func PageOnce[T any](ctx context.Context, key string, load func() (T, error)) (T, error) {
+	p, ok := ctx.Value(pageKey{}).(*Pass)
+	if !ok {
+		return load()
+	}
+	return Once(WithPass(ctx, p), key, load)
+}
+
 // ItemsKey is the Once key of the items of every unit of a pass, a map[unit.Unit][]items.Item, which the facts
 // and the draft step share.
 const ItemsKey = "items"

@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -638,5 +639,32 @@ func TestTheQueueComputesEachTasksFactsOnce(t *testing.T) {
 	}
 	if got := q.factReads.Load(); got != n {
 		t.Fatalf("%d facts reads for a queue of %d tasks, want %d", got, n, n)
+	}
+}
+
+// countedMessages are openMessages that count the reads of one message.
+type countedMessages struct {
+	openMessages
+	reads *atomic.Int64
+}
+
+func (c countedMessages) Message(ctx context.Context, id int64) (dmessage.Message, bool, error) {
+	c.reads.Add(1)
+	return c.openMessages.Message(ctx, id)
+}
+
+func TestTheQueueReadsEachQuestionsMessageOnce(t *testing.T) {
+	t.Parallel()
+	q := newQueueRig(t, nil)
+	q.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "answer the vendor"})
+	q.pinnedQuestion(t, "t-0000000000000001")
+	var reads atomic.Int64
+	m := q.s.deps.Messages.Store.(openMessages)
+	q.s.deps.Messages = &messages.Service{Store: countedMessages{m, &reads}, Books: noBooks{}}
+	if got := q.all(t); len(got.Items) != 1 {
+		t.Fatalf("%d items, want the question", len(got.Items))
+	}
+	if got := reads.Load(); got != 1 {
+		t.Errorf("%d reads of the question's message for one queue page, want 1", got)
 	}
 }

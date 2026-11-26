@@ -241,6 +241,7 @@ func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
 	if p.Pass != nil {
 		ctx = coretasks.WithPass(ctx, p.Pass)
 	}
+	ctx = coretasks.WithPage(ctx)
 	s.queueCounted(ctx, g, &p.Counters, nil)
 	page.Counters = wireCounters(p.Counters)
 	vs := s.taskViews(ctx, g, false)

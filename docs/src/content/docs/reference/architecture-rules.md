@@ -223,7 +223,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/cli/launcher.go` `cliLauncher.Launch` `pr.RefOf` `1` | 🧾 | the launcher reads a pull request's workspace outside the plugin |
 | `internal/cli/launcher.go` `githubRef` `pr.Codec{}.Provider` `1` | 🧾 | the launcher reads a pull request's workspace outside the plugin |
 | `internal/cli/launcher.go` `isPR` `pr.RefOf` `1` | 🧾 | the launcher reads a pull request's workspace outside the plugin |
-| `internal/cli/serve_ended.go` `openPRBooks.Books` `pr.RefOf` `1` | 🧾 | the ended turns' books are pull requests |
+| `internal/cli/serve_ended.go` `openPRBooks.read` `pr.RefOf` `1` | 🧾 | the ended turns' books are pull requests |
 
 ### `TestProviderIdsInStringsOutsideThePluginsOnlyShrink`
 

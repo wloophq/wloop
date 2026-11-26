@@ -101,3 +101,20 @@ func TestATasksFactsMayReadOncePerPassWhileTheyAreRead(t *testing.T) {
 		t.Fatalf("%v, %v", got, err)
 	}
 }
+
+func TestAPageLoadsEachKeyOnceAndNothingOutsideItIsKept(t *testing.T) {
+	var loads int
+	read := func() (int, error) { loads++; return loads, nil }
+	ctx := WithPage(context.Background())
+	for range 3 {
+		if got, err := PageOnce(ctx, "book", read); got != 1 || err != nil {
+			t.Fatalf("PageOnce = %d, %v, want the first load", got, err)
+		}
+	}
+	if got, _ := PageOnce(WithPage(context.Background()), "book", read); got != 2 {
+		t.Errorf("another page's PageOnce = %d, want a load of its own", got)
+	}
+	if got, _ := PageOnce(context.Background(), "book", read); got != 3 {
+		t.Errorf("PageOnce outside a page = %d, want a load each call", got)
+	}
+}
