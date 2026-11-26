@@ -51,7 +51,6 @@ var clientTokens = map[string]string{
 	"blocked":       "a plan decision the API serves",
 	"plan":          "the plan tab's key",
 	"vi":            "the editor run when $VISUAL and $EDITOR are unset",
-	"PR":            "the status item's mark before its first count, the same in every language",
 	"%.1f GiB":      "a size in a binary unit",
 	"%.1f MiB":      "a size in a binary unit",
 	"main":          "a native window's internal name, never shown",
@@ -61,7 +60,7 @@ var clientTokens = map[string]string{
 }
 
 // clientTokenUses is how many literals clientTokens lets pass; a new one raises it on purpose, in review.
-const clientTokenUses = 67
+const clientTokenUses = 66
 
 var (
 	singleWord = regexp.MustCompile(`^[\s(·,;:—–-]*\pL[\pL'’…-]*\pL[\s.,:;!?…)·]*$`)

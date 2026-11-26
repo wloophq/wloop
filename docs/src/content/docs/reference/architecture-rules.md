@@ -124,7 +124,6 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `Enter` | ✅ | a key's name as the served bindings spell it |
 | `Esc` | ✅ | a key's name as the served bindings spell it |
 | `Float` | ✅ | the suffix of the floating widget's window property after the brand's command |
-| `PR` | ✅ | the status item's mark before its first count, the same in every language |
 | `Tab` | ✅ | a key's name as the served bindings spell it |
 | `answer` | ✅ | an action's id |
 | `app` | ✅ | the name the app subscribes to the daemon's events as |
