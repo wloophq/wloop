@@ -94,7 +94,7 @@ func newInitTestEnv(t *testing.T) *initTestEnv {
 		Out: te.out, Err: te.err, In: strings.NewReader(""),
 		forge: ghForge{te.gh}, WS: workspace.NewSet(te.ws),
 		Sh: func(_ context.Context, name string, args ...string) ([]byte, error) {
-			if name == shellPath() && len(args) == 2 && args[0] == "-lc" {
+			if name == "/usr/bin/env" && slices.Contains(args, "-lc") {
 				var out []string
 				for _, b := range te.onPath {
 					out = append(out, "/opt/bin/"+b)

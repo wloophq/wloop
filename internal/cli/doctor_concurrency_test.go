@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"io"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -84,7 +85,7 @@ func TestDoctorWaitsOnItsSlowChecksAtOnce(t *testing.T) {
 	te.Env.forge = slowForge{testForge{te}, b}
 	te.Git = gitx.Git{R: slowGit{te.git, b}}
 	te.Sh = func(_ context.Context, _ string, args ...string) ([]byte, error) {
-		if len(args) > 0 && args[0] == "-lc" {
+		if slices.Contains(args, "-lc") {
 			b.wait("login shell")
 		}
 		return nil, nil
