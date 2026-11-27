@@ -4,9 +4,11 @@
   import { getJSON } from "../../state/api";
   import { checkPanelBuild } from "../../state/build.svelte";
   import Omnibox from "./Omnibox.svelte";
+  import OverlayStack from "./OverlayStack.svelte";
   import { panelFollow } from "./omnibox";
 
-  // The floating panel's page: the omnibox alone, modal and with no backdrop; Esc hides the panel. Each time
+  // The floating panel's page: the omnibox alone, modal and with no backdrop, under the questions it asks; Esc
+  // hides the panel. Each time
   // the panel shows again after it was left it starts empty and follows the daemon's strings and build.
   let { hide = () => window.close() }: { hide?: () => void } = $props();
 
@@ -30,3 +32,4 @@
 {#key shown}
   <Omnibox panel onclose={() => hide()} />
 {/key}
+<OverlayStack />

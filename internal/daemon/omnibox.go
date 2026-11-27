@@ -127,14 +127,23 @@ func (s *Server) omniboxRow(ctx context.Context, u unit.Unit) (row api.Row, held
 	return row, false, ok, err
 }
 
-// asking are ops, each action with what its unit's row asks before it runs; a row that cannot be read asks
-// nothing here, and the run answers for it.
+// asking are ops, each action with what its unit's row asks before it runs and the guidance its spec takes; a
+// row that cannot be read asks nothing here, and the run answers for it. An action that takes no guidance
+// carries none.
 func (s *Server) asking(ctx context.Context, ops []api.OmniboxOperation) []api.OmniboxOperation {
 	rows := map[unit.Unit]api.Row{}
-	for i, op := range ops {
-		ops[i].Confirm = ""
+	specs := s.servedSpecs()
+	for i := range ops {
+		op := &ops[i]
+		op.Confirm, op.Input = "", nil
 		if op.Op != omnibox.OpAction || op.Unit == nil {
 			continue
+		}
+		if j := slices.IndexFunc(specs, func(sp api.ActionSpec) bool { return sp.ID == op.Action }); j >= 0 && takesGuidance(specs[j].Input) {
+			in := *specs[j].Input
+			op.Input = &in
+		} else {
+			op.Guidance = ""
 		}
 		row, read := rows[*op.Unit]
 		if !read {
@@ -145,10 +154,13 @@ func (s *Server) asking(ctx context.Context, ops []api.OmniboxOperation) []api.O
 			rows[*op.Unit] = row
 		}
 		st, _ := offerOf(row, op.Action)
-		ops[i].Confirm = st.Confirm
+		op.Confirm = st.Confirm
 	}
 	return ops
 }
+
+// takesGuidance says whether an action asking in takes free text as its guidance.
+func takesGuidance(in *api.InputSpec) bool { return in != nil && in.Kind == "text" }
 
 // taskRefs find what a token names among the open tasks, the rows and the plugins' addresses.
 type taskRefs struct {

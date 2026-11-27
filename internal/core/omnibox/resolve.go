@@ -53,7 +53,8 @@ type Resolution struct {
 }
 
 // Resolve is text as a pasted address, a known verb's operations on what it names, or a search; a ref that
-// names more than one thing goes to the agent, never guessed.
+// names more than one thing goes to the agent, never guessed. The text after a verb's last ref is the guidance
+// of each action it runs.
 func (r Resolver) Resolve(ctx context.Context, text string) (Resolution, error) {
 	fields := strings.Fields(text)
 	if len(fields) == 0 {
@@ -76,6 +77,7 @@ func (r Resolver) Resolve(ctx context.Context, text string) (Resolution, error) 
 	if len(refs) == 0 {
 		return r.onText(verb, strings.Join(rest, " ")), nil
 	}
+	guidance := afterLast(text, refs[len(refs)-1])
 	var ops []AskOp
 	for _, token := range refs {
 		found, err := r.Refs.Find(ctx, token)
@@ -88,6 +90,9 @@ func (r Resolver) Resolve(ctx context.Context, text string) (Resolution, error) 
 		op, ok := operation(verb, found)
 		if !ok {
 			return Resolution{Kind: KindSearch, Why: WhyNoRef, Params: map[string]string{"ref": token}}, nil
+		}
+		if op.Op == OpAction {
+			op.Guidance = guidance
 		}
 		ops = append(ops, op)
 	}
@@ -141,6 +146,11 @@ func operation(verb Verb, found []Ref) (AskOp, bool) {
 		return AskOp{Op: OpVerb, Task: string(ref.Task), Verb: verb.TaskVerb}, true
 	}
 	return AskOp{}, false
+}
+
+// afterLast is text after the last token, trimmed.
+func afterLast(text, token string) string {
+	return strings.TrimSpace(text[strings.LastIndex(text, token)+len(token):])
 }
 
 // looksLikeRef says whether token is written as an address, a unit or a task id rather than a word.

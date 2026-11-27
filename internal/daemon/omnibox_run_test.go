@@ -10,6 +10,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 func run(t *testing.T, r *tasksRig, ops ...api.OmniboxOperation) []api.OmniboxResult {
@@ -162,5 +163,23 @@ func TestRunNeedsAuthLikeTheHandlers(t *testing.T) {
 	}
 	if n := storedTasks(t, r); n != 1 {
 		t.Fatalf("%d tasks after refused requests", n)
+	}
+}
+
+func TestRunHandsAnActionItsGuidance(t *testing.T) {
+	t.Parallel()
+	s := newServer(t)
+	seedWaitingOnAna(t, s)
+	fa := startingActions(s)
+	s.deps.Actions = fa
+	u := unit.Unit{Provider: unit.GitHub, Key: "acme/api#9"}
+	body, _ := json.Marshal(api.OmniboxRun{Operations: []api.OmniboxOperation{{Op: "action", Unit: &u, Action: "review", Guidance: "every TODO needs an issue"}}})
+	rec := post(t, s, api.OmniboxRunPath, string(body))
+	var out api.OmniboxRan
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || len(out.Results) != 1 || !out.Results[0].OK {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	if len(fa.calls) != 1 || !strings.HasSuffix(fa.calls[0], " every TODO needs an issue") {
+		t.Fatalf("the action ran as %v", fa.calls)
 	}
 }

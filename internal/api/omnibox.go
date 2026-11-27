@@ -82,7 +82,8 @@ type OmniboxProposal struct {
 
 // OmniboxOperation is one operation: Op "action" (Action on Unit), "verb" (Verb on Task), "capture" (a
 // task titled Title) or "start" (a task from Brief, started in Repo). Confirm is what the unit's row asks
-// before Action runs, for the person confirming the operation to read.
+// before Action runs, for the person confirming the operation to read; Input is the guidance Action takes, for
+// the person to give or change, nil when it takes none.
 type OmniboxOperation struct {
 	Op       string     `json:"op"`
 	Unit     *unit.Unit `json:"unit,omitempty"`
@@ -95,6 +96,7 @@ type OmniboxOperation struct {
 	Guidance string     `json:"guidance,omitempty"`
 	Reason   string     `json:"reason,omitempty"`
 	Confirm  string     `json:"confirm,omitempty"`
+	Input    *InputSpec `json:"input,omitempty"`
 }
 
 // OmniboxRun is the operations the user confirmed.

@@ -7,6 +7,7 @@ import { net } from "../../state/api";
 import { state } from "../../state/store.svelte";
 import * as actions from "../../state/actions.svelte";
 import * as loaders from "../../state/loaders.svelte";
+import { askConfirm, closeOverlays, overlays } from "../../state/overlays.svelte";
 import { resetStore } from "../../testing/reset.svelte";
 import Omnibox from "./Omnibox.svelte";
 import { omniboxAct, omniboxEnter, omniboxNew, omniboxTrap, omniboxType, panelFollow, type OmniEnv } from "./omnibox";
@@ -99,7 +100,10 @@ function fake(input: Input) {
     clear: () => {},
     now: () => 0,
     open: (href) => { log.opened.push(href); },
-    act: async (u, id, copies, row) => { log.acts.push(u.key + " " + id + (row ? " on " + row.title : "")); log.actCopies.push(!!copies); },
+    act: async (u, id, copies, row, guidance) => {
+      log.acts.push(u.key + " " + id + (row ? " on " + row.title : "") + (guidance === undefined ? "" : " guided " + JSON.stringify(guidance)));
+      log.actCopies.push(!!copies);
+    },
     close: () => { log.closed++; },
   };
   return { log, env, held, ctl };
@@ -418,7 +422,7 @@ describe("omnibox_test.go", () => {
   });
 
   test("TestOmniboxPanelHandsAnActionThatNeedsAnInputToTheWindow", async () => {
-    for (const input of [{ kind: "text", required: true }, { kind: "duration", required: true }, { kind: "answer" }]) {
+    for (const input of [{ kind: "duration", required: true }, { kind: "answer" }]) {
       const o = mount({ resolve: unitWith({ id: "guide", label: "Guide", input }) }, { panel: true });
       await o.type(ADDRESS);
       await fireEvent.click(o.button("Guide"));
@@ -429,14 +433,123 @@ describe("omnibox_test.go", () => {
     }
   });
 
-  test("the panel runs an action whose guidance is optional, without it", async () => {
-    const o = mount({ resolve: unitWith({ id: "review", label: "Review", input: { kind: "text" } }) }, { panel: true });
+  const REVIEW = { id: "review", label: "Review", input: { kind: "text", label: "Guidance", placeholder: "what the round should look at", max: 40 } };
+  const unitPosts = (o: ReturnType<typeof mount>) => o.log.posts.filter((p) => p.url.startsWith("/api/units/")).map((p) => [p.url, p.body]);
+
+  test("an action that takes guidance asks it in the unit's card, as its spec words it, before it runs", async () => {
+    for (const panel of [false, true]) {
+      const o = mount({ resolve: unitWith(REVIEW) }, { panel });
+      await o.type(ADDRESS);
+      await fireEvent.click(o.button("Review"));
+      await settle();
+      const field = o.q(".omni-guide input")[0] as HTMLInputElement;
+      expect(field.getAttribute("aria-label")).toBe("Guidance");
+      expect(field.placeholder).toBe("what the round should look at");
+      expect(field.maxLength).toBe(40);
+      expect(document.activeElement).toBe(field);
+      expect(o.log.acts).toEqual([]);
+      expect(unitPosts(o)).toEqual([]);
+      cleanup();
+    }
+  });
+
+  test("the main window runs the action with the guidance typed in the card, or without it when empty", async () => {
+    for (const [typed, want] of [["  every TODO needs an issue ", "every TODO needs an issue"], ["", ""]]) {
+      const o = mount({ resolve: unitWith(REVIEW) });
+      await o.type(ADDRESS);
+      await fireEvent.click(o.button("Review"));
+      await settle();
+      const field = o.q(".omni-guide input")[0] as HTMLInputElement;
+      field.value = typed;
+      await fireEvent.input(field);
+      await fireEvent.keyDown(field, { key: "Enter" });
+      await settle();
+      expect(o.log.acts).toEqual(["acme/api#8 review guided " + JSON.stringify(want)]);
+      expect(o.q(".omni-guide")).toEqual([]);
+      cleanup();
+    }
+  });
+
+  test("the panel posts the guidance typed in the card, and none when it is empty", async () => {
+    for (const [typed, body] of [["focus on the migration", { source: "cockpit", guidance: "focus on the migration" }], ["", { source: "cockpit" }]] as const) {
+      const o = mount({ resolve: unitWith(REVIEW) }, { panel: true });
+      await o.type(ADDRESS);
+      await fireEvent.click(o.button("Review"));
+      await settle();
+      const field = o.q(".omni-guide input")[0] as HTMLInputElement;
+      field.value = typed;
+      await fireEvent.input(field);
+      await fireEvent.click(o.q(".omni-guide button")[0]);
+      await settle();
+      expect(o.log.opened).toEqual([]);
+      expect(unitPosts(o)).toEqual([["/api/units/alpha/acme%2Fapi%238/review", body]]);
+      expect(o.log.closed).toBe(1);
+      cleanup();
+    }
+  });
+
+  test("a required guidance runs only once given, in the panel too", async () => {
+    const o = mount({ resolve: unitWith({ id: "guide", label: "Guide", input: { kind: "text", required: true, label: "Brief" } }) }, { panel: true });
+    await o.type(ADDRESS);
+    await fireEvent.click(o.button("Guide"));
+    await settle();
+    const run = o.q(".omni-guide button")[0] as HTMLButtonElement;
+    expect(run.disabled).toBe(true);
+    const field = o.q(".omni-guide input")[0] as HTMLInputElement;
+    await fireEvent.keyDown(field, { key: "Enter" });
+    await settle();
+    expect(unitPosts(o)).toEqual([]);
+    field.value = "the brief";
+    await fireEvent.input(field);
+    expect(run.disabled).toBe(false);
+    await fireEvent.click(run);
+    await settle();
+    expect(unitPosts(o)).toEqual([["/api/units/alpha/acme%2Fapi%238/guide", { source: "cockpit", guidance: "the brief" }]]);
+    expect(o.log.opened).toEqual([]);
+  });
+
+  test("Esc in the card's guidance puts it away and keeps the omnibox open", async () => {
+    const o = mount({ resolve: unitWith(REVIEW) }, { panel: true });
     await o.type(ADDRESS);
     await fireEvent.click(o.button("Review"));
     await settle();
-    expect(o.log.opened).toEqual([]);
-    expect(o.log.posts.filter((p) => p.url.startsWith("/api/units/")).map((p) => [p.url, p.body])).toEqual([["/api/units/alpha/acme%2Fapi%238/review", { source: "cockpit" }]]);
-    expect(o.log.closed).toBe(1);
+    await fireEvent.keyDown(o.q(".omni-guide input")[0], { key: "Escape" });
+    await settle();
+    expect(o.q(".omni-guide")).toEqual([]);
+    expect(o.log.closed).toBe(0);
+    expect(document.activeElement).toBe(o.field);
+  });
+
+  test("new text puts the card's guidance away", async () => {
+    const o = mount({ resolve: unitWith(REVIEW) });
+    await o.type(ADDRESS);
+    await fireEvent.click(o.button("Review"));
+    await settle();
+    await o.type(ADDRESS + " ");
+    expect(o.q(".omni-guide")).toEqual([]);
+  });
+
+  test("an operation to confirm that takes guidance shows it, editable, and runs with it", async () => {
+    const op = { op: "action", unit: { provider: "alpha", key: "acme/api#8" }, action: "review", guidance: "focus on X", input: REVIEW.input };
+    const o = mount({ resolve: { "review acme/api#8 focus on X": { kind: "verb", preview: { operations: [op] } } } });
+    await o.type("review acme/api#8 focus on X");
+    const field = o.q(".omni-op input.omni-edit")[0] as HTMLInputElement;
+    expect(field.value).toBe("focus on X");
+    expect(field.getAttribute("aria-label")).toBe("Guidance");
+    expect(field.placeholder).toBe("what the round should look at");
+    expect(field.maxLength).toBe(40);
+    field.value = "focus on Y";
+    await fireEvent.input(field);
+    await fireEvent.click(o.button("Run"));
+    await settle();
+    const run = o.log.posts.filter((p) => p.url === "/api/omnibox/run");
+    expect(run.map((p) => p.body.operations[0].guidance)).toEqual(["focus on Y"]);
+  });
+
+  test("an operation that takes no guidance shows no field for it", async () => {
+    const o = mount({ resolve: { "review acme/api#8": { kind: "verb", preview: { operations: [{ op: "action", unit: { provider: "alpha", key: "acme/api#8" }, action: "track" }] } } } });
+    await o.type("review acme/api#8");
+    expect(o.q(".omni-op input.omni-edit")).toEqual([]);
   });
 
   test("TestOmniboxPanelRunsAnActionThatCopiesInTheClick", async () => {
@@ -520,6 +633,27 @@ describe("omnibox_test.go", () => {
       await settle();
     }
     expect(o.log.actCopies).toEqual([false, true]);
+  });
+
+  test("omniboxAct runs with the guidance given and asks for none", async () => {
+    net.fetch = async () => new Response(JSON.stringify({ row: { unit: { provider: "alpha", key: "acme/api#8" }, actions: [{ id: "review", enabled: true }] } }));
+    vi.mocked(loaders.refreshSpecs).mockResolvedValue();
+    const extras: J[] = [];
+    vi.mocked(actions.act).mockImplementation(async (_row: J, _id: string, extra: J) => { extras.push(extra); return true; });
+    state.specs = { version: "", byId: { review: { id: "review", input: { kind: "text" } } } };
+    await omniboxAct({ provider: "alpha", key: "acme/api#8" }, "review", false, undefined, "focus on X");
+    expect(extras).toEqual([{ guidance: "focus on X" }]);
+    expect(overlays.stack).toEqual([]);
+  });
+
+  test("the panel asks a row's confirm in its own page", async () => {
+    net.fetch = async () => new Response("{}");
+    const { container } = render(PanelOmnibox, { hide: () => {} });
+    const asked = askConfirm("Starts a new round?");
+    flushSync();
+    expect((container.ownerDocument.body.textContent || "").includes("Starts a new round?")).toBe(true);
+    closeOverlays();
+    expect(await asked).toBe(false);
   });
 
   test("TestOmniboxActRunsTheServedRowsAction", async () => {
