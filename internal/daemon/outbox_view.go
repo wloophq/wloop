@@ -255,11 +255,11 @@ func (ev *taskViewer) draftOf(ctx context.Context, e task.Task) (draftShown, boo
 	if dt, ok := ev.draftTasks[e.ID]; ok {
 		return dt, true, nil
 	}
-	d, err := s.deps.Outbox.Store.Get(ctx, n)
+	d, err := s.pageDraft(ctx, n)
 	if err != nil {
 		return draftShown{}, false, err
 	}
-	g, _, err := s.deps.Outbox.GateOf(ctx, d)
+	g, err := s.pageDraftGate(ctx, d)
 	if err != nil {
 		return draftShown{}, false, err
 	}

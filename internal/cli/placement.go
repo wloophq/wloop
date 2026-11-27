@@ -3,8 +3,9 @@ package cli
 import (
 	"context"
 	"errors"
-	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"maps"
+
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/config"
