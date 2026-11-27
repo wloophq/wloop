@@ -8,8 +8,10 @@ import (
 
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/card"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/wake"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -119,5 +121,47 @@ func TestPrepareStartsAPassOverEveryTask(t *testing.T) {
 		if n := e.reads[what]; n != 1 {
 			t.Errorf("%s read %d times for %d tasks", what, n, len(units))
 		}
+	}
+}
+
+// TestHeldSaysWhatTheFactsSayReadingOnlyGatesAndTurnsOncePerPass: whether the loop still holds a task is what
+// its facts say of its open gates and running turns, and a pass reads the gates and the open turns once for
+// every task and nothing else to say it.
+func TestHeldSaysWhatTheFactsSayReadingOnlyGatesAndTurnsOncePerPass(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	e := newEnv(t)
+	chatC := unit.Unit{Provider: "chat", Key: "T1/C1/300.3"}
+	done := func(id task.ID, u unit.Unit) task.Task {
+		return e.task(task.Task{ID: id, State: "done", Category: task.CategoryDone, Title: string(id), Units: []unit.Unit{u}})
+	}
+	all := []task.Task{done("t-01", chatA), done("t-02", chatB), done("t-03", chatC),
+		e.task(task.Task{ID: "t-04", State: "next", Category: task.CategoryReady, Title: "t-04"})}
+	if _, err := e.db.Gates(func() time.Time { return monday }).Open(ctx, gate.Gate{Task: "t-01", Unit: task.UnitOf("t-01"), Kind: gate.KindPlan, Name: "plan", Subject: "1", Intents: []string{"approve"}}); err != nil {
+		t.Fatal(err)
+	}
+	e.open = map[unit.Unit][]turn.Turn{chatB: {{State: turn.Started}}}
+	want := map[task.ID]bool{"t-01": true, "t-02": true}
+	for _, en := range all {
+		f, err := e.p.TaskFacts(ctx, en)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if facts := f["task.gates_open"].(int) > 0 || f["task.turns_running"].(int) > 0; facts != want[en.ID] {
+			t.Fatalf("%s: its facts say held %v, want %v", en.ID, facts, want[en.ID])
+		}
+		if held, err := e.p.Held(ctx, en); err != nil || held != want[en.ID] {
+			t.Errorf("%s: held %v (%v), want %v", en.ID, held, err, want[en.ID])
+		}
+	}
+	e.reads = map[string]int{}
+	pctx := coretasks.WithPass(ctx, &coretasks.Pass{Tasks: all})
+	for _, en := range all {
+		if held, err := e.p.Held(pctx, en); err != nil || held != want[en.ID] {
+			t.Errorf("%s in a pass: held %v (%v), want %v", en.ID, held, err, want[en.ID])
+		}
+	}
+	if !reflect.DeepEqual(e.reads, map[string]int{"gates": 1, "every open gate": 1, "open turns": 1}) {
+		t.Errorf("a pass over %d tasks read %v to say which the loop holds", len(all), e.reads)
 	}
 }

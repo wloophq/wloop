@@ -64,6 +64,7 @@ var viewsGrammar = []Key{
 	{Path: "views.*.group", In: SurfaceViews, Kind: KindText, Doc: "The fact the view groups by, such as task.owed_by."},
 	{Path: "views.*.sort", In: SurfaceViews, Kind: KindText, Doc: "The facts the view sorts by, comma-separated; a leading - sorts one descending. A view's tasks start oldest first, a parent's children in their sibling order."},
 	{Path: "views.*.key", In: SurfaceViews, Kind: KindText, Doc: "The key that jumps to the view: `g`, a space and a key that no core key uses, such as `g i`. Its help is the view's label, and its help line the view's summary."},
+	{Path: "views.*.closed", In: SurfaceViews, Kind: KindBool, Default: "false", Doc: "The view lists closed tasks too, those of a done or dropped category. Without it the view lists the open tasks and the closed ones the loop still holds (an open gate waits on the user over it, or an agent's turn runs on it), and reads no fact of any other closed task: its `when` never sees one."},
 	{Path: "views.*.hide_disabled", In: SurfaceViews, Kind: KindBool, Default: "false", Doc: "The view hides the tasks whose units are all of a disabled plugin, and the gates on a disabled plugin's units."},
 	{Path: "views.*.opens", In: SurfaceViews, Kind: KindTable, Doc: "What a page of the view opens instead of its own, such as one that opens what waits on you narrowed to the drafts to send; none opens its own."},
 	{Path: "views.*.opens.view", In: SurfaceViews, Kind: KindText, Doc: "The view it opens, such as needs-you."},

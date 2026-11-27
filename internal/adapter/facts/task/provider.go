@@ -263,6 +263,21 @@ func (p *Provider) TaskFacts(ctx context.Context, e task.Task) (workflow.Facts, 
 	return out, p.costlyFacts(ctx, e, out)
 }
 
+// Held says whether the loop still holds e: an open gate waits on the user over it, or an agent's turn runs on
+// it, as its task.gates_open and task.turns_running say; in a pass, the gates and the turns are read once for
+// every task.
+func (p *Provider) Held(ctx context.Context, e task.Task) (bool, error) {
+	gs, err := p.gates(ctx, e.ID)
+	if err != nil || len(gs) > 0 {
+		return len(gs) > 0, err
+	}
+	if p.d.OpenTurns == nil {
+		return false, nil
+	}
+	o, err := p.openTurns(ctx, append([]unit.Unit{task.UnitOf(e.ID)}, unitsOf(e)...))
+	return o.running > 0, err
+}
+
 func fingerprint(e task.Task) string {
 	return string(e.ID) + "|" + string(e.State) + "|" + e.Updated.UTC().Format(time.RFC3339Nano)
 }
