@@ -67,6 +67,55 @@ func TestASweepsPassReadsTheCurrentView(t *testing.T) {
 	}
 }
 
+// TestAPullRequestNoClosedTaskLinksReadsItsOwnEventsAlone reads, for the facts of a pull request no closed task of
+// the pass links, its own events, and leaves those of the closed tasks' pull requests unread.
+func TestAPullRequestNoClosedTaskLinksReadsItsOwnEventsAlone(t *testing.T) {
+	t.Parallel()
+	w := newWorld()
+	w.add(1, "ana", nil)
+	w.add(9, "bea", nil)
+	var closed []task.Task
+	for i, n := range []int{4, 5, 6} {
+		w.add(n, "ana", nil)
+		closed = append(closed, task.Task{ID: task.ID("t-" + string(rune('x'+i))), State: "done", Category: task.CategoryDone, Units: []unit.Unit{ref(n).Unit()}})
+	}
+	open := task.Task{ID: "t-a", State: "next", Category: task.CategoryReady, Units: []unit.Unit{ref(1).Unit()}}
+	p := w.provider()
+	ctx := coretasks.WithPage(coretasks.WithPass(context.Background(), &coretasks.Pass{Tasks: append(closed, open)}))
+	if _, err := p.Facts(ctx, ref(9).Unit()); err != nil {
+		t.Fatal(err)
+	}
+	if w.eventRefs != 2 {
+		t.Errorf("the facts of a pull request no task links asked for the events of %d pull requests, want its own and the open task's", w.eventRefs)
+	}
+}
+
+// TestAPassWithNoChangeLogReadsEachCallsOwnEvents reads, in a pass that serves no page and over no change log,
+// where each call builds its own view, the events of the pull request each call asks for alone.
+func TestAPassWithNoChangeLogReadsEachCallsOwnEvents(t *testing.T) {
+	t.Parallel()
+	w := newWorld()
+	var es []task.Task
+	for i, n := range []int{1, 2, 3, 4} {
+		w.add(n, "ana", nil)
+		e := task.Task{ID: task.ID("t-" + string(rune('a'+i))), State: "next", Category: task.CategoryReady, Units: []unit.Unit{ref(n).Unit()}}
+		if n > 2 {
+			e.State, e.Category = "done", task.CategoryDone
+		}
+		es = append(es, e)
+	}
+	p := w.provider()
+	ctx := coretasks.WithPass(context.Background(), &coretasks.Pass{Tasks: es})
+	for _, e := range es {
+		if _, err := p.Facts(ctx, e.Units[0]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if w.eventRefs != len(es) {
+		t.Errorf("%d calls with no view to share asked for the events of %d pull requests, want one each", len(es), w.eventRefs)
+	}
+}
+
 // TestAPassOutsideAPageReadsItsOpenTasksEventsOnce reads, in a pass that serves no page, the events of every
 // pull request its open tasks link at once, for every view the calls find current.
 func TestAPassOutsideAPageReadsItsOpenTasksEventsOnce(t *testing.T) {
