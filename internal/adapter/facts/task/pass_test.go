@@ -3,11 +3,16 @@ package facttask_test
 import (
 	"context"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/catalog"
+	"github.com/wloophq/wloop/internal/core/gates"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/card"
+	"github.com/wloophq/wloop/internal/domain/decision"
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -124,10 +129,10 @@ func TestPrepareStartsAPassOverEveryTask(t *testing.T) {
 	}
 }
 
-// TestHeldSaysWhatTheFactsSayReadingOnlyGatesAndTurnsOncePerPass: whether the loop still holds a task is what
-// its facts say of its open gates and running turns, and a pass reads the gates and the open turns once for
-// every task and nothing else to say it.
-func TestHeldSaysWhatTheFactsSayReadingOnlyGatesAndTurnsOncePerPass(t *testing.T) {
+// TestHeldSaysWhatTheFactsSayReadingOnlyGatesDraftsAndTurnsOncePerPass: whether the loop still holds a task is
+// what its facts say of its open gates, its decisions (a failed delivery's approved gate among them) and its
+// running turns, and a pass reads the gates, the failed drafts and the open turns once for every task.
+func TestHeldSaysWhatTheFactsSayReadingOnlyGatesDraftsAndTurnsOncePerPass(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	e := newEnv(t)
@@ -141,13 +146,27 @@ func TestHeldSaysWhatTheFactsSayReadingOnlyGatesAndTurnsOncePerPass(t *testing.T
 		t.Fatal(err)
 	}
 	e.open = map[unit.Unit][]turn.Turn{chatB: {{State: turn.Started}}}
-	want := map[task.ID]bool{"t-01": true, "t-02": true}
+	e.decisions = decision.Map{Gates: map[gate.Kind]decision.Kind{gate.KindDraft: decision.SendDraft}}
+	all = append(all, done("t-05", chatA))
+	d, err := e.db.Drafts().Insert(ctx, draft.Draft{Unit: chatA, Kind: "reply", Text: "hi", State: draft.Failed, CreatedAt: monday})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gs := e.db.Gates(func() time.Time { return monday })
+	g, err := gs.Open(ctx, gate.Gate{Task: "t-05", Unit: task.UnitOf("t-05"), Kind: gate.KindDraft, Subject: strconv.FormatInt(int64(d.ID), 10), Intents: []string{"approve"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := gs.Resolve(ctx, g.ID, gates.Resolution{Status: gate.Approved, Intent: "approve", By: task.ActorPerson}); err != nil {
+		t.Fatal(err)
+	}
+	want := map[task.ID]bool{"t-01": true, "t-02": true, "t-05": true}
 	for _, en := range all {
 		f, err := e.p.TaskFacts(ctx, en)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if facts := f["task.gates_open"].(int) > 0 || f["task.turns_running"].(int) > 0; facts != want[en.ID] {
+		if facts := catalog.HeldBy(f); facts != want[en.ID] {
 			t.Fatalf("%s: its facts say held %v, want %v", en.ID, facts, want[en.ID])
 		}
 		if held, err := e.p.Held(ctx, en); err != nil || held != want[en.ID] {
@@ -161,7 +180,7 @@ func TestHeldSaysWhatTheFactsSayReadingOnlyGatesAndTurnsOncePerPass(t *testing.T
 			t.Errorf("%s in a pass: held %v (%v), want %v", en.ID, held, err, want[en.ID])
 		}
 	}
-	if !reflect.DeepEqual(e.reads, map[string]int{"gates": 1, "every open gate": 1, "open turns": 1}) {
+	if !reflect.DeepEqual(e.reads, map[string]int{"gates": 2, "every open gate": 1, "drafts": 1, "open turns": 1}) {
 		t.Errorf("a pass over %d tasks read %v to say which the loop holds", len(all), e.reads)
 	}
 }

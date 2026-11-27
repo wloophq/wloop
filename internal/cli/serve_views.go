@@ -42,7 +42,7 @@ func (e *Env) lens() catalog.Lens {
 		return read()
 	}, Held: func(ctx context.Context, t task.Task) (bool, error) {
 		if e.taskHeld == nil {
-			f, err := e.factsOfTask(ctx, t)
+			f, err := e.factsOfTask(catalog.HeldReads(ctx), t)
 			return catalog.HeldBy(f), err
 		}
 		return e.taskHeld(ctx, t)

@@ -196,8 +196,8 @@ func compareFact(a, b any) int {
 type Lens struct {
 	Loaded func() *intentload.Loaded
 	Facts  func(ctx context.Context, t task.Task) (workflow.Facts, error)
-	// Held says whether the loop still holds t: an open gate waits on the user over it, or an agent's turn
-	// runs on it; nil: what Facts says of them.
+	// Held says whether the loop still holds t: an open gate or a failed delivery waits on the user over it,
+	// or an agent's turn runs on it; nil: what Facts says of them.
 	Held func(ctx context.Context, t task.Task) (bool, error)
 	Now  func() time.Time
 }
@@ -205,7 +205,7 @@ type Lens struct {
 // Eval says whether t is in view.
 func (l Lens) Eval(ctx context.Context, view string, t task.Task) (bool, error) {
 	def := l.Loaded().Views
-	if !t.Open() {
+	if v, ok := def.View(view); ok && !v.Closed && !t.Open() {
 		held, err := l.held(ctx, t)
 		if err != nil {
 			return false, err
@@ -226,7 +226,7 @@ func (l Lens) Sort(ctx context.Context, view string, ts []task.Task) error {
 	return Sort(l.Loaded().Views, view, ts, func(t task.Task) (workflow.Facts, error) { return l.facts(ctx, view, t) })
 }
 
-// held is l.Held, else what t's facts say of its open gates and running turns.
+// held is l.Held, else what t's facts say of its open gates, its decisions and its running turns.
 func (l Lens) held(ctx context.Context, t task.Task) (bool, error) {
 	if l.Held != nil {
 		return l.Held(ctx, t)
@@ -234,19 +234,25 @@ func (l Lens) held(ctx context.Context, t task.Task) (bool, error) {
 	if l.Facts == nil {
 		return false, nil
 	}
-	f, err := l.Facts(workflow.WithReads(ctx, "task.gates_open", "task.turns_running"), t)
+	f, err := l.Facts(HeldReads(ctx), t)
 	if err != nil {
 		return false, err
 	}
 	return HeldBy(f), nil
 }
 
-// heldBy says whether facts f hold an open gate or a running turn.
+// HeldBy says whether facts f hold an open gate, a decision the user owes or a running turn.
 func HeldBy(f workflow.Facts) bool {
 	gates, _ := f["task.gates_open"].(int)
+	decisions, _ := f["task.decisions"].([]string)
 	turns, _ := f["task.turns_running"].(int)
-	return gates > 0 || turns > 0
+	return gates > 0 || len(decisions) > 0 || turns > 0
 }
+
+var heldReads = []string{"task.gates_open", "task.decisions", "task.turns_running"}
+
+// HeldReads narrows ctx's reads to those HeldBy reads.
+func HeldReads(ctx context.Context) context.Context { return workflow.WithReads(ctx, heldReads...) }
 
 func (l Lens) facts(ctx context.Context, view string, t task.Task) (workflow.Facts, error) {
 	in := l.Loaded()

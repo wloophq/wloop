@@ -582,7 +582,7 @@
         "properties": {
           "closed": {
             "default": false,
-            "description": "The view lists closed tasks too, those of a done or dropped category. Without it the view lists the open tasks and the closed ones the loop still holds (an open gate waits on the user over it, or an agent's turn runs on it), and reads no fact of any other closed task: its `when` never sees one.",
+            "description": "The view lists closed tasks too, those of a done or dropped category. Without it the view lists the open tasks and the closed ones the loop still holds (an open gate or a failed delivery waits on the user over it, or an agent's turn runs on it), and reads no fact of any other closed task: its `when` never sees one.",
             "type": "boolean"
           },
           "counted": {

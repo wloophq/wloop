@@ -211,9 +211,12 @@ func TestAViewListsOpenTasksAloneUnlessItAsksForClosedOnes(t *testing.T) {
 	l.Views.Views = append(slices.Clone(l.Views.Views),
 		intentload.ViewDef{ID: "every", Over: task.OverTasks, When: every},
 		intentload.ViewDef{ID: "every-ever", Over: task.OverTasks, When: every, Closed: true})
-	var read []task.ID
+	var read, heldAsked []task.ID
 	lens := Lens{Loaded: func() *intentload.Loaded { return l }, Now: func() time.Time { return lensNow },
-		Held: func(_ context.Context, e task.Task) (bool, error) { return e.ID == "t-asked", nil },
+		Held: func(_ context.Context, e task.Task) (bool, error) {
+			heldAsked = append(heldAsked, e.ID)
+			return e.ID == "t-asked", nil
+		},
 		Facts: func(_ context.Context, e task.Task) (workflow.Facts, error) {
 			read = append(read, e.ID)
 			return TaskFacts(e, l.Tasks), nil
@@ -222,6 +225,7 @@ func TestAViewListsOpenTasksAloneUnlessItAsksForClosedOnes(t *testing.T) {
 	done := task.Task{ID: "t-done", State: "done", Category: task.CategoryDone, Props: task.Props{}}
 	dropped := task.Task{ID: "t-dropped", State: "trash", Category: task.CategoryDropped, Props: task.Props{}}
 	asked := task.Task{ID: "t-asked", State: "done", Category: task.CategoryDone, Props: task.Props{}}
+	failed := task.Task{ID: "t-failed", State: "done", Category: task.CategoryDone, Props: task.Props{}}
 	for _, c := range []struct {
 		view string
 		e    task.Task
@@ -231,13 +235,16 @@ func TestAViewListsOpenTasksAloneUnlessItAsksForClosedOnes(t *testing.T) {
 		{"every-ever", open, true}, {"every-ever", done, true}, {"every-ever", dropped, true},
 		{"every", asked, true}, {"every-ever", asked, true},
 	} {
-		read = nil
+		read, heldAsked = nil, nil
 		in, err := lens.Eval(ctx, c.view, c.e)
 		if err != nil || in != c.want {
 			t.Errorf("%s holds %s: %v (%v), want %v", c.view, c.e.ID, in, err, c.want)
 		}
 		if !c.e.Open() && !c.want && len(read) > 0 {
 			t.Errorf("%s read the facts of %s, a closed task it cannot hold", c.view, c.e.ID)
+		}
+		if c.view == "every-ever" && len(heldAsked) > 0 {
+			t.Errorf("%s, which lists closed tasks, asked whether the loop holds %s", c.view, c.e.ID)
 		}
 		f := TaskFacts(c.e, l.Tasks)
 		if c.e.ID == "t-asked" {
@@ -252,12 +259,15 @@ func TestAViewListsOpenTasksAloneUnlessItAsksForClosedOnes(t *testing.T) {
 	unwired.Facts = func(_ context.Context, e task.Task) (workflow.Facts, error) {
 		f := TaskFacts(e, l.Tasks)
 		f["task.turns_running"] = map[task.ID]int{"t-asked": 1}[e.ID]
+		if e.ID == "t-failed" {
+			f["task.decisions"] = []string{"send-draft"}
+		}
 		return f, nil
 	}
 	for _, c := range []struct {
 		e    task.Task
 		want bool
-	}{{asked, true}, {done, false}} {
+	}{{asked, true}, {failed, true}, {done, false}} {
 		if in, err := unwired.Eval(ctx, "every", c.e); err != nil || in != c.want {
 			t.Errorf("with no Held, every holds %s: %v (%v), want %v", c.e.ID, in, err, c.want)
 		}

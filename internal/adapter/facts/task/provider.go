@@ -263,13 +263,22 @@ func (p *Provider) TaskFacts(ctx context.Context, e task.Task) (workflow.Facts, 
 	return out, p.costlyFacts(ctx, e, out)
 }
 
-// Held says whether the loop still holds e: an open gate waits on the user over it, or an agent's turn runs on
-// it, as its task.gates_open and task.turns_running say; in a pass, the gates and the turns are read once for
-// every task.
+// Held says whether the loop still holds closed task e: an open gate or a failed delivery waits on the user over it, or an
+// agent's turn runs on it, as its task.gates_open, task.decisions and task.turns_running say; in a pass, the
+// gates, the failed drafts and the turns are read once for every task.
 func (p *Provider) Held(ctx context.Context, e task.Task) (bool, error) {
 	gs, err := p.gates(ctx, e.ID)
 	if err != nil || len(gs) > 0 {
 		return len(gs) > 0, err
+	}
+	if p.d.Decisions != nil {
+		w, err := p.waiting(ctx, e.ID, gs)
+		if err != nil {
+			return false, err
+		}
+		if len(w.Of(p.d.Decisions(), e.ID, nil)) > 0 {
+			return true, nil
+		}
 	}
 	if p.d.OpenTurns == nil {
 		return false, nil
