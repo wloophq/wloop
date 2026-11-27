@@ -40,11 +40,12 @@ import (
 )
 
 // cockpitShape is a store as the cockpit reads it on a busy day: every task open, each linked to a pull request
-// or a Slack thread holding up to four items, a question on one task in ten, a held draft on one in twenty with a question that offers it, and
+// or a Slack thread holding up to four items, a workflow's proposal on one task in ten, a held draft on one in twenty with a proposal that offers it, and
 // a project every fifty tasks whose next tasks are its children.
 type cockpitShape struct{ tasks int }
 
-// seed writes s into db.
+// seed writes s into db. The messages are workflows' proposals, which no reconcile of the daemon closes: a
+// question with no turn behind it would close as the daemon starts, at a moment no read controls.
 func (s cockpitShape) seed(tb testing.TB, db *sqlite.DB) {
 	tb.Helper()
 	ctx := context.Background()
@@ -116,12 +117,12 @@ func (s cockpitShape) seed(tb testing.TB, db *sqlite.DB) {
 	for i, c := range changes {
 		id, u := c.Task.ID, c.Task.Units[0]
 		if i%10 == 3 {
-			m, err := msgs.Upsert(ctx, message.Message{TaskID: string(id), Unit: task.UnitOf(id), Kind: message.Question, Text: "Which widget first?",
+			m, err := msgs.Upsert(ctx, message.Message{TaskID: string(id), Unit: task.UnitOf(id), Kind: message.Proposal, Text: "Which widget first?",
 				Origin: message.Origin{Kind: message.OriginWorkflow, Workflow: "widget-ask"}, CreatedAt: testNow.Add(-time.Hour)})
 			if err != nil {
 				tb.Fatal(err)
 			}
-			if _, err := gs.Open(ctx, gate.Gate{Task: id, Unit: task.UnitOf(id), Kind: gate.KindQuestion, Subject: strconv.FormatInt(m.ID, 10)}); err != nil {
+			if _, err := gs.Open(ctx, gate.Gate{Task: id, Unit: task.UnitOf(id), Kind: gate.KindProposal, Subject: strconv.FormatInt(m.ID, 10)}); err != nil {
 				tb.Fatal(err)
 			}
 		}
@@ -136,13 +137,13 @@ func (s cockpitShape) seed(tb testing.TB, db *sqlite.DB) {
 			if _, err := gs.Open(ctx, gate.Gate{Task: id, Unit: u, Kind: gate.KindDraft, Subject: strconv.FormatInt(int64(d.ID), 10)}); err != nil {
 				tb.Fatal(err)
 			}
-			m, err := msgs.Upsert(ctx, message.Message{TaskID: string(id), Unit: task.UnitOf(id), Kind: message.Question, Text: "Send this nudge?",
+			m, err := msgs.Upsert(ctx, message.Message{TaskID: string(id), Unit: task.UnitOf(id), Kind: message.Proposal, Text: "Send this nudge?",
 				Options: []record.Option{{ID: "send", Label: "Send", Draft: &record.DraftRef{ID: int64(d.ID), Rev: d.Rev}}, {ID: "skip", Label: "Skip"}},
 				Origin:  message.Origin{Kind: message.OriginWorkflow, Workflow: "widget-pick"}, CreatedAt: testNow.Add(-time.Hour)})
 			if err != nil {
 				tb.Fatal(err)
 			}
-			if _, err := gs.Open(ctx, gate.Gate{Task: id, Unit: task.UnitOf(id), Kind: gate.KindQuestion, Subject: strconv.FormatInt(m.ID, 10)}); err != nil {
+			if _, err := gs.Open(ctx, gate.Gate{Task: id, Unit: task.UnitOf(id), Kind: gate.KindProposal, Subject: strconv.FormatInt(m.ID, 10)}); err != nil {
 				tb.Fatal(err)
 			}
 		}
