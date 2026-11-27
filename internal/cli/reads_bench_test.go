@@ -39,10 +39,11 @@ import (
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
-// cockpitShape is a store as the cockpit reads it on a busy day: every task open, each linked to a pull request
-// or a Slack thread holding up to four items, a workflow's proposal on one task in ten, a held draft on one in twenty with a proposal that offers it, and
-// a project every fifty tasks whose next tasks are its children.
-type cockpitShape struct{ tasks int }
+// cockpitShape is a store as the cockpit reads it: tasks open tasks, each linked to a pull request or a Slack
+// thread holding up to four items, a workflow's proposal on one task in ten, a held draft on one in twenty with a
+// proposal that offers it, and a project every fifty tasks whose next tasks are its children; then closed tasks
+// finished or trashed, linked alike, nothing waiting on them.
+type cockpitShape struct{ tasks, closed int }
 
 // seed writes s into db. The messages are workflows' proposals, which no reconcile of the daemon closes: a
 // question with no turn behind it would close as the daemon starts, at a moment no read controls.
@@ -55,7 +56,7 @@ func (s cockpitShape) seed(tb testing.TB, db *sqlite.DB) {
 	var its []items.Item
 	var changes []task.Change
 	var project task.ID
-	for i := range s.tasks {
+	for i := range s.tasks + s.closed {
 		id := task.ID(fmt.Sprintf("t-%016x", i+1))
 		e := task.Task{ID: id, Title: "Widget task " + strconv.Itoa(i+1), Notes: "about widget " + strconv.Itoa(i%97), Origin: task.OriginUser,
 			Created: at.Add(time.Duration(i) * time.Minute), Updated: at.Add(time.Duration(i) * time.Minute)}
@@ -68,6 +69,10 @@ func (s cockpitShape) seed(tb testing.TB, db *sqlite.DB) {
 			e.State, e.Category = "waiting", task.CategoryWaiting
 		}
 		switch {
+		case i >= s.tasks && i%3 == 0:
+			e.State, e.Category = "trash", task.CategoryDropped
+		case i >= s.tasks:
+			e.State, e.Category = "done", task.CategoryDone
 		case i%50 == 0:
 			e.SetProp(task.PropKind, task.Value{Text: task.KindProject}, task.WriterPerson, at)
 			e.State, e.Category = "next", task.CategoryReady
@@ -78,7 +83,7 @@ func (s cockpitShape) seed(tb testing.TB, db *sqlite.DB) {
 		n := i % 5
 		if i%2 == 0 {
 			ref := pr.Ref{Owner: "acme", Repo: "widgets", Number: i + 1}
-			p := dinv.PR{Ref: ref, Title: "Widget change " + strconv.Itoa(i+1), Author: "ana", State: "OPEN", HeadOid: fmt.Sprintf("%040x", i+1),
+			p := dinv.PR{Ref: ref, Title: "Widget change " + strconv.Itoa(i+1), Author: "ana", State: prState(i < s.tasks), HeadOid: fmt.Sprintf("%040x", i+1),
 				HeadBranch: "feat/" + strconv.Itoa(i+1), BaseBranch: "main", ChecksState: "SUCCESS", ReviewDecision: "REVIEW_REQUIRED",
 				URL: "https://github.example/acme/widgets/pull/" + strconv.Itoa(i+1), CreatedAt: at, UpdatedAt: at, LastSeenAt: testNow,
 				Reasons: []string{"review_requested"}}
@@ -114,7 +119,7 @@ func (s cockpitShape) seed(tb testing.TB, db *sqlite.DB) {
 	}
 	gs := db.Gates(func() time.Time { return testNow })
 	msgs := inventory.NewMessages(db)
-	for i, c := range changes {
+	for i, c := range changes[:s.tasks] {
 		id, u := c.Task.ID, c.Task.Units[0]
 		if i%10 == 3 {
 			m, err := msgs.Upsert(ctx, message.Message{TaskID: string(id), Unit: task.UnitOf(id), Kind: message.Proposal, Text: "Which widget first?",
@@ -148,6 +153,13 @@ func (s cockpitShape) seed(tb testing.TB, db *sqlite.DB) {
 			}
 		}
 	}
+}
+
+func prState(open bool) string {
+	if open {
+		return "OPEN"
+	}
+	return "MERGED"
 }
 
 // readsDaemon is a daemon over a store shaped as s, wired as serve wires it, and the change log it notes on; the
@@ -212,8 +224,19 @@ func burst(tb testing.TB, ctx context.Context, h http.Handler) {
 
 // BenchmarkReads times the cockpit's reads over 2000 open tasks, wired as serve wires them; cold reads follow a
 // note of a topic the facts read, so each builds a new pass. queries/op counts the statements the store ran.
+// BenchmarkReads reads a store of 2000 open tasks, and one of 130 open over 1900 closed, as a store that has
+// kept its history for months holds.
 func BenchmarkReads(b *testing.B) {
-	h, log := readsDaemon(b, cockpitShape{tasks: 2000})
+	for _, shape := range []struct {
+		name  string
+		shape cockpitShape
+	}{{"open", cockpitShape{tasks: 2000}}, {"history", cockpitShape{tasks: 130, closed: 1900}}} {
+		b.Run(shape.name, func(b *testing.B) { benchmarkReads(b, shape.shape) })
+	}
+}
+
+func benchmarkReads(b *testing.B, s cockpitShape) {
+	h, log := readsDaemon(b, s)
 	cold := func() { log.Note(port.TopicTasks) }
 	for _, c := range []struct {
 		name string
@@ -241,14 +264,14 @@ func BenchmarkReads(b *testing.B) {
 	}
 }
 
-// TestACockpitReadQueriesTheStoreAFixedNumberOfTimes guards BenchmarkReads' cold reads: ten times the tasks
-// cost no more statements.
+// TestACockpitReadQueriesTheStoreAFixedNumberOfTimes guards BenchmarkReads' cold reads: ten times the open and
+// the closed tasks cost no more statements.
 func TestACockpitReadQueriesTheStoreAFixedNumberOfTimes(t *testing.T) {
 	if testing.Short() {
 		t.Skip("seeds two stores")
 	}
-	queries := func(n int, path string) (int64, *meter.Scope) {
-		h, log := readsDaemon(t, cockpitShape{tasks: n})
+	queries := func(s cockpitShape, path string) (int64, *meter.Scope) {
+		h, log := readsDaemon(t, s)
 		log.Note(port.TopicTasks)
 		ctx, sc := metertest.Start(t, context.Background())
 		read(t, ctx, h, path)
@@ -256,10 +279,10 @@ func TestACockpitReadQueriesTheStoreAFixedNumberOfTimes(t *testing.T) {
 	}
 	for _, path := range []string{readSearch, readQueue, readHome, readNeedsYou} {
 		t.Run(path, func(t *testing.T) {
-			few, _ := queries(20, path)
-			many, sc := queries(200, path)
+			few, _ := queries(cockpitShape{tasks: 20, closed: 20}, path)
+			many, sc := queries(cockpitShape{tasks: 200, closed: 200}, path)
 			if many > few {
-				t.Errorf("%s: %d statements over 20 tasks, %d over 200", path, few, many)
+				t.Errorf("%s: %d statements over 20 open and 20 closed tasks, %d over 200 and 200", path, few, many)
 				metertest.Within(t, sc, metertest.Budget{{Res: meter.SQL}: few})
 			}
 		})
