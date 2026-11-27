@@ -51,12 +51,14 @@ func (h *fakeHost) ShowFloat(url string, reload bool) {
 	}
 	h.record("float " + url)
 }
-func (h *fakeHost) HideFloat()                { h.record("hide-float") }
-func (h *fakeHost) SetFloatFrame(r Rect)      { h.record(fmt.Sprint("float-frame ", r)) }
-func (h *fakeHost) PlaceFloat(p FloatPlace)   { h.record(fmt.Sprintf("float-place %q", p.Edge)) }
+func (h *fakeHost) HideFloat()           { h.record("hide-float") }
+func (h *fakeHost) SetFloatFrame(r Rect) { h.record(fmt.Sprint("float-frame ", r)) }
+func (h *fakeHost) PlaceFloat(p FloatPlace) {
+	h.record(fmt.Sprintf("float-place %q", p.Edge) + filterOf(p.Filter))
+}
 func (h *fakeHost) LoadFloatPanel(url string) { h.record("fpanel-load " + url) }
 func (h *fakeHost) TellFloatPanel(p PanelPlace) {
-	h.record(fmt.Sprintf("fpanel-tell %q %q %q %vx%v", p.Mode, p.Item, p.Side, p.MaxW, p.MaxH))
+	h.record(fmt.Sprintf("fpanel-tell %q %q %q %vx%v", p.Mode, p.Item, p.Side, p.MaxW, p.MaxH) + filterOf(p.Filter))
 }
 func (h *fakeHost) ShowFloatPanel(r Rect, mode string) {
 	h.record(fmt.Sprint("fpanel-show ", r, " ", mode))
@@ -67,6 +69,14 @@ func (h *fakeHost) Listen(hs Handlers) error {
 	defer h.mu.Unlock()
 	h.listened = &hs
 	return h.listen
+}
+
+// filterOf is how a call records the filter it tells, nothing for none.
+func filterOf(f FloatFilter) string {
+	if !f.On() {
+		return ""
+	}
+	return fmt.Sprintf(" filter %q %q", f.Q, f.Kinds)
 }
 
 func (h *fakeHost) taken() []string {

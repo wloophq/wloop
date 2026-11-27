@@ -22,7 +22,7 @@ A work loop for the reviews and pull requests that reach you.
   [cyan]status[/]                 What needs you, by view, and the tracked pull requests
   [cyan]tui[/]                    The same views in the terminal, one-key actions
   [cyan]open[/]                   The cockpit, a workspace or a pull request
-  [cyan]outbox[/]                 Drafts waiting for your approval, and yours
+  [cyan]needs[/]                  What waits on you: questions, drafts, plans and steps
   [cyan]task[/]                   Create a task, or make this agent session a run of one
   [cyan]explore[/]                Open pull requests of others to help on
 
@@ -70,7 +70,7 @@ A work loop for the reviews and pull requests that reach you.
 [bold]FOR AGENTS AND SCRIPTS[/]
   [cyan]instructions[/]           Run a turn by hand from an agent session
   [cyan]turn end/answer[/]        Record how a turn ended; read your answer
-  [cyan]draft[/]                  Write, read, revise, post or withdraw your drafts
+  [cyan]draft[/]                  Write, revise, post, discard or withdraw drafts
   [cyan]hook[/]                   The agent hooks install writes
   [cyan]serve[/]                  Run the daemon
   [cyan]app[/]                    macOS: the menu bar and notifications

@@ -1,6 +1,6 @@
 # GateCard
 
-The one decision card: an open gate on a task (a plan step, a question, a post, a proposal) or a draft, with the actions it offers. `GateCard.svelte` and `DraftCard.svelte` in `internal/web/ui/src/components/gates/` draw it for the detail panel, and the Outbox and the queues draw the same components.
+The one decision card: an open gate on a task (a plan step, a question, a post, a proposal) or a draft, with the actions it offers. `GateCard.svelte` and `DraftCard.svelte` in `internal/web/ui/src/components/gates/` draw it for the detail panel, and the queues draw the same components.
 
 ## Gate
 
@@ -16,7 +16,7 @@ An `article.ask.d-gate` on `raise`, `rule-strong` border, `radius-lg`:
 
 ## Draft
 
-A `section.d-draft` on `raise`: its purpose and, once it left your hands, its state as the heading, in the words of `gates.toml`'s `[drafts.purposes]` and `[drafts.states]` (a purpose with no word shows as named); in the Outbox, what it answers (the [OutboxGroup](../OutboxGroup/README.md) context block); where it posts and the language its text is written in (by name, `Intl.DisplayNames`); who wrote its current content, in `gates.toml`'s `[drafts.authors]` words; the summary line its kind's preview template renders (`d-preview`, from the plugin's profile layer, none when the kind has no template); the text as it will be posted (markdown); every value of its payload, as a `dl.d-payload` of the plugin's words (`ui.toml`'s `[drafts.<kind>.fields]`) over the value, a worded value keeping its raw one in its title, an object's or a list's values nested one step in on a `rule` border, multi-line values whole; the profile's notes on how it stands (`d-note`: stale in `err`, held from rules, posted by your rule); why it was drafted; what sending it does besides posting, one sentence per effect from `gates.toml`'s `[effects]`; the window line when its gate has one; its actions; links to its task and to its unit at the source.
+A `section.d-draft` on `raise`: its purpose and, once it left your hands, its state as the heading, in the words of `gates.toml`'s `[drafts.purposes]` and `[drafts.states]` (a purpose with no word shows as named); where it posts and the language its text is written in (by name, `Intl.DisplayNames`); who wrote its current content, in `gates.toml`'s `[drafts.authors]` words; the summary line its kind's preview template renders (`d-preview`, from the plugin's profile layer, none when the kind has no template); the text as it will be posted (markdown); every value of its payload, as a `dl.d-payload` of the plugin's words (`ui.toml`'s `[drafts.<kind>.fields]`) over the value, a worded value keeping its raw one in its title, an object's or a list's values nested one step in on a `rule` border, multi-line values whole; the profile's notes on how it stands (`d-note`: stale in `err`, held from rules, posted by your rule); why it was drafted; what sending it does besides posting, one sentence per effect from `gates.toml`'s `[effects]`; the window line when its gate has one; its actions; links to its task and to its unit at the source.
 
 While a gate's or a draft's intent is on its way, its card dims (`.resolving`, `aria-busy`, over `motion-fast`) and takes no clicks; the next redraw drops it, and a failure brings it back.
 

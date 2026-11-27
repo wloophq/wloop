@@ -1,11 +1,13 @@
+import { KIND } from "../lib/routes";
 import type { J } from "../lib/util";
 import { APIError, getJSON } from "./api";
 import { state } from "./store.svelte";
 import { CONN_CLOSED, DEBOUNCE_MS, timer, type Follow } from "./sync.svelte";
 
 // The floating widget's state, which each of its two pages keeps on its own: the queue of every decision kind in the
-// daemon's order and the live turns, which both read; where the tab sits; and, in the panel's page, which item is
-// current and whether it shows a peek, the full panel or nothing. Nothing is drawn here.
+// daemon's order, narrowed by the widget's filter, and the live turns, which both read; where the tab sits; and, in
+// the panel's page, which item is current and whether it shows a peek, the full panel or nothing. Nothing is drawn
+// here.
 
 export const FLOAT_QUEUE = "/api/queue";
 export const FLOAT_TURNS = "/api/turns/live";
@@ -36,9 +38,39 @@ export const FLOAT_MODES: readonly FloatMode[] = ["", "peek", "panel"];
 // FloatHide is how long the host hides the widget: until something new arrives, for an hour, or until tomorrow.
 export type FloatHide = "quiet" | "hour" | "tomorrow";
 
-// FloatPlace is where the host keeps the tab: docked on a side edge, which stands it upright, or free.
+// FloatPlace is where the host keeps the tab: docked on a side edge, which stands it upright, or free; and the
+// filter the host keeps.
 export interface FloatPlace {
   edge: "" | "left" | "right";
+  filter?: FloatFilter;
+}
+
+// FloatFilter narrows the queue the widget shows: q is a lens query, as the cockpit's, and kinds the decision kinds it
+// keeps, every kind when none.
+export interface FloatFilter {
+  q: string;
+  kinds: string[];
+}
+
+// filterOf reads a filter the host sent; null when it sent none.
+function filterOf(raw: unknown): FloatFilter | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as J;
+  const kinds: string[] = [];
+  for (const k of Array.isArray(r.kinds) ? r.kinds : []) if (typeof k === "string" && k.trim() && !kinds.includes(k.trim())) kinds.push(k.trim());
+  return { q: typeof r.q === "string" ? r.q.trim() : "", kinds };
+}
+
+const filterOn = (f: FloatFilter): boolean => !!f.q || f.kinds.length > 0;
+const sameFilter = (a: FloatFilter, b: FloatFilter): boolean => a.q === b.q && a.kinds.join(" ") === b.kinds.join(" ");
+
+// queueURL is the queue f narrows.
+function queueURL(f: FloatFilter): string {
+  const p = new URLSearchParams();
+  if (f.q) p.set("q", f.q);
+  for (const k of f.kinds) p.append(KIND, k);
+  const qs = p.toString();
+  return qs ? FLOAT_QUEUE + "?" + qs : FLOAT_QUEUE;
 }
 
 // PanelPlace is where the host puts the panel's window: on which side of the tab, and the room it may fill there,
@@ -67,6 +99,12 @@ export type FloatRead = "ok" | "offline" | "failed";
 
 const fresh = () => ({
   items: [] as J[],
+  // total counts the whole queue, of which the filter shows items; present are the kinds it holds, and kinds every
+  // kind the daemon names, in its order.
+  total: 0,
+  present: [] as string[],
+  kinds: [] as J[],
+  filter: { q: "", kinds: [] } as FloatFilter,
   current: 0,
   title: "",
   empty: "",
@@ -104,6 +142,7 @@ const marks = {
   chain: Promise.resolve(),
   idle: false,
   missed: null as Reads | null,
+  refiltered: false,
 };
 
 // itemKey names an item across reads, as the menu bar does: its gate, else its task's decision of its kind and
@@ -176,10 +215,17 @@ function arrived(item: J): void {
   if (quiet) floatDeps.peek(item);
 }
 
-function applyQueue(q: J): void {
+// applyQueue takes q, the queue the filter shows, out of whole, the queue it narrows; what a new filter brings in is no
+// arrival.
+function applyQueue(q: J, whole: J = q): void {
   const items: J[] = (q && q.items) || [];
+  const all: J[] = (whole && whole.items) || [];
   const keys = items.map(itemKey);
-  const arrivals = fl.loaded ? items.filter((_, i) => !marks.seen.has(keys[i])) : [];
+  const arrivals = fl.loaded && !marks.refiltered ? items.filter((_, i) => !marks.seen.has(keys[i])) : [];
+  marks.refiltered = false;
+  fl.total = all.length;
+  fl.present = [...new Set(all.map((it) => it.kind as string))];
+  fl.kinds = (whole && whole.kinds) || fl.kinds;
   fl.current = successor(fl.items, fl.current, items);
   fl.items = items;
   fl.title = (q && q.title) || "";
@@ -226,13 +272,16 @@ function wake(): void {
 
 async function read(asked: Reads): Promise<void> {
   const what = fl.read === "ok" ? asked : { queue: true, turns: true };
-  const [q, tr] = await Promise.allSettled([what.queue ? getJSON(FLOAT_QUEUE) : null, what.turns ? getJSON(FLOAT_TURNS) : null]);
-  if (q.status === "rejected") {
-    lose(q.reason instanceof APIError && q.reason.status > 0 ? "failed" : "offline");
+  const filter = fl.filter;
+  const narrowed = what.queue && filterOn(filter);
+  const [q, tr, whole] = await Promise.allSettled([what.queue ? getJSON(queueURL(filter)) : null, what.turns ? getJSON(FLOAT_TURNS) : null, narrowed ? getJSON(FLOAT_QUEUE) : null]);
+  const failed = [q, whole].find((r) => r.status === "rejected") as PromiseRejectedResult | undefined;
+  if (failed) {
+    lose(failed.reason instanceof APIError && failed.reason.status > 0 ? "failed" : "offline");
     return retry();
   }
   fl.read = "ok";
-  if (what.queue) applyQueue(q.value);
+  if (what.queue && sameFilter(filter, fl.filter)) applyQueue((q as PromiseFulfilledResult<J>).value, narrowed ? (whole as PromiseFulfilledResult<J>).value : undefined);
   if (tr.status === "rejected") {
     Object.assign(fl, { turns: null, turnsFailed: true });
     return retry();
@@ -290,18 +339,37 @@ export const floatFollow: Follow = {
   lost: () => lose("offline"),
 };
 
-// setPlace keeps where the host says the tab sits.
+// setPlace keeps where the host says the tab sits, and the filter it keeps.
 function setPlace(p: Partial<FloatPlace> | undefined): void {
   if (!p || typeof p !== "object") return;
   fl.place = { edge: p.edge === "left" || p.edge === "right" ? p.edge : "" };
+  takeFilter(p.filter);
+}
+
+// takeFilter narrows the queue by the filter raw names, reading it again when it changed; a page that sleeps reads it
+// as it wakes.
+function takeFilter(raw: unknown): boolean {
+  const f = filterOf(raw);
+  if (!f || sameFilter(f, fl.filter)) return false;
+  fl.filter = f;
+  marks.refiltered = true;
+  if (asleep()) miss({ queue: true, turns: false });
+  else void floatLoad({ queue: true, turns: false });
+  return true;
+}
+
+// setFilter narrows the queue by f and asks the host to keep it, which tells the other page.
+function setFilter(f: FloatFilter): void {
+  if (takeFilter(f)) floatDeps.post({ type: "float:filter", filter: fl.filter });
 }
 
 const SIDES: readonly PanelPlace["side"][] = ["left", "right", "above", "below"];
 
 // show shows m in the panel's page, at the place the host gives: the full panel on item's key, else on the item
 // last peeked at, a peek at item, or nothing. The same mode again with no item only takes the new place.
-function show(m: FloatMode, p?: Partial<PanelPlace> & { item?: string }): void {
+function show(m: FloatMode, p?: Partial<PanelPlace> & { item?: string; filter?: FloatFilter }): void {
   if (p && typeof p === "object") {
+    takeFilter(p.filter);
     const size = (n: unknown) => (typeof n === "number" && n > 0 ? n : 0);
     fl.room = { side: SIDES.includes(p.side as PanelPlace["side"]) ? (p.side as PanelPlace["side"]) : "", maxW: size(p.maxW), maxH: size(p.maxH) };
   }
@@ -438,6 +506,22 @@ export function floatState() {
     get items(): J[] {
       return fl.items;
     },
+    // total counts the whole queue the filter narrows.
+    get total(): number {
+      return fl.total;
+    },
+    get filter(): FloatFilter {
+      return fl.filter;
+    },
+    get filtered(): boolean {
+      return filterOn(fl.filter);
+    },
+    // kinds are the kinds a filter may keep: those the whole queue holds, and those the filter keeps, in the daemon's
+    // order, each with its label.
+    get kinds(): J[] {
+      const named: J[] = fl.kinds.length ? fl.kinds : fl.present.map((id) => ({ id, label: id }));
+      return named.filter((k) => fl.present.includes(k.id) || fl.filter.kinds.includes(k.id));
+    },
     get current(): number {
       return fl.current;
     },
@@ -501,6 +585,7 @@ export function floatState() {
       return this.read === "ok";
     },
     setPlace,
+    setFilter,
     holdPeek,
     releasePeek,
     show,
@@ -528,7 +613,7 @@ export type FloatState = ReturnType<typeof floatState>;
 // resetFloat puts the widget back as the page starts; tests call it between cases.
 export function resetFloat(): void {
   for (const id of Object.values(marks.timers)) timer.clear(id);
-  Object.assign(marks, { seen: new Set<string>(), focus: "", burst: false, retries: 0, queued: null, chain: Promise.resolve(), idle: false, missed: null });
+  Object.assign(marks, { seen: new Set<string>(), focus: "", burst: false, retries: 0, queued: null, chain: Promise.resolve(), idle: false, missed: null, refiltered: false });
   marks.timers = { peek: undefined, focus: undefined, quiet: undefined, sync: undefined, retry: undefined };
   Object.assign(fl, fresh());
 }

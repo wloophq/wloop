@@ -6,13 +6,13 @@ import { dropOverlays } from "../state/overlays.svelte";
 import { served } from "../state/keycaps.svelte";
 import { nav } from "../state/route.svelte";
 import {
-  answered, busy, catalog, collapsed, detailState, drafts, editing, editPayloads, editRevs, gateState, homeState, notice, outboxState,
+  answered, busy, catalog, collapsed, detailState, drafts, editing, editPayloads, editRevs, gateState, homeState, notice,
   plugins, queueState, removeState, reviewState, state, taskState, tasksState,
 } from "../state/store.svelte";
 import { I18N } from "../lib/i18n.svelte";
 
 // fresh are the store's values as the page starts, taken before any test writes.
-const fresh = $state.snapshot({ catalog, state, detailState, drafts, homeState, notice, outboxState, queueState, removeState, reviewState, taskState, tasksState });
+const fresh = $state.snapshot({ catalog, state, detailState, drafts, homeState, notice, queueState, removeState, reviewState, taskState, tasksState });
 
 // resetStore puts every store back as the page starts, the clock at now and the hash at hash.
 // A test that wants the sync an action asks for drives it itself: resetStore stops any read a previous test left
@@ -30,7 +30,6 @@ export function resetStore(now = Date.parse("2026-11-07T12:00:00Z"), hash = ""):
   Object.assign(drafts, copy.drafts);
   Object.assign(homeState, copy.homeState);
   Object.assign(notice, copy.notice);
-  Object.assign(outboxState, copy.outboxState);
   Object.assign(queueState, copy.queueState);
   Object.assign(removeState, copy.removeState);
   Object.assign(reviewState, copy.reviewState);

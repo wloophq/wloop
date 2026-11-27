@@ -15,10 +15,6 @@ profile   = "address"
 dims      = ["reviewer"]
 effects   = ["pr.addressed", "turn.guidance_handed", "turn.round_sent", "plan.cleared"]
 
-[outbox]
-title = "Address rounds"
-about = "Drafted when you address the reviews and checks of your own pull request."
-
 [help]
 target   = "a pull request URL"
 summary  = "Triage the reviews and failing checks of yours"

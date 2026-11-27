@@ -182,8 +182,8 @@ type Notifications struct {
 // of the browser; Hotkey is the global shortcut that opens the omnibox panel,
 // "" for none. Float turns the floating widget on, FloatHotkey shows and
 // hides it, FloatMorning is the local "HH:MM" a snooze until tomorrow ends
-// at, and FloatOverFullScreen lets the floating widget show over a
-// full-screen app.
+// at, FloatOverFullScreen lets the floating widget show over a full-screen
+// app, and FloatFilter is the lens query its filter starts with.
 type Window struct {
 	Enabled             bool   `json:"enabled"`
 	Hotkey              string `json:"hotkey"`
@@ -191,6 +191,7 @@ type Window struct {
 	FloatHotkey         string `json:"float_hotkey"`
 	FloatMorning        string `json:"float_morning"`
 	FloatOverFullScreen bool   `json:"float_over_full_screen"`
+	FloatFilter         string `json:"float_filter"`
 }
 
 // The values of window.float.

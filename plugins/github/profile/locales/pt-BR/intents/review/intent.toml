@@ -2,10 +2,6 @@ label = "Review"
 summary = "Começar ou continuar uma rodada de review no pull request de outra pessoa, num workspace dedicado"
 why = "{{.pr.review.reason}}"
 
-[outbox]
-title = "Reviews"
-about = "Rascunhado por uma rodada de review no pull request de outra pessoa."
-
 [guidance]
 help = "o que a rodada deve olhar"
 

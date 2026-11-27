@@ -55,7 +55,7 @@
 "answer queued; the agent session is told of it when the agent stops" = "answer queued; the agent session is told of it when the agent stops"
 "Reply not saved" = "Reply not saved"
 "Nothing was typed." = "Nothing was typed."
-"Reply saved to the Outbox" = "Reply saved to the Outbox"
+"Reply saved for your approval" = "Reply saved for your approval"
 "Reply sent" = "Reply sent"
 "Action not sent" = "Action not sent"
 # The terminal client.
@@ -222,7 +222,7 @@
 "Posted" = "Posted"
 "Draft text" = "Draft text"
 "Draft {id} approved; it goes out in a moment" = "Draft {id} approved; it goes out in a moment"
-"Draft {id} saved to the Outbox for your approval" = "Draft {id} saved to the Outbox for your approval"
+"Draft {id} saved; it waits in Needs you for your approval" = "Draft {id} saved; it waits in Needs you for your approval"
 "Draft {purpose}" = "Draft {purpose}"
 "Due in 24h" = "Due in 24h"
 "Enter marks the step done; ] and [ move between steps" = "Enter marks the step done; ] and [ move between steps"
@@ -305,7 +305,6 @@
 "Round sends" = "Round sends"
 "Runs" = "Runs"
 "Save as draft" = "Save as draft"
-"Save to Outbox" = "Save to Outbox"
 "Send" = "Send"
 "Send now" = "Send now"
 "Send reply" = "Send reply"
@@ -619,15 +618,8 @@
 "{unit} by {author} · opened {opened} · updated {updated}" = "{unit} by {author} · opened {opened} · updated {updated}"
 "{unit} is in the inventory." = "{unit} is in the inventory."
 "{unit} is not in the inventory." = "{unit} is not in the inventory."
-# The Outbox.
+# A folded text and an item's state.
 "Read all" = "Read all"
-"Could not load the Outbox: {error}" = "Could not load the Outbox: {error}"
-"{n} draft" = { one = "{n} draft", other = "{n} drafts" }
-"Stop drafting these" = "Stop drafting these"
-"An open question decides these drafts: the option you pick posts its draft and withdraws the other options' drafts." = "An open question decides these drafts: the option you pick posts its draft and withdraws the other options' drafts."
-"Stop this workflow" = "Stop this workflow"
-"Keep it" = "Keep it"
-"Stopped {workflow}" = "Stopped {workflow}"
 "open" = "open"
 "resolved" = "resolved"
 # A unit's items.
@@ -716,7 +708,7 @@
 "That link could not be read, so the default view opened" = "That link could not be read, so the default view opened"
 "{action} ({key})" = "{action} ({key})"
 "In the detail" = "In the detail"
-# The detail's chrome, the Outbox's groups and the filter bar.
+# The detail's chrome and the filter bar.
 "Changed since you saw it" = "Changed since you saw it"
 "{n} draft waits for you" = { one = "{n} draft waits for you", other = "{n} drafts wait for you" }
 "Risk" = "Risk"
@@ -806,6 +798,9 @@
 # The floating widget.
 "{n} wait on you" = { one = "{n} waits on you", other = "{n} wait on you" }
 "Nothing waits on you" = "Nothing waits on you"
+"{n} of {total} wait on you" = { one = "{n} of {total} waits on you", other = "{n} of {total} wait on you" }
+"Filter the queue" = "Filter the queue"
+"Decision kinds" = "Decision kinds"
 "Pin" = "Pin"
 "Offline" = "Offline"
 "The daemon is not answering." = "The daemon is not answering."

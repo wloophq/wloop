@@ -141,25 +141,3 @@ func TestTaskFacetsTakeTheOrderOfTheirFactFromTheProfile(t *testing.T) {
 		t.Errorf("prop.kind rank %v, want its enum values %v", byID["prop.kind"].Rank, p.Values)
 	}
 }
-
-func TestDraftFacetsServeTheirMechanics(t *testing.T) {
-	specs := DraftFacets(bundled(t).Views.DraftFacets)
-	byID := map[string]api.FacetSpec{}
-	var ids []string
-	for _, f := range specs {
-		byID[f.ID] = f
-		ids = append(ids, f.ID)
-	}
-	if want := []string{"proposer", "workflow", "kind", "source", "where", "people", "state", "age"}; !slices.Equal(ids, want) {
-		t.Errorf("draft facets %q, want %q", ids, want)
-	}
-	if s := byID["state"]; s.Fact != "draft.state" || !slices.Equal(s.Rank, []string{"failed", "sending", "queued", "held"}) || s.Labels["held"] == "" {
-		t.Errorf("state: %+v", s)
-	}
-	if s := byID["source"]; s.Labels["github"] != "GitHub" || s.Labels["slack"] != "Slack" {
-		t.Errorf("source: %+v, want the words the task source facet gives its values", s)
-	}
-	if p := byID["people"]; p.Match != "team" || !p.Group {
-		t.Errorf("people: %+v", p)
-	}
-}

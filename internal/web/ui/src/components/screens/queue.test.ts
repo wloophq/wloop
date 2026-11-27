@@ -247,12 +247,12 @@ describe("a decision queue", () => {
   });
 });
 
-// withNeedsYou is the views catalog with Needs you drawn as the queue and the Outbox opening it narrowed to drafts.
+// withNeedsYou is the views catalog with Needs you drawn as the queue and a user's view over drafts opening it
+// narrowed to drafts.
 function withNeedsYou(): void {
   const cat = fixture("views.json");
-  cat.views = [{ id: "needs-you", label: "Needs you", rail: true, layout: "queue" },
-    ...cat.views.filter((v: J) => v.id !== "outbox"),
-    { id: "outbox", label: "Outbox", rail: true, over: "gates", layout: "outbox", opens: "view=needs-you&kind=send-draft" }];
+  cat.views = [{ id: "needs-you", label: "Needs you", rail: true, layout: "queue" }, ...cat.views,
+    { id: "held-drafts", label: "Held drafts", rail: true, over: "gates", opens: "view=needs-you&kind=send-draft" }];
   tasksState.catalog = cat;
 }
 
@@ -278,22 +278,22 @@ describe("Needs you", () => {
     expect(viewHash({ task: "t-9" })).toBe("view=inbox&task=t-9");
   });
 
-  it("outbox route opens Needs you filtered to send-draft", async () => {
+  it("a view that opens Needs you filtered to send-draft opens it", async () => {
     withNeedsYou();
     input.queues = { "send-draft": { kind: "send-draft", title: "Drafts to send", empty: "No draft waits to be sent.", total: 1, items: [itemOf("send-draft", "t-9")] } };
-    nav.hash = "#view=outbox";
+    nav.hash = "#view=held-drafts";
     await loadTasks();
     expect(nav.hash).toBe("#view=needs-you&kind=send-draft");
     expect(log.gets).toContain("/api/queues/send-draft");
-    expect(log.gets.some((u) => u.startsWith("/api/outbox"))).toBe(false);
+    expect(log.gets.some((u) => u.includes("view=held-drafts"))).toBe(false);
     const c = render(Queue).container as HTMLElement;
     expect(rows(c)[0]).toBe("task:t-9");
   });
 
-  it("keeps the area, the contexts and the filter through the Outbox's redirect", async () => {
+  it("keeps the area, the contexts and the filter through a view's redirect", async () => {
     withNeedsYou();
     input.queues = { "send-draft": { kind: "send-draft", title: "Drafts to send", total: 0, items: [] } };
-    nav.hash = "#view=outbox&area=OSS&ctx=" + encodeURIComponent("@decide") + "&q=retries";
+    nav.hash = "#view=held-drafts&area=OSS&ctx=" + encodeURIComponent("@decide") + "&q=retries";
     await loadTasks();
     expect(nav.hash).toBe("#view=needs-you&kind=send-draft&area=OSS&ctx=%40decide&q=retries");
     expect(log.gets).toContain("/api/queues/send-draft?q=retries");

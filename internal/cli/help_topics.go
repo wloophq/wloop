@@ -110,10 +110,10 @@ func helpGroups(manager string) []helpGroup {
 				Names:   []string{"status"},
 				Summary: "What needs you, by view, and the tracked pull requests",
 				Usage:   []string{"status [--color auto|always|never]"},
-				About: "List the tasks of the views the badge names, such as Inbox and Needs me, then the pull requests you track. " +
+				About: "List the tasks of the views the badge names, such as Needs you, Next actions and Inbox, then the pull requests you track. " +
 					"Piped, it prints one tab-separated line per task or pull request and view.",
 				Flags:    []helpFlag{colorFlag},
-				Examples: []string{"status", "status | grep needs-me"},
+				Examples: []string{"status", "status | grep next"},
 				Docs:     "concepts/surfaces",
 			},
 			{
@@ -135,38 +135,38 @@ func helpGroups(manager string) []helpGroup {
 					"With --print, print the cockpit URL with its token instead of opening it.",
 				Flags: []helpFlag{
 					{"--print", "Print the cockpit URL with its token instead of opening it"},
-					{"--view <view>", "The cockpit view, by its id, such as needs-me or mine"},
+					{"--view <view>", "The cockpit view, by its id, such as next or inbox"},
 				},
-				Examples: []string{"open", "open " + pr, "open '#queue=answer'", "open " + brand.URLScheme() + "://open/#view=needs-me", "open --print --view needs-me"},
+				Examples: []string{"open", "open " + pr, "open '#queue=answer'", "open " + brand.URLScheme() + "://open/#view=next", "open --print --view next"},
 				Docs:     "concepts/surfaces",
 			},
 			{
-				Names:   []string{"outbox"},
-				Summary: "Drafts waiting for your approval, and yours",
+				Names:   []string{"needs"},
+				Summary: "What waits on you: questions, drafts, plans and steps",
 				Usage: []string{
-					"outbox [list] [--color <when>]", "outbox show <id> [--color <when>]",
-					"outbox new <unit|message> <markdown> [--send [--yes]]", "outbox new <unit|message> --react <emoji> [--send [--yes]]",
-					"outbox approve <id> [--text <markdown> --rev <n>] [--yes]", "outbox retry <id> [--confirm] [--yes]",
-					"outbox edit <id> <markdown> --rev <n>", "outbox discard <id> [--reason <why>]",
+					"needs [<query>] [--kind <kind>]... [--open] [--color <when>]", "needs show <ref> [--color <when>]",
+					"needs approve <ref> [--text <markdown> --rev <n>] [--payload <json> --rev <n>] [--confirm] [--yes]",
+					"needs answer <ref> [<option>] [--text <answer>] [--yes]",
 				},
-				About: "List the drafts waiting on you, proposed, failed or left sending, grouped by kind, or print one whole: its text as it reads, the items it is about and the commands it takes. " +
-					"Piped, the list is one tab-separated line per draft: id, kind, state, unit, label, mentions, creation time and first line. " +
-					"new writes a reply, or a reaction, on a unit: a Slack message ref (<conversation>/<ts>) or permalink (its thread, or with --react the message itself), a pull request URL or owner/repo#n, or <provider>:<key>. " +
-					"It waits in the Outbox for your approval; with --send it posts once you read it and say yes. " +
-					"approve shows a draft whole and posts it once you say yes at a terminal; from an agent's shell it needs --yes and a session you drive, whose agent asks you first; retry posts a failed one again. " +
-					"edit changes a draft's text and discard drops it.",
+				About: "List Needs you, every decision that waits on you in the profile's order, the queue the cockpit, the menu bar and the floating widget show, or print one whole: what it asks, its options and the commands it takes. " +
+					"A query narrows it as the cockpit's lens does (source:github, @context, asked-by:<name>, free text), and --kind keeps the decisions of a kind (answer, approve-plan, send-draft, review-step, last-step, pick-someone, act); --open opens the cockpit on the same queue. " +
+					"Piped, the list is one tab-separated line per item: ref, kind, task, title, since, primary action and what it asks. " +
+					"An item's ref is its gate's id; a situation of a unit, which no gate decides, is <kind>@<unit>. " +
+					"approve resolves an item's gate with its primary action, as the cockpit's button does; a draft's shows it whole and posts once you say yes at a terminal, from an agent's shell only with --yes and a session you drive, whose agent asks you first, and a stale draft is refused; a failed delivery's posts it again. " +
+					"answer answers a question with one of its options, or your words with --text; an option that posts a draft shows it and asks first, as approve does.",
 				Flags: []helpFlag{
+					{"--kind <kind>", "list: keep the items of this decision kind; repeat it for more"},
+					{"--open", "list: open the cockpit on the same queue, narrowed by one kind at most"},
 					{"--color <when>", "list, show: auto, always or never"},
-					{"--react <emoji>", "new: react instead of replying: to the Slack message named, else to the unit's message"},
-					{"--send", "new: post it now, through the Outbox, instead of saving it there"},
-					{"--text <markdown>", "approve: post this text instead of the draft's"},
-					{"--confirm", "retry: post again a draft that may have been posted"},
-					{"--yes", "new --send, approve, retry: go ahead without asking"},
-					{"--reason <why>", "discard: why the draft is dropped"},
+					{"--text <markdown>", "approve: post this text instead of the draft's; answer: your answer, after the option when one is given"},
+					{"--payload <json>", "approve: post this payload instead of the draft's, whole"},
+					{"--rev <n>", "approve --text or --payload: the rev of the draft you read, as needs show prints it"},
+					{"--confirm", "approve of a failed delivery: post again a draft that may have been posted"},
+					{"--yes", "approve, answer: go ahead without asking, after showing the draft"},
 				},
-				Examples: []string{"outbox", "outbox new https://acme.slack.com/archives/C0123/p1700000000000100 \"Friday works\"", "outbox approve 12",
-					"outbox discard 12 --reason \"answered in person\""},
-				Docs: "concepts/approval",
+				Examples: []string{"needs", "needs source:github --kind send-draft", "needs show 412", "needs approve 412", "needs answer 398 b",
+					"needs @ops --open"},
+				Docs: "concepts/home",
 			},
 			{
 				Names:   []string{"task"},
@@ -353,7 +353,7 @@ func helpGroups(manager string) []helpGroup {
 				Summary: "Post as you to a thread, channel or person",
 				Usage:   []string{"slack send <target> <text> [--thread=false] [--broadcast] [--yes]"},
 				About: "Post as you to a message, by its ref (<conversation>/<ts>) or permalink, a #channel, channel id, @handle, email or user id. " +
-					"A message target replies in its thread, through the Outbox: a draft of yours on the thread, approved once you say yes, so it feeds the thread's items and shows in the Logbook. " +
+					"A message target replies in its thread as a draft of yours on the thread, approved once you say yes, so it feeds the thread's items and shows in the Logbook. " +
 					"It asks first unless --yes.",
 				Flags: []helpFlag{
 					{"--thread=false", "Post to a message's conversation instead of its thread"},
@@ -584,15 +584,26 @@ func helpGroups(manager string) []helpGroup {
 			},
 			{
 				Names:   []string{"draft"},
-				Summary: "Write, read, revise, post or withdraw your drafts",
-				Usage: []string{"draft write --kind <kind> [--unit <provider>/<key>] [--text <t> | --text-file <path>] [--payload <json> | --payload-file <path>] [--basis <b>] [--hold] [--draft=false]",
+				Summary: "Write, revise, post, discard or withdraw drafts",
+				Usage: []string{
+					"draft new <unit|message> <markdown> [--send [--yes]]", "draft new <unit|message> --react <emoji> [--send [--yes]]",
+					"draft edit <id> <markdown> --rev <n>", "draft discard <id> [--reason <why>]", "draft retry <id> [--confirm] [--yes]",
+					"draft write --kind <kind> [--unit <provider>/<key>] [--text <t> | --text-file <path>] [--payload <json> | --payload-file <path>] [--basis <b>] [--hold] [--draft=false]",
 					"draft read <id>", "draft update <id> --rev <rev> [--text <t>] [--payload <json>] [--basis <b>] [--draft=false]", "draft withdraw <id> --rev <rev> [--reason <r>]"},
-				About: "An agent session's drafts, as the MCP draft tools reach them: each is a draft that waits for the user unless a rule of theirs posts it, " +
+				About: "Your drafts: new writes a reply, or a reaction, on a unit: a Slack message ref (<conversation>/<ts>) or permalink (its thread, or with --react the message itself), a pull request URL or owner/repo#n, or <provider>:<key>. " +
+					"It waits in Needs you for your approval; with --send it posts once you read it and say yes. " +
+					"edit changes a draft's text at the rev you read, discard drops it, and retry posts a failed one again once you say yes at a terminal. " +
+					"An agent session's drafts, as the MCP draft tools reach them: each is a draft that waits for the user unless a rule of theirs posts it, " +
 					"and --draft=false posts it at once from a session the user drives. " +
 					"write drafts on this session's turn's unit unless --unit names another; read reaches any draft on that unit or written from it, " +
 					"update and withdraw only those an agent wrote there, never a person's or a workflow's; " +
 					"both apply at the rev read, so a revision made meanwhile is never overwritten. Each prints the draft as JSON.",
 				Flags: []helpFlag{
+					{"--react <emoji>", "new: react instead of replying: to the Slack message named, else to the unit's message"},
+					{"--send", "new: post it now instead of saving it for your approval"},
+					{"--yes", "new --send, retry: go ahead without asking"},
+					{"--reason <why>", "discard: why the draft is dropped"},
+					{"--confirm", "retry: post again a draft that may have been posted"},
 					{"--kind <kind>", "A draft kind the unit's plugin declares"},
 					{"--rev <rev>", "The rev you read"},
 					{"--payload <json>", "What the kind's schema shapes beside the text"},
@@ -600,8 +611,9 @@ func helpGroups(manager string) []helpGroup {
 					{"--hold", "No approval rule of the user's posts this draft; use it for a draft your question pins"},
 					{"--draft=false", "Post at once in the user's name, from a session the user drives; only when the user told you to"},
 				},
-				Examples: []string{"draft read 42", "draft update 42 --rev 3 --payload '{\"event\":\"COMMENT\"}'", "draft withdraw 43 --rev 1 --reason other_option"},
-				Docs:     "concepts/turns",
+				Examples: []string{"draft new https://acme.slack.com/archives/C0123/p1700000000000100 \"Friday works\"", "draft discard 12 --reason \"answered in person\"",
+					"draft read 42", "draft update 42 --rev 3 --payload '{\"event\":\"COMMENT\"}'", "draft withdraw 43 --rev 1 --reason other_option"},
+				Docs: "concepts/turns",
 			},
 			{
 				Names:   []string{"hook"},

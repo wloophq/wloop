@@ -61,11 +61,72 @@ func (c *Controller) pullTasks(ctx context.Context) error {
 		c.queueErr = err.Error()
 		c.cfg.Log("reading the queue: %v", err)
 	}
+	c.pullShown(ctx)
 	c.taskViews, c.tasks, c.tasksLoading = views, tasks, loading
 	c.mu.Lock()
 	c.cat = cat
 	c.mu.Unlock()
 	return nil
+}
+
+// pullShown reads the queue the float's filter shows; one it cannot read
+// shows nothing, so every banner posts.
+func (c *Controller) pullShown(ctx context.Context) {
+	var f window.FloatFilter
+	if c.floatOn() && c.cfg.FloatFilter != nil {
+		f = c.cfg.FloatFilter()
+	}
+	if !f.On() {
+		c.shown, c.shownRead = nil, c.queueRead
+		return
+	}
+	q, err := c.cfg.Daemon.QueueAll(ctx, f.Q, f.Kinds...)
+	c.shownRead = err == nil
+	switch {
+	case err == nil:
+		c.shown, c.shownErr = &q, ""
+		return
+	case err.Error() != c.shownErr:
+		c.shownErr = err.Error()
+		c.cfg.Log("reading the floating widget's queue: %v", err)
+	}
+	c.shown = &api.Queue{}
+}
+
+// shownItems are the items of the queue the float shows.
+func (c *Controller) shownItems() []api.QueueItem {
+	if c.shown != nil {
+		return c.shown.Items
+	}
+	return c.needs.Items
+}
+
+// carriedTasks are the tasks whose Needs you banner a float that carries
+// the queue mutes: those whose every decision its filter shows, since a
+// task's one banner stands for all of them; nil, every task, without a
+// filter; none while the whole queue's last read failed, which leaves what a
+// task holds unknown.
+func (c *Controller) carriedTasks() map[string]bool {
+	if c.shown == nil {
+		return nil
+	}
+	if !c.queueRead {
+		return map[string]bool{}
+	}
+	left := map[string]int{}
+	for _, it := range c.needs.Items {
+		left[it.Task.ID]++
+	}
+	for _, it := range c.shown.Items {
+		left[it.Task.ID]--
+	}
+	out := map[string]bool{}
+	for _, it := range c.shown.Items {
+		if left[it.Task.ID] <= 0 {
+			out[it.Task.ID] = true
+		}
+	}
+	return out
 }
 
 // verbOf is the served verb that runs handler, handler itself before the catalog was read.

@@ -85,7 +85,7 @@ type Value struct {
 }
 
 // Grammar is every reserved key of the language.
-var Grammar = slices.Concat(intentGrammar, workflowGrammar, stepGrammar, actionsGrammar, configGrammar, profileGrammar, toolsGrammar, tasksGrammar, viewsGrammar, draftFacetsGrammar, gatesGrammar, recordsGrammar, keysGrammar, noticesGrammar, uiGrammar,
+var Grammar = slices.Concat(intentGrammar, workflowGrammar, stepGrammar, actionsGrammar, configGrammar, profileGrammar, toolsGrammar, tasksGrammar, viewsGrammar, gatesGrammar, recordsGrammar, keysGrammar, noticesGrammar, uiGrammar,
 	rowWordRows(SurfaceViews, true), rowWordRows(SurfaceUI, false), retiredRowWordRows(SurfaceViews), retiredRowWordRows(SurfaceUI), showRows(SurfaceViews), showRows(SurfaceUI),
 	gateApprovalRows(SurfaceIntent), gateApprovalRows(SurfaceWorkflow), stringsGrammar, timelineGrammar,
 	decisionsGrammar, uiPluralGrammar, homeGrammar, omniboxGrammar, predsGrammar)

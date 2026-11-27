@@ -13,6 +13,6 @@ Origin      rule stalled-nudge, 26h ago
 Approval    wait
 Rev         0
 
-{{command}} outbox approve 12
-{{command}} outbox discard 12
-{{command}} outbox edit 12 <markdown> --rev 0
+{{command}} needs approve 3
+{{command}} draft discard 12
+{{command}} draft edit 12 <markdown> --rev 0

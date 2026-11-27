@@ -259,7 +259,7 @@ What needs you, by view, and the tracked pull requests.
 {{command}} status [--color auto|always|never]
 ```
 
-List the tasks of the views the badge names, such as Inbox and Needs me, then the pull requests you track. Piped, it prints one tab-separated line per task or pull request and view.
+List the tasks of the views the badge names, such as Needs you, Next actions and Inbox, then the pull requests you track. Piped, it prints one tab-separated line per task or pull request and view.
 
 | Flag | Description |
 | --- | --- |
@@ -269,7 +269,7 @@ Examples:
 
 ```sh
 {{command}} status
-{{command}} status | grep needs-me
+{{command}} status | grep next
 ```
 
 See [Cockpit, terminal client and menu bar](/concepts/surfaces/).
@@ -306,7 +306,7 @@ Open the workspace of a pull request in Claude Desktop or Orca, or the pull requ
 | Flag | Description |
 | --- | --- |
 | `--print` | Print the cockpit URL with its token instead of opening it |
-| `--view <view>` | The cockpit view, by its id, such as needs-me or mine |
+| `--view <view>` | The cockpit view, by its id, such as next or inbox |
 
 Examples:
 
@@ -314,49 +314,48 @@ Examples:
 {{command}} open
 {{command}} open https://github.com/acme/api/pull/7
 {{command}} open '#queue=answer'
-{{command}} open {{command}}://open/#view=needs-me
-{{command}} open --print --view needs-me
+{{command}} open {{command}}://open/#view=next
+{{command}} open --print --view next
 ```
 
 See [Cockpit, terminal client and menu bar](/concepts/surfaces/).
 
-### outbox
+### needs
 
-Drafts waiting for your approval, and yours.
+What waits on you: questions, drafts, plans and steps.
 
 ```sh
-{{command}} outbox [list] [--color <when>]
-{{command}} outbox show <id> [--color <when>]
-{{command}} outbox new <unit|message> <markdown> [--send [--yes]]
-{{command}} outbox new <unit|message> --react <emoji> [--send [--yes]]
-{{command}} outbox approve <id> [--text <markdown> --rev <n>] [--yes]
-{{command}} outbox retry <id> [--confirm] [--yes]
-{{command}} outbox edit <id> <markdown> --rev <n>
-{{command}} outbox discard <id> [--reason <why>]
+{{command}} needs [<query>] [--kind <kind>]... [--open] [--color <when>]
+{{command}} needs show <ref> [--color <when>]
+{{command}} needs approve <ref> [--text <markdown> --rev <n>] [--payload <json> --rev <n>] [--confirm] [--yes]
+{{command}} needs answer <ref> [<option>] [--text <answer>] [--yes]
 ```
 
-List the drafts waiting on you, proposed, failed or left sending, grouped by kind, or print one whole: its text as it reads, the items it is about and the commands it takes. Piped, the list is one tab-separated line per draft: id, kind, state, unit, label, mentions, creation time and first line. new writes a reply, or a reaction, on a unit: a Slack message ref (&lt;conversation&gt;/&lt;ts&gt;) or permalink (its thread, or with `--react` the message itself), a pull request URL or owner/repo#n, or &lt;provider&gt;:&lt;key&gt;. It waits in the Outbox for your approval; with `--send` it posts once you read it and say yes. approve shows a draft whole and posts it once you say yes at a terminal; from an agent's shell it needs `--yes` and a session you drive, whose agent asks you first; retry posts a failed one again. edit changes a draft's text and discard drops it.
+List Needs you, every decision that waits on you in the profile's order, the queue the cockpit, the menu bar and the floating widget show, or print one whole: what it asks, its options and the commands it takes. A query narrows it as the cockpit's lens does (source:github, @context, asked-by:&lt;name&gt;, free text), and `--kind` keeps the decisions of a kind (answer, approve-plan, send-draft, review-step, last-step, pick-someone, act); `--open` opens the cockpit on the same queue. Piped, the list is one tab-separated line per item: ref, kind, task, title, since, primary action and what it asks. An item's ref is its gate's id; a situation of a unit, which no gate decides, is &lt;kind&gt;@&lt;unit&gt;. approve resolves an item's gate with its primary action, as the cockpit's button does; a draft's shows it whole and posts once you say yes at a terminal, from an agent's shell only with `--yes` and a session you drive, whose agent asks you first, and a stale draft is refused; a failed delivery's posts it again. answer answers a question with one of its options, or your words with `--text`; an option that posts a draft shows it and asks first, as approve does.
 
 | Flag | Description |
 | --- | --- |
+| `--kind <kind>` | list: keep the items of this decision kind; repeat it for more |
+| `--open` | list: open the cockpit on the same queue, narrowed by one kind at most |
 | `--color <when>` | list, show: auto, always or never |
-| `--react <emoji>` | new: react instead of replying: to the Slack message named, else to the unit's message |
-| `--send` | new: post it now, through the Outbox, instead of saving it there |
-| `--text <markdown>` | approve: post this text instead of the draft's |
-| `--confirm` | retry: post again a draft that may have been posted |
-| `--yes` | new `--send`, approve, retry: go ahead without asking |
-| `--reason <why>` | discard: why the draft is dropped |
+| `--text <markdown>` | approve: post this text instead of the draft's; answer: your answer, after the option when one is given |
+| `--payload <json>` | approve: post this payload instead of the draft's, whole |
+| `--rev <n>` | approve `--text` or `--payload`: the rev of the draft you read, as needs show prints it |
+| `--confirm` | approve of a failed delivery: post again a draft that may have been posted |
+| `--yes` | approve, answer: go ahead without asking, after showing the draft |
 
 Examples:
 
 ```sh
-{{command}} outbox
-{{command}} outbox new https://acme.slack.com/archives/C0123/p1700000000000100 "Friday works"
-{{command}} outbox approve 12
-{{command}} outbox discard 12 --reason "answered in person"
+{{command}} needs
+{{command}} needs source:github --kind send-draft
+{{command}} needs show 412
+{{command}} needs approve 412
+{{command}} needs answer 398 b
+{{command}} needs @ops --open
 ```
 
-See [What waits for you](/concepts/approval/).
+See [The home and decision queues](/concepts/home/).
 
 ### task
 
@@ -731,7 +730,7 @@ Post as you to a thread, channel or person.
 {{command}} slack send <target> <text> [--thread=false] [--broadcast] [--yes]
 ```
 
-Post as you to a message, by its ref (&lt;conversation&gt;/&lt;ts&gt;) or permalink, a #channel, channel id, @handle, email or user id. A message target replies in its thread, through the Outbox: a draft of yours on the thread, approved once you say yes, so it feeds the thread's items and shows in the Logbook. It asks first unless `--yes`.
+Post as you to a message, by its ref (&lt;conversation&gt;/&lt;ts&gt;) or permalink, a #channel, channel id, @handle, email or user id. A message target replies in its thread as a draft of yours on the thread, approved once you say yes, so it feeds the thread's items and shows in the Logbook. It asks first unless `--yes`.
 
 | Flag | Description |
 | --- | --- |
@@ -1174,19 +1173,29 @@ See [Turns and rounds](/concepts/turns/).
 
 ### draft
 
-Write, read, revise, post or withdraw your drafts.
+Write, revise, post, discard or withdraw drafts.
 
 ```sh
+{{command}} draft new <unit|message> <markdown> [--send [--yes]]
+{{command}} draft new <unit|message> --react <emoji> [--send [--yes]]
+{{command}} draft edit <id> <markdown> --rev <n>
+{{command}} draft discard <id> [--reason <why>]
+{{command}} draft retry <id> [--confirm] [--yes]
 {{command}} draft write --kind <kind> [--unit <provider>/<key>] [--text <t> | --text-file <path>] [--payload <json> | --payload-file <path>] [--basis <b>] [--hold] [--draft=false]
 {{command}} draft read <id>
 {{command}} draft update <id> --rev <rev> [--text <t>] [--payload <json>] [--basis <b>] [--draft=false]
 {{command}} draft withdraw <id> --rev <rev> [--reason <r>]
 ```
 
-An agent session's drafts, as the MCP draft tools reach them: each is a draft that waits for the user unless a rule of theirs posts it, and `--draft=false` posts it at once from a session the user drives. write drafts on this session's turn's unit unless `--unit` names another; read reaches any draft on that unit or written from it, update and withdraw only those an agent wrote there, never a person's or a workflow's; both apply at the rev read, so a revision made meanwhile is never overwritten. Each prints the draft as JSON.
+Your drafts: new writes a reply, or a reaction, on a unit: a Slack message ref (&lt;conversation&gt;/&lt;ts&gt;) or permalink (its thread, or with `--react` the message itself), a pull request URL or owner/repo#n, or &lt;provider&gt;:&lt;key&gt;. It waits in Needs you for your approval; with `--send` it posts once you read it and say yes. edit changes a draft's text at the rev you read, discard drops it, and retry posts a failed one again once you say yes at a terminal. An agent session's drafts, as the MCP draft tools reach them: each is a draft that waits for the user unless a rule of theirs posts it, and `--draft=false` posts it at once from a session the user drives. write drafts on this session's turn's unit unless `--unit` names another; read reaches any draft on that unit or written from it, update and withdraw only those an agent wrote there, never a person's or a workflow's; both apply at the rev read, so a revision made meanwhile is never overwritten. Each prints the draft as JSON.
 
 | Flag | Description |
 | --- | --- |
+| `--react <emoji>` | new: react instead of replying: to the Slack message named, else to the unit's message |
+| `--send` | new: post it now instead of saving it for your approval |
+| `--yes` | new `--send`, retry: go ahead without asking |
+| `--reason <why>` | discard: why the draft is dropped |
+| `--confirm` | retry: post again a draft that may have been posted |
 | `--kind <kind>` | A draft kind the unit's plugin declares |
 | `--rev <rev>` | The rev you read |
 | `--payload <json>` | What the kind's schema shapes beside the text |
@@ -1197,6 +1206,8 @@ An agent session's drafts, as the MCP draft tools reach them: each is a draft th
 Examples:
 
 ```sh
+{{command}} draft new https://acme.slack.com/archives/C0123/p1700000000000100 "Friday works"
+{{command}} draft discard 12 --reason "answered in person"
 {{command}} draft read 42
 {{command}} draft update 42 --rev 3 --payload '{"event":"COMMENT"}'
 {{command}} draft withdraw 43 --rev 1 --reason other_option

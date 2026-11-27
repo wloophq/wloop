@@ -27,7 +27,7 @@ func TestTheReviewIsServedOnceRegistered(t *testing.T) {
 	r.serveProjects()
 	var cat api.ViewsCatalog
 	get(t, r.s, api.ViewsPath, &cat)
-	if want := []string{"inbox", "outbox", "waiting", "review-projects", "someday", "focus"}; !slices.Equal(cat.Review, want) {
+	if want := []string{"inbox", "decide-send-draft", "waiting", "review-projects", "someday", "focus"}; !slices.Equal(cat.Review, want) {
 		t.Fatalf("the catalog's review %v, want %v", cat.Review, want)
 	}
 	var rv api.Review
@@ -126,7 +126,7 @@ func TestProjectTaskViews(t *testing.T) {
 	if vs := verbs(p); !vs["reviewed"] || !vs["sequential"] || vs["project"] {
 		t.Errorf("project verbs %v", vs)
 	}
-	a := r.page(t, "view=needs-me").Tasks
+	a := r.page(t, "view=next").Tasks
 	i := slices.IndexFunc(a, func(v api.TaskView) bool { return v.ID == "t-a" })
 	if i < 0 {
 		t.Fatalf("t-a not in Needs me: %v", taskIDs(a))

@@ -9,6 +9,8 @@ import (
 	facttask "github.com/wloophq/wloop/internal/adapter/facts/task"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
+	"github.com/wloophq/wloop/internal/domain/decision"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -33,7 +35,7 @@ const (
 )
 
 // lensViews are the lens views a pull request's task shows in.
-var lensViews = []string{"needs-me", "stalled", "in-loop", "approved", "done"}
+var lensViews = []string{"needs-you", "next", "stalled", "in-loop", "approved", "done"}
 
 // prCase is one pull request as the GitHub plugin reports it in a snapshot, the host's state over it, what the
 // host's pipeline makes of it for its task (the category of its state, who its items wait on, its open items and
@@ -69,55 +71,55 @@ type prCase struct {
 // prCases are every situation of situation.Order, each at least once.
 var prCases = []prCase{
 	{name: "round pending", kind: situation.KindRoundPending, source: situation.KindReview, waitingOn: "me", pending: true,
-		category: task.CategoryReady, owes: []string{"me"}, items: 1, gates: 1, lens: []string{"needs-me"}},
+		category: task.CategoryReady, owes: []string{"me"}, items: 1, gates: 1, lens: []string{"needs-you"}},
 	{name: "agent asks", kind: situation.KindLoopWaiting, source: situation.KindReview, waitingOn: "me", review: true, turn: "asked",
-		category: task.CategoryReady, owes: []string{"me"}, items: 1, gates: 1, runs: 1, lens: []string{"needs-me", "in-loop"}},
+		category: task.CategoryReady, owes: []string{"me"}, items: 1, gates: 1, runs: 1, lens: []string{"needs-you", "in-loop"}},
 	{name: "agent stopped", kind: situation.KindLoopStopped, source: situation.KindReview, waitingOn: "me", review: true, turn: "failed",
-		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"needs-me", "in-loop"}},
+		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"next", "in-loop"}},
 	{name: "round blocked", kind: situation.KindBlocked, source: situation.KindBlocked, waitingOn: "me",
-		category: task.CategoryReady, owes: []string{"me"}, items: 1, gates: 1, lens: []string{"needs-me"}},
+		category: task.CategoryReady, owes: []string{"me"}, items: 1, gates: 1, lens: []string{"needs-you"}},
 	{name: "to address", kind: situation.KindToAddress, source: situation.KindToAddress, waitingOn: "me", author: prViewer, workspace: true,
-		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"needs-me"}},
+		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"next"}},
 	{name: "held by the cap", kind: situation.KindHeldByCap, source: situation.KindHeldByCap, waitingOn: "me", review: true,
-		category: task.CategoryReady, owes: []string{"me"}, items: 1, gates: 1, lens: []string{"needs-me", "in-loop"}},
+		category: task.CategoryReady, owes: []string{"me"}, items: 1, gates: 1, lens: []string{"needs-you", "in-loop"}},
 	{name: "agent working in a review workspace", kind: situation.KindLoopWorking, source: situation.KindReview, waitingOn: "me", review: true,
 		turn: "started", category: task.CategoryReady, owes: []string{loopPerson}, items: 1, runs: 1, lens: []string{"in-loop"}},
 	{name: "agent working in an author workspace", kind: situation.KindLoopWorking, source: situation.KindChanges, waitingOn: "me",
 		author: prViewer, workspace: true, turn: "started", category: task.CategoryReady, owes: []string{loopPerson}, items: 1, runs: 1, lens: []string{"in-loop"}},
 	{name: "changes asked", kind: situation.KindChanges, source: situation.KindChanges, waitingOn: "me", author: prViewer,
-		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"needs-me"}},
+		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"next"}},
 	{name: "checks failing", kind: situation.KindChecks, source: situation.KindChecks, waitingOn: "me", author: prViewer,
-		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"needs-me"}},
+		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"next"}},
 	{name: "merge conflicts", kind: situation.KindConflicts, source: situation.KindConflicts, waitingOn: "me", author: prViewer,
-		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"needs-me"}},
+		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"next"}},
 	{name: "reply due", kind: situation.KindReply, source: situation.KindReply, waitingOn: "me",
-		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"needs-me"}},
+		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"next"}},
 	{name: "reply due stalled", kind: situation.KindReply, source: situation.KindReply, waitingOn: "me", stalled: true,
-		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"needs-me", "stalled"}},
+		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"next", "stalled"}},
 	{name: "reviewer due", kind: situation.KindReviewerBack, source: situation.KindReviewerBack, waitingOn: "reviewer",
 		category: task.CategoryWaiting, owes: []string{"github:bruno"}, items: 1},
 	{name: "reviewer due stalled", kind: situation.KindReviewerBack, source: situation.KindReviewerBack, waitingOn: "reviewer", stalled: true,
 		category: task.CategoryWaiting, owes: []string{"github:bruno"}, items: 1, lens: []string{"stalled"}},
 	{name: "review asked of me", kind: situation.KindReview, source: situation.KindReview, waitingOn: "me",
-		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"needs-me"}},
+		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"next"}},
 	{name: "review asked of me, stalled", kind: situation.KindReview, source: situation.KindReview, waitingOn: "me", stalled: true,
-		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"needs-me", "stalled"}},
+		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"next", "stalled"}},
 	{name: "review asked of another, stalled out of scope", kind: situation.KindReview, source: situation.KindReview, waitingOn: "reviewer",
 		stalled: true, reasons: []string{}, category: task.CategoryWaiting, owes: []string{"github:bruno"}, items: 1},
 	{name: "approved in my review workspace", kind: situation.KindReview, source: situation.KindReview, waitingOn: "reviewer", review: true, approved: true,
 		category: task.CategoryWaiting, owes: []string{"github:bruno"}, items: 1, lens: []string{"in-loop", "approved"}},
 	{name: "no reviewer on mine", kind: situation.KindNoReviewer, source: situation.KindNoReviewer, waitingOn: "author", author: prViewer,
-		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"needs-me"}},
+		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"needs-you"}},
 	{name: "mine can merge", kind: situation.KindMerge, source: situation.KindMerge, waitingOn: "me", author: prViewer, workspace: true,
-		approved: true, category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"needs-me", "approved"}},
+		approved: true, category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"needs-you", "approved"}},
 	{name: "mine draft", kind: situation.KindDraft, source: situation.KindDraft, waitingOn: "author", author: prViewer, workspace: true,
 		category: task.CategoryWaiting, owes: []string{}, items: 1},
 	{name: "mine can merge, waiting on its author", kind: situation.KindMerge, source: situation.KindMerge, waitingOn: "author", author: prViewer,
-		workspace: true, approved: true, category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"needs-me", "approved"}},
+		workspace: true, approved: true, category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"needs-you", "approved"}},
 	{name: "reply due on mine", kind: situation.KindReply, source: situation.KindReply, waitingOn: "author", author: prViewer,
-		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"needs-me"}},
+		category: task.CategoryReady, owes: []string{"me"}, items: 1, lens: []string{"next"}},
 	{name: "a draft to approve on a review asked of another", kind: situation.KindReview, source: situation.KindReview, waitingOn: "reviewer",
-		category: task.CategoryWaiting, owes: []string{"github:bruno"}, items: 1, gates: 1, lens: []string{"needs-me"}},
+		category: task.CategoryWaiting, owes: []string{"github:bruno"}, items: 1, gates: 1, lens: []string{"needs-you"}},
 	{name: "muted review", kind: situation.KindMuted, source: situation.KindReview, waitingOn: "me", stalled: true, muted: true,
 		category: task.CategoryDeferred, owes: []string{"me"}, items: 1},
 	{name: "merged in a review workspace", kind: situation.KindDone, source: situation.KindDone, review: true, state: "MERGED",
@@ -292,6 +294,7 @@ func (c prCase) facts(t *testing.T, l *intentload.Loaded, row api.Row) workflow.
 		}
 	}
 	f["task.link_signals"] = reported
+	f["task.decisions"] = c.decisions(l, row)
 	who, err := catalog.OwedByOf(func() *intentload.Loaded { return l })(context.Background(), f)
 	if err != nil {
 		t.Fatal(err)
@@ -301,6 +304,20 @@ func (c prCase) facts(t *testing.T, l *intentload.Loaded, row api.Row) workflow.
 		f["task.check_on"] = task.AddWorkdays(row.Summary.Since, prStaleDays, time.UTC)
 	}
 	return f
+}
+
+// decisions are what the task waits on you to decide, as the facts provider reads them: its open gates, and, while
+// the task is open, its pull request's situation and link signals.
+func (c prCase) decisions(l *intentload.Loaded, row api.Row) []string {
+	open := make([]gate.Gate, c.gates)
+	for i := range open {
+		open[i] = gate.Gate{Kind: gate.KindQuestion, Status: gate.Open}
+	}
+	var links []decision.Source
+	if c.category != task.CategoryDone && c.category != task.CategoryDropped {
+		links = []decision.Source{{Unit: unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}, Situation: string(row.Kind), Signals: prrow.Signals(row)}}
+	}
+	return decision.Names(l.Decisions.Map.Of(open, nil, links))
 }
 
 // prStaleDays is tasks.stale_waiting_days as the bundled configuration sets it.

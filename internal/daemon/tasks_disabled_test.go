@@ -17,7 +17,7 @@ import (
 
 func TestADisabledPluginsTasksAndDraftsLeaveTheCountsAndStayDismissable(t *testing.T) {
 	t.Parallel()
-	r := newOutboxRig(t, unit.GitHub, "slack")
+	r := newGatesViewRig(t, unit.GitHub, "slack")
 	ctx := context.Background()
 	r.put(t, task.Task{ID: "t-gh", State: "inbox", Category: task.CategoryInbox, Title: "reply", Units: []unit.Unit{r7u}})
 	r.put(t, task.Task{ID: "t-mine", State: "inbox", Category: task.CategoryInbox, Title: "mine"})
@@ -27,11 +27,11 @@ func TestADisabledPluginsTasksAndDraftsLeaveTheCountsAndStayDismissable(t *testi
 	if got := taskIDs(inbox.Tasks); len(got) != 1 || got[0] != "t-mine" {
 		t.Fatalf("inbox %v", got)
 	}
-	if c := inbox.Counters; c.Views["inbox"] != 1 || c.Views["outbox"] != 0 {
+	if c := inbox.Counters; c.Views["inbox"] != 1 || c.Views[heldDraftsView] != 0 {
 		t.Fatalf("counters %+v", c)
 	}
-	if p := r.page(t, "view=outbox"); len(p.Tasks) != 0 {
-		t.Fatalf("outbox %v", taskIDs(p.Tasks))
+	if p := r.page(t, "view=held-drafts"); len(p.Tasks) != 0 {
+		t.Fatalf("%s %v", heldDraftsView, taskIDs(p.Tasks))
 	}
 	var v api.TaskView
 	if code := get(t, r.s, api.TaskPath("t-gh"), &v); code != 200 {

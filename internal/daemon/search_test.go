@@ -41,10 +41,10 @@ func TestSearchGroupsByWaitsOn(t *testing.T) {
 	if s.Query != "retries" || s.Total != 3 {
 		t.Fatalf("search %+v", s)
 	}
-	if got := groupCounts(s); got["you"] != 1 || got["others"] != 1 || got["done"] != 1 || len(got) != 3 {
+	if got := groupCounts(s); got["next"] != 1 || got["others"] != 1 || got["done"] != 1 || len(got) != 3 {
 		t.Fatalf("groups %v", got)
 	}
-	if s.Groups[0].ID != "you" || s.Groups[0].Label != "Needs you" || s.Groups[0].Results[0].Task.ID != "t-0000000000000001" {
+	if s.Groups[0].ID != "next" || s.Groups[0].Label != "Next actions" || s.Groups[0].Results[0].Task.ID != "t-0000000000000001" {
 		t.Fatalf("first group %+v", s.Groups[0])
 	}
 	for _, g := range s.Groups {
@@ -62,8 +62,8 @@ func TestSearchListsViewsOfEachResult(t *testing.T) {
 	r.withGates(t, "t-0000000000000001")
 	s := search(t, r, "ship")
 	views := s.Groups[0].Results[0].Views
-	if !slices.Contains(views, "needs-me") || !slices.Contains(views, "focus") {
-		t.Fatalf("views %v, want needs-me and focus", views)
+	if !slices.Contains(views, "needs-you") || !slices.Contains(views, "focus") || slices.Contains(views, "next") {
+		t.Fatalf("views %v, want needs-you and focus, and not next, for a task with an open gate", views)
 	}
 	for _, v := range views {
 		if spec, _ := bundledLoaded().Views.View(v); !spec.Rail {

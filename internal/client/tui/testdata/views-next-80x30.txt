@@ -1,4 +1,4 @@
- Inbox 2    Outbox 1   [Next 4]   Waiting 4    Projects 0    Someday 0
+ Inbox 2    Held drafts 1   [Next 4]   Waiting 4    Projects 0    Someday 0
 
  @computer
 >* 5h 0m    Rename the export flag  next

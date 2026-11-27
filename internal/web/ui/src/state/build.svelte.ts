@@ -1,7 +1,7 @@
 import { pending } from "./actions.svelte";
 import { omni, overlays } from "./overlays.svelte";
 import type { J } from "../lib/util";
-import { busy, detailState, drafts, editPayloads, editing, gateState, outboxState, queueState, taskState, tasksState } from "./store.svelte";
+import { busy, detailState, drafts, editPayloads, editing, gateState, queueState, taskState, tasksState } from "./store.svelte";
 
 // update says whether the banner that offers a reload into the daemon's new build shows.
 export const update = $state({ shown: false });
@@ -17,7 +17,7 @@ export function buildAction(loaded: string, served: string, blocked: boolean, re
 const held = (text: unknown) => String(text || "").trim() !== "";
 
 // draftsShown are the drafts the page holds, as "draft:<id>", the key a draft's edits live under: those of the
-// open task, its drafts, the open unit's, the listed tasks and gates, the Outbox and the queue.
+// open task, its drafts, the open unit's, the listed tasks and gates, and the queue.
 function draftsShown(): Set<string> {
   const out = new Set<string>();
   const subject = (g: J) => g && g.subject && typeof g.subject === "object" && g.subject.id !== undefined && out.add("draft:" + g.subject.id);
@@ -27,7 +27,6 @@ function draftsShown(): Set<string> {
   for (const d of detailState.unitDrafts) out.add("draft:" + d.id);
   tasksState.tasks.forEach(task);
   tasksState.gates.forEach(subject);
-  for (const d of (outboxState.page && outboxState.page.drafts) || []) out.add("draft:" + d.id);
   for (const it of (queueState.queue && queueState.queue.items) || []) subject(it.gate);
   return out;
 }

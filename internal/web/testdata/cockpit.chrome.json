@@ -3338,7 +3338,6 @@
   "All keys": "All keys",
   "Also send to the conversation": "Also send to the conversation",
   "An answer approves a draft: open the question's task to see it before you answer.": "An answer approves a draft: open the question's task to see it before you answer.",
-  "An open question decides these drafts: the option you pick posts its draft and withdraws the other options' drafts.": "An open question decides these drafts: the option you pick posts its draft and withdraws the other options' drafts.",
   "Answer": "Answer",
   "Answer in your own words": "Answer in your own words",
   "Answer not sent": "Answer not sent",
@@ -3406,7 +3405,6 @@
   "Copy this text": "Copy this text",
   "Could not copy: {error}": "Could not copy: {error}",
   "Could not list the tasks: {error}": "Could not list the tasks: {error}",
-  "Could not load the Outbox: {error}": "Could not load the Outbox: {error}",
   "Could not load the actions: {error}": "Could not load the actions: {error}",
   "Could not load the areas: {error}": "Could not load the areas: {error}",
   "Could not load the home: {error}": "Could not load the home: {error}",
@@ -3427,6 +3425,7 @@
   "Counts": "Counts",
   "Cut": "Cut",
   "Daemon not answering: {error}": "Daemon not answering: {error}",
+  "Decision kinds": "Decision kinds",
   "Decision queue": "Decision queue",
   "Descending": "Descending",
   "Detail": "Detail",
@@ -3438,7 +3437,7 @@
   "Draft a message you approve before it posts": "Draft a message you approve before it posts",
   "Draft text": "Draft text",
   "Draft {id} approved; it goes out in a moment": "Draft {id} approved; it goes out in a moment",
-  "Draft {id} saved to the Outbox for your approval": "Draft {id} saved to the Outbox for your approval",
+  "Draft {id} saved; it waits in Needs you for your approval": "Draft {id} saved; it waits in Needs you for your approval",
   "Draft {purpose}": "Draft {purpose}",
   "Due in 24h": "Due in 24h",
   "Edit": "Edit",
@@ -3457,6 +3456,7 @@
   "Filter": "Filter",
   "Filter is:{flag}; Alt+click excludes": "Filter is:{flag}; Alt+click excludes",
   "Filter the list": "Filter the list",
+  "Filter the queue": "Filter the queue",
   "Filter, group and sort": "Filter, group and sort",
   "Filter, group and sort the tasks": "Filter, group and sort the tasks",
   "Filter: text, where:, author:, wait:me, risk:high, tag:lang:go  ( / )": "Filter: text, where:, author:, wait:me, risk:high, tag:lang:go  ( / )",
@@ -3499,7 +3499,6 @@
   "Intake {seq} ({intent}) waits for the brief, attempt {attempt}": "Intake {seq} ({intent}) waits for the brief, attempt {attempt}",
   "It changed since the question pinned it and is now at rev {rev}; picking this option posts what it says now.": "It changed since the question pinned it and is now at rev {rev}; picking this option posts what it says now.",
   "Items": "Items",
-  "Keep it": "Keep it",
   "Kept {n} with details": {
    "one": "Kept {n} with details",
    "other": "Kept {n} with details"
@@ -3639,7 +3638,7 @@
   "Reply": "Reply",
   "Reply not saved": "Reply not saved",
   "Reply on {unit} failed: {error}": "Reply on {unit} failed: {error}",
-  "Reply saved to the Outbox": "Reply saved to the Outbox",
+  "Reply saved for your approval": "Reply saved for your approval",
   "Reply sent": "Reply sent",
   "Repositories (color: share stalled)": "Repositories (color: share stalled)",
   "Repository": "Repository",
@@ -3665,7 +3664,6 @@
   "Run {verb} on the task, with “{task}”": "Run {verb} on the task, with “{task}”",
   "Runs": "Runs",
   "Save as draft": "Save as draft",
-  "Save to Outbox": "Save to Outbox",
   "Search": "Search",
   "Search or ask": "Search or ask",
   "Search, paste a link, or ask": "Search, paste a link, or ask",
@@ -3706,9 +3704,6 @@
   "Start an agent turn: {intent}": "Start an agent turn: {intent}",
   "Start in {repo}: {brief}": "Start in {repo}: {brief}",
   "Start: {brief}": "Start: {brief}",
-  "Stop drafting these": "Stop drafting these",
-  "Stop this workflow": "Stop this workflow",
-  "Stopped {workflow}": "Stopped {workflow}",
   "Store needs attention: {why}": "Store needs attention: {why}",
   "Sweep now": "Sweep now",
   "Synced {time}": "Synced {time}",
@@ -4126,10 +4121,6 @@
    "one": "{n} done today",
    "other": "{n} done today"
   },
-  "{n} draft": {
-   "one": "{n} draft",
-   "other": "{n} drafts"
-  },
   "{n} draft waits for you": {
    "one": "{n} draft waits for you",
    "other": "{n} drafts wait for you"
@@ -4143,6 +4134,10 @@
    "other": "{n} files"
   },
   "{n} of {total}": "{n} of {total}",
+  "{n} of {total} wait on you": {
+   "one": "{n} of {total} waits on you",
+   "other": "{n} of {total} wait on you"
+  },
   "{n} open questions in the brief": {
    "one": "{n} open question in the brief",
    "other": "{n} open questions in the brief"
@@ -4238,7 +4233,6 @@
   "All keys": "Todas as chaves",
   "Also send to the conversation": "Também enviar na conversa",
   "An answer approves a draft: open the question's task to see it before you answer.": "Uma resposta aprova um rascunho: abra a tarefa da pergunta para vê-lo antes de responder.",
-  "An open question decides these drafts: the option you pick posts its draft and withdraws the other options' drafts.": "Uma pergunta aberta decide estes rascunhos: a opção que você escolher posta o rascunho dela e retira os rascunhos das outras opções.",
   "Answer": "Resposta",
   "Answer in your own words": "Responder com suas palavras",
   "Answer not sent": "Resposta não enviada",
@@ -4306,7 +4300,6 @@
   "Copy this text": "Copie este texto",
   "Could not copy: {error}": "Não foi possível copiar: {error}",
   "Could not list the tasks: {error}": "Não foi possível listar as tarefas: {error}",
-  "Could not load the Outbox: {error}": "Não foi possível carregar a Outbox: {error}",
   "Could not load the actions: {error}": "Não foi possível carregar as ações: {error}",
   "Could not load the areas: {error}": "Não foi possível carregar as áreas: {error}",
   "Could not load the home: {error}": "Não foi possível carregar o início: {error}",
@@ -4327,6 +4320,7 @@
   "Counts": "Contagens",
   "Cut": "Recortar",
   "Daemon not answering: {error}": "O daemon não responde: {error}",
+  "Decision kinds": "Tipos de decisão",
   "Decision queue": "Fila de decisões",
   "Descending": "Decrescente",
   "Detail": "Detalhe",
@@ -4338,7 +4332,7 @@
   "Draft a message you approve before it posts": "Rascunhar uma mensagem que você aprova antes de publicar",
   "Draft text": "Texto do rascunho",
   "Draft {id} approved; it goes out in a moment": "Rascunho {id} aprovado; sai em instantes",
-  "Draft {id} saved to the Outbox for your approval": "Rascunho {id} salvo no Outbox para sua aprovação",
+  "Draft {id} saved; it waits in Needs you for your approval": "Rascunho {id} salvo; ele espera sua aprovação em Precisa de você",
   "Draft {purpose}": "Rascunho: {purpose}",
   "Due in 24h": "Vencem em 24h",
   "Edit": "Editar",
@@ -4357,6 +4351,7 @@
   "Filter": "Filtro",
   "Filter is:{flag}; Alt+click excludes": "Filtrar is:{flag}; Alt+clique exclui",
   "Filter the list": "Filtrar a lista",
+  "Filter the queue": "Filtrar a fila",
   "Filter, group and sort": "Filtrar, agrupar e ordenar",
   "Filter, group and sort the tasks": "Filtrar, agrupar e ordenar as tarefas",
   "Filter: text, where:, author:, wait:me, risk:high, tag:lang:go  ( / )": "Filtro: texto, where:, author:, wait:me, risk:high, tag:lang:go  ( / )",
@@ -4399,7 +4394,6 @@
   "Intake {seq} ({intent}) waits for the brief, attempt {attempt}": "A entrada {seq} ({intent}) espera o brief, tentativa {attempt}",
   "It changed since the question pinned it and is now at rev {rev}; picking this option posts what it says now.": "Ele mudou desde que a pergunta o fixou e está na revisão {rev}; escolher esta opção posta o que ele diz agora.",
   "Items": "Itens",
-  "Keep it": "Manter",
   "Kept {n} with details": {
    "one": "{n} mantido com detalhes",
    "other": "{n} mantidos com detalhes"
@@ -4539,7 +4533,7 @@
   "Reply": "Resposta",
   "Reply not saved": "Resposta não salva",
   "Reply on {unit} failed: {error}": "A resposta em {unit} falhou: {error}",
-  "Reply saved to the Outbox": "Resposta salva no Outbox",
+  "Reply saved for your approval": "Resposta salva para sua aprovação",
   "Reply sent": "Resposta enviada",
   "Repositories (color: share stalled)": "Repositórios (cor: fatia parada)",
   "Repository": "Repositório",
@@ -4565,7 +4559,6 @@
   "Run {verb} on the task, with “{task}”": "Executar {verb} na tarefa, com “{task}”",
   "Runs": "Execuções",
   "Save as draft": "Salvar como rascunho",
-  "Save to Outbox": "Salvar no Outbox",
   "Search": "Buscar",
   "Search or ask": "Buscar ou pedir",
   "Search, paste a link, or ask": "Busque, cole um link ou pergunte",
@@ -4606,9 +4599,6 @@
   "Start an agent turn: {intent}": "Iniciar um turno do agente: {intent}",
   "Start in {repo}: {brief}": "Iniciar em {repo}: {brief}",
   "Start: {brief}": "Iniciar: {brief}",
-  "Stop drafting these": "Parar de rascunhar estes",
-  "Stop this workflow": "Parar este workflow",
-  "Stopped {workflow}": "{workflow} parado",
   "Store needs attention: {why}": "O banco precisa de atenção: {why}",
   "Sweep now": "Varrer agora",
   "Synced {time}": "Sincronizado às {time}",
@@ -5026,10 +5016,6 @@
    "one": "{n} concluído hoje",
    "other": "{n} concluídos hoje"
   },
-  "{n} draft": {
-   "one": "{n} rascunho",
-   "other": "{n} rascunhos"
-  },
   "{n} draft waits for you": {
    "one": "{n} rascunho espera por você",
    "other": "{n} rascunhos esperam por você"
@@ -5043,6 +5029,10 @@
    "other": "{n} arquivos"
   },
   "{n} of {total}": "{n} de {total}",
+  "{n} of {total} wait on you": {
+   "one": "{n} de {total} espera por você",
+   "other": "{n} de {total} esperam por você"
+  },
   "{n} open questions in the brief": {
    "one": "{n} pergunta em aberto no brief",
    "other": "{n} perguntas em aberto no brief"
@@ -6161,6 +6151,17 @@
     "layout": "queue"
    },
    {
+    "id": "next",
+    "label": "Next actions",
+    "summary": "Your tasks whose next step is yours, with nothing waiting on a decision.",
+    "empty": "No next action of yours.",
+    "when": "task.owed_by == 'me' \u0026\u0026 task.category in ['ready', 'active', 'waiting'] \u0026\u0026 size(task.decisions) == 0",
+    "sort": "-task.sequential_next",
+    "over": "tasks",
+    "rail": false,
+    "layout": "list"
+   },
+   {
     "id": "inbox",
     "label": "Inbox",
     "summary": "What nobody has clarified yet; once clarified, a task leaves for good.",
@@ -6171,12 +6172,22 @@
     "layout": "list"
    },
    {
-    "id": "needs-me",
-    "label": "Needs me",
-    "summary": "Tasks whose next step is yours: a gate to answer or your own next action.",
-    "empty": "Nothing waits on you.",
-    "when": "task.owed_by == 'me' \u0026\u0026 task.category != 'inbox' \u0026\u0026 (task.gates_open \u003e 0 || task.category in ['ready', 'active', 'waiting'])",
-    "sort": "-task.sequential_next",
+    "id": "focus",
+    "label": "Focus",
+    "summary": "The tasks you marked to focus on.",
+    "empty": "Nothing in focus: mark a task to focus on it.",
+    "when": "task.prop.focus == 'on' \u0026\u0026 !(task.category in ['done', 'dropped'])",
+    "over": "tasks",
+    "rail": false,
+    "layout": "list"
+   },
+   {
+    "id": "fits-now",
+    "label": "Fits now",
+    "summary": "Your next steps that take half an hour or less.",
+    "empty": "Nothing of yours fits in half an hour.",
+    "when": "task.owed_by == 'me' \u0026\u0026 task.category in ['ready', 'active'] \u0026\u0026 task.prop.size \u003e duration('0s') \u0026\u0026 task.prop.size \u003c= duration('30m')",
+    "sort": "task.prop.size",
     "over": "tasks",
     "rail": false,
     "layout": "list"
@@ -6204,29 +6215,6 @@
     "layout": "list"
    },
    {
-    "id": "fits-now",
-    "label": "Fits now",
-    "summary": "Your next steps that take half an hour or less.",
-    "empty": "Nothing of yours fits in half an hour.",
-    "when": "task.owed_by == 'me' \u0026\u0026 task.category in ['ready', 'active'] \u0026\u0026 task.prop.size \u003e duration('0s') \u0026\u0026 task.prop.size \u003c= duration('30m')",
-    "sort": "task.prop.size",
-    "over": "tasks",
-    "rail": false,
-    "layout": "list"
-   },
-   {
-    "id": "blocked-by-me",
-    "label": "Blocked by me",
-    "summary": "Asks that wait on you, grouped by who asked, the oldest first.",
-    "empty": "Nobody is blocked by you.",
-    "when": "task.owed_by == 'me' \u0026\u0026 size(task.askers) \u003e 0 \u0026\u0026 !(task.category in ['deferred', 'done', 'dropped'])",
-    "sort": "-task.ask_age",
-    "over": "tasks",
-    "group": "task.asker_names",
-    "rail": false,
-    "layout": "list"
-   },
-   {
     "id": "stalled",
     "label": "Stalled",
     "summary": "Tasks waiting too long: a source says they stalled, or their check date passed with nothing moving.",
@@ -6238,7 +6226,7 @@
    },
    {
     "id": "in-loop",
-    "label": "In loop",
+    "label": "In the loop",
     "summary": "Tasks an agent is working on right now.",
     "empty": "No agent is working on anything.",
     "when": "task.link_signal.in_loop || task.turns_running \u003e 0",
@@ -6257,26 +6245,6 @@
     "layout": "list"
    },
    {
-    "id": "snoozed",
-    "label": "Snoozed",
-    "summary": "Tasks asleep until a date, an event or a condition.",
-    "empty": "Nothing is snoozed.",
-    "when": "task.wake_until \u003e timestamp(0) || task.wake_when != '' || task.state == 'scheduled'",
-    "over": "tasks",
-    "rail": false,
-    "layout": "list"
-   },
-   {
-    "id": "focus",
-    "label": "Focus",
-    "summary": "The tasks you marked to focus on.",
-    "empty": "Nothing in focus: mark a task to focus on it.",
-    "when": "task.prop.focus == 'on' \u0026\u0026 !(task.category in ['done', 'dropped'])",
-    "over": "tasks",
-    "rail": false,
-    "layout": "list"
-   },
-   {
     "id": "projects",
     "label": "Projects",
     "summary": "Your open projects.",
@@ -6287,11 +6255,41 @@
     "layout": "list"
    },
    {
+    "id": "review-projects",
+    "label": "Projects to review",
+    "summary": "Projects past their review, or with no next action of yours and not in Someday.",
+    "empty": "Every project has a next action and is reviewed.",
+    "when": "task.prop.kind == 'project' \u0026\u0026 !(task.category in ['done', 'dropped']) \u0026\u0026 (task.review_due || (!task.children_mine \u0026\u0026 task.state != 'someday'))",
+    "over": "tasks",
+    "rail": false,
+    "layout": "list"
+   },
+   {
+    "id": "snoozed",
+    "label": "Snoozed",
+    "summary": "Tasks asleep until a date, an event or a condition.",
+    "empty": "Nothing is snoozed.",
+    "when": "task.wake_until \u003e timestamp(0) || task.wake_when != '' || task.state == 'scheduled'",
+    "over": "tasks",
+    "rail": false,
+    "layout": "list"
+   },
+   {
     "id": "someday",
     "label": "Someday",
     "summary": "Tasks you might do some day, out of the way until then.",
     "empty": "Nothing in Someday right now.",
     "when": "task.state == 'someday'",
+    "over": "tasks",
+    "rail": false,
+    "layout": "list"
+   },
+   {
+    "id": "done",
+    "label": "Done",
+    "summary": "Finished tasks that still hold a workspace on disk, to remove.",
+    "empty": "No finished task holds a workspace.",
+    "when": "task.category == 'done' \u0026\u0026 task.link_signal.workspace",
     "over": "tasks",
     "rail": false,
     "layout": "list"
@@ -6308,53 +6306,10 @@
     "layout": "list"
    },
    {
-    "id": "done",
-    "label": "Done",
-    "summary": "Finished tasks that still hold a workspace on disk, to remove.",
-    "empty": "No finished task holds a workspace.",
-    "when": "task.category == 'done' \u0026\u0026 task.link_signal.workspace",
-    "over": "tasks",
-    "rail": false,
-    "layout": "list"
-   },
-   {
-    "id": "outbox",
-    "label": "Outbox",
-    "summary": "Drafts waiting for your approval, and approved ones still sending or that failed to send.",
-    "empty": "No drafts wait on you.",
-    "when": "gate.kind == 'draft' \u0026\u0026 (gate.status == 'open' || gate.delivery in ['sending', 'failed'])",
-    "sort": "draft.created_at",
-    "over": "gates",
-    "group": "draft.proposer",
-    "rail": false,
-    "layout": "outbox"
-   },
-   {
-    "id": "review-projects",
-    "label": "Projects to review",
-    "summary": "Projects past their review, or with no next action of yours and not in Someday.",
-    "empty": "Every project has a next action and is reviewed.",
-    "when": "task.prop.kind == 'project' \u0026\u0026 !(task.category in ['done', 'dropped']) \u0026\u0026 (task.review_due || (!task.children_mine \u0026\u0026 task.state != 'someday'))",
-    "over": "tasks",
-    "rail": false,
-    "layout": "list"
-   },
-   {
     "id": "review",
     "label": "Review",
     "summary": "The weekly review: walk each step until the lists are clean.",
     "empty": "Nothing in Review right now.",
-    "over": "tasks",
-    "rail": false,
-    "layout": "list"
-   },
-   {
-    "id": "home-blocked",
-    "label": "Blocked by you",
-    "summary": "Tasks that wait on you: a gate to decide or someone's ask, the longest owed first.",
-    "empty": "Nothing in Blocked by you right now.",
-    "when": "task.owed_by == 'me' \u0026\u0026 (task.gates_open \u003e 0 || size(task.askers) \u003e 0) \u0026\u0026 !(task.category in ['inbox', 'deferred', 'done', 'dropped'])",
-    "sort": "task.owed_since",
     "over": "tasks",
     "rail": false,
     "layout": "list"

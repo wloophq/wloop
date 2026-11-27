@@ -148,10 +148,13 @@ type RowWords struct {
 }
 
 type ViewsCatalog struct {
-	Views    []TaskViewSpec `json:"views"` // core views in spec 9.1 order, review only once registered
-	Areas    []string       `json:"areas"`
-	Contexts []string       `json:"contexts"`
-	Verbs    []VerbSpec     `json:"verbs"` // key from internal/keys
+	Views []TaskViewSpec `json:"views"` // core views in spec 9.1 order, review only once registered
+	// Rail places the rail's own entries, plan and recent, by entry: an entry absent sits in the untitled top
+	// block, counted.
+	Rail     map[string]RailEntrySpec `json:"rail,omitempty"`
+	Areas    []string                 `json:"areas"`
+	Contexts []string                 `json:"contexts"`
+	Verbs    []VerbSpec               `json:"verbs"` // key from internal/keys
 	// Review are the ids of the views the review walks, in order.
 	Review []string `json:"review,omitempty"`
 	// States are the profile's states in their declared order; Props its task properties.
@@ -198,11 +201,21 @@ type TaskViewSpec struct {
 	RemoveClean  bool   `json:"remove_clean,omitempty"`
 	// Rail says whether the rail lists the view; a view only the home, a queue or search reads does not.
 	Rail bool `json:"rail"`
-	// Layout is how the cockpit draws the view: list, board, outbox or queue.
+	// Layout is how the cockpit draws the view: list, board or queue.
 	Layout string `json:"layout,omitempty"`
-	// Opens is the route a page of the view opens instead, "" for its own: the Outbox's opens the queue's view
-	// narrowed to the kind draft gates count as.
+	// Opens is the route a page of the view opens instead, "" for its own, such as the queue's view narrowed to
+	// the kind draft gates count as.
 	Opens string `json:"opens,omitempty"`
+	// Section is the rail section the view sits in, "" for the untitled top block; Uncounted says the rail draws
+	// no number for it.
+	Section   string `json:"section,omitempty"`
+	Uncounted bool   `json:"uncounted,omitempty"`
+}
+
+// RailEntrySpec is the rail section of one of the rail's own entries, and whether the rail draws no number for it.
+type RailEntrySpec struct {
+	Section   string `json:"section,omitempty"`
+	Uncounted bool   `json:"uncounted,omitempty"`
 }
 
 // StateSpec is a state of tasks.toml and the category Go reads of it.

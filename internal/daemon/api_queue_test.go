@@ -196,6 +196,29 @@ func TestQueueAllAcceptsTheLens(t *testing.T) {
 	}
 }
 
+func TestQueueAllNarrowsByKind(t *testing.T) {
+	t.Parallel()
+	q := newQueueRig(t, nil)
+	q.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "send the notes"},
+		task.Task{ID: "t-0000000000000002", State: "next", Category: task.CategoryReady, Title: "pick a name"},
+		task.Task{ID: "t-0000000000000003", State: "next", Category: task.CategoryReady, Title: "plan the move"})
+	q.open(t, "t-0000000000000001", gate.KindDraft, "41", 2*time.Hour)
+	q.open(t, "t-0000000000000002", gate.KindQuestion, "7", time.Hour)
+	q.open(t, "t-0000000000000003", gate.KindPlan, "1", 3*time.Hour)
+	var narrowed api.Queue
+	if code := get(t, q.s, api.QueueAllPath+"?kind=approve-plan&kind=answer", &narrowed); code != 200 {
+		t.Fatalf("%d", code)
+	}
+	if want := []string{"answer", "approve-plan"}; !slices.Equal(kindsOf(narrowed), want) || narrowed.Total != 2 {
+		t.Fatalf("kinds %v, total %d, want %v in the profile's order", kindsOf(narrowed), narrowed.Total, want)
+	}
+	rec := httptest.NewRecorder()
+	q.s.Handler().ServeHTTP(rec, apiRequest("GET", api.QueueAllPath+"?kind=merge", nil))
+	if rec.Code != 404 || !strings.Contains(rec.Body.String(), "last-step") {
+		t.Fatalf("an unknown kind: %d %s", rec.Code, rec.Body)
+	}
+}
+
 func TestQueueItemCarriesKindOnPerKindRoute(t *testing.T) {
 	t.Parallel()
 	r := newTasksRig(t, nil)
@@ -428,10 +451,6 @@ func TestFailedDeliveryIsAQueueItem(t *testing.T) {
 	r := newOutboxRig(t)
 	r.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "thank the reviewer"})
 	d, g := r.failedOn(t, "t-0000000000000001", "Thanks for the review.")
-	var outboxPage api.OutboxPage
-	if code := get(t, r.s, api.OutboxPath+"?view=outbox", &outboxPage); code != 200 || !slices.ContainsFunc(outboxPage.Drafts, func(o api.OutboxDraft) bool { return o.ID == int64(d.ID) }) {
-		t.Fatalf("%d: the Outbox lists %+v, want the failed draft", code, outboxPage.Drafts)
-	}
 	for _, path := range []string{api.QueueAllPath, queuePath("send-draft")} {
 		var q api.Queue
 		if code := get(t, r.s, path, &q); code != 200 {
@@ -575,11 +594,16 @@ func TestTheHomesNeedsYouSectionIsTheQueueOfEveryKind(t *testing.T) {
 	if all := q.all(t); all.View != "needs-you" {
 		t.Fatalf("the queue's view %q, want the view that draws it", all.View)
 	}
+}
+
+func TestAViewThatOpensNeedsYouIsServedWithItsRoute(t *testing.T) {
+	t.Parallel()
+	r := newGatesViewRig(t)
 	var cat api.ViewsCatalog
-	get(t, q.s, api.ViewsPath, &cat)
-	i := slices.IndexFunc(cat.Views, func(v api.TaskViewSpec) bool { return v.ID == "outbox" })
+	get(t, r.s, api.ViewsPath, &cat)
+	i := slices.IndexFunc(cat.Views, func(v api.TaskViewSpec) bool { return v.ID == heldDraftsView })
 	if i < 0 || cat.Views[i].Opens != "view=needs-you&kind=send-draft" {
-		t.Fatalf("the Outbox's view %+v, want it to open Needs you narrowed to the drafts to send", cat.Views)
+		t.Fatalf("the %s view %+v, want it to open Needs you narrowed to the drafts to send", heldDraftsView, cat.Views)
 	}
 }
 
@@ -827,5 +851,22 @@ func TestAQueuePageReadsRelatedTasksFromItsPass(t *testing.T) {
 	}
 	if reads != 0 {
 		t.Errorf("%d reads of single tasks for a queue page whose pass holds them, want 0", reads)
+	}
+}
+
+func TestQueueAllServesItsKindsInProfileOrder(t *testing.T) {
+	t.Parallel()
+	l := *bundledLoaded()
+	l.Decisions.Order = []decision.Kind{decision.Kind("send-draft"), decision.Kind("answer")}
+	q := newQueueRig(t, func(d *Deps) { d.Intents = func() *intentload.Loaded { return &l } })
+	got := q.all(t)
+	want := decision.Ordered(l.Decisions.Order)
+	if len(got.Kinds) != len(decision.Kinds) || len(want) != len(decision.Kinds) {
+		t.Fatalf("kinds %+v, want every kind, those order leaves out after it", got.Kinds)
+	}
+	for i, k := range want {
+		if got.Kinds[i] != (api.QueueKind{ID: string(k), Label: l.Decisions.Kinds[k].Queue}) {
+			t.Errorf("kind %d %+v, want %s worded by its queue", i, got.Kinds[i], k)
+		}
 	}
 }

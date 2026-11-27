@@ -19,7 +19,7 @@ import (
 )
 
 func viewsCatalog() api.ViewsCatalog {
-	views := []api.TaskViewSpec{{ID: "focus", Label: "Focus", Rail: true}, {ID: "inbox", Label: "Inbox", Rail: true}, {ID: "outbox", Label: "Outbox", Over: "gates", Rail: true},
+	views := []api.TaskViewSpec{{ID: "focus", Label: "Focus", Rail: true}, {ID: "inbox", Label: "Inbox", Rail: true}, {ID: "held-drafts", Label: "Held drafts", Over: "gates", Rail: true},
 		{ID: "next", Label: "Next", Group: "task.prop.contexts", Rail: true}, {ID: "waiting", Label: "Waiting", Group: "task.owed_by", Rail: true}, {ID: "projects", Label: "Projects", Rail: true},
 		{ID: "someday", Label: "Someday", Rail: true}, {ID: "logbook", Label: "Logbook", Rail: true}}
 	verbs := []api.VerbSpec{{Verb: "next", Label: "Next", Key: "x"}, {Verb: "waiting", Handler: "waiting", Label: "Waiting", Key: "w", Input: "Waiting on whom"},
@@ -96,14 +96,14 @@ func viewTasks() map[string][]api.TaskView {
 		Options: []record.Option{{ID: "early", Label: "Before six"}, {ID: "late", Label: "After ten"}}})
 	asked.Gates = []api.GateView{{ID: 4, Kind: "question", Status: "open", Intents: []api.IntentView{}, Subject: subject}}
 	captured := task("e3", "Buy cables", "inbox")
-	draft := task("draft:11", "Reply in the release thread", "outbox")
+	draft := task("draft:11", "Reply in the release thread", "held-drafts")
 	draft.Verbs = verbs("approve", "dismiss")
 	draft.Gates = draftGates(api.Draft{ID: 11, Rev: 4, Kind: "reply", Purpose: "reply", Target: "C0REL", Where: "#releases thread", Text: "Ship it tonight.\nRollback plan in the doc.",
 		State: "pending", Origin: api.DraftOrigin{Kind: "turn"}})
 	return map[string][]api.TaskView{
-		"focus":  {focus},
-		"inbox":  {asked, captured},
-		"outbox": {draft},
+		"focus":       {focus},
+		"inbox":       {asked, captured},
+		"held-drafts": {draft},
 		"next": {task("e4", "Call the bank", "next", "calls"), task("e5", "Rename the export flag", "next", "computer"),
 			task("e6", "Sort the receipts", "next"), task("e7", "Write the runbook", "next", "computer")},
 		"waiting": {waitingOn(task("e8", "Contract signature", "waiting"), "bob"), waitingOn(task("e9", "Design review", "waiting"), "ana"),
@@ -112,7 +112,7 @@ func viewTasks() map[string][]api.TaskView {
 }
 
 func viewCounters() api.Counters {
-	return api.Counters{Views: map[string]int{"focus": 1, "inbox": 2, "outbox": 1, "next": 4, "waiting": 4, "projects": 0, "someday": 0, "logbook": 12},
+	return api.Counters{Views: map[string]int{"focus": 1, "inbox": 2, "held-drafts": 1, "next": 4, "waiting": 4, "projects": 0, "someday": 0, "logbook": 12},
 		Areas: map[string]int{}, Contexts: map[string]int{}}
 }
 
@@ -165,7 +165,7 @@ func TestStartsOnFocus(t *testing.T) {
 			t.Fatalf("started on view %d", m.view)
 		}
 		tabs := m.Render(220, 20, now)[0]
-		order := []string{"[Focus 1]", "Inbox 2", "Outbox 1", "Next 4", "Waiting 4", "Projects 0", "Someday 0", "Logbook 12", "Needs me 0", "Plan 0"}
+		order := []string{"[Focus 1]", "Inbox 2", "Held drafts 1", "Next 4", "Waiting 4", "Projects 0", "Someday 0", "Logbook 12", "Needs me 0", "Plan 0"}
 		at := -1
 		for _, want := range order {
 			i := strings.Index(tabs, want)
@@ -258,7 +258,7 @@ func TestGoGitHubSkipsOtherProviders(t *testing.T) {
 	}
 }
 
-func TestOutboxInTUI(t *testing.T) {
+func TestAViewOverGatesInTUI(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		d := &fakeDaemon{rows: oneRow(), viewsCat: ptr(viewsCatalog()), tasks: viewTasks(), counters: viewCounters(), doLag: 300 * time.Millisecond}
 		term, done := start(t, d)
@@ -266,7 +266,7 @@ func TestOutboxInTUI(t *testing.T) {
 		term.press(Key{Rune: 'g'}, Key{Rune: 'o'})
 		eventually(t, "the draft", func() bool {
 			s := term.screen()
-			return strings.Contains(s, "[Outbox 1]") && strings.Contains(s, "#releases thread") && strings.Contains(s, "Ship it tonight.")
+			return strings.Contains(s, "[Held drafts 1]") && strings.Contains(s, "#releases thread") && strings.Contains(s, "Ship it tonight.")
 		})
 		term.press(Key{Rune: 'a'})
 		eventually(t, "the refusal from the list", func() bool { return strings.Contains(term.screen(), "open the draft to approve it") })
@@ -295,13 +295,13 @@ func TestOutboxInTUI(t *testing.T) {
 	})
 }
 
-func TestOutboxApprovesTheTextOnScreen(t *testing.T) {
+func TestAGatesViewApprovesTheTextOnScreen(t *testing.T) {
 	m := viewsModel(t)
 	chord(m, "go")
 	if _, ok := press(m, Key{Rune: 'a'}, Key{Rune: 'y'}); ok {
 		t.Fatal("approved from the list")
 	}
-	e := viewTasks()["outbox"][0]
+	e := viewTasks()["held-drafts"][0]
 	press(m, Key{Name: KeyEnter})
 	m.SetDetail(e.ID, e, nil)
 	edited := e
@@ -309,7 +309,7 @@ func TestOutboxApprovesTheTextOnScreen(t *testing.T) {
 	ed := *draftOn(e)
 	ed.Text, ed.Rev = "Ship it now, no rollback.", 5
 	edited.Gates = draftGates(ed)
-	m.SetTasks("outbox", []api.TaskView{edited}, viewCounters())
+	m.SetTasks("held-drafts", []api.TaskView{edited}, viewCounters())
 	if _, ok := press(m, Key{Rune: 'a'}); ok || m.prompt == nil || !m.prompt.confirm {
 		t.Fatalf("a did not ask: %+v", m.prompt)
 	}
@@ -331,7 +331,7 @@ func TestGChordsSwitchViews(t *testing.T) {
 	if v, _ := m.viewOnScreen(); v.ID != "inbox" {
 		t.Fatalf("g i: view %d", m.view)
 	}
-	for keys, want := range map[string]string{"gf": "focus", "go": "outbox", "gw": "waiting", "gp": "projects"} {
+	for keys, want := range map[string]string{"gf": "focus", "go": "held-drafts", "gw": "waiting", "gp": "projects"} {
 		chord(m, keys)
 		if v, _ := m.viewOnScreen(); v.ID != want {
 			t.Errorf("%s: view %d, want %s", keys, m.view, want)
@@ -341,9 +341,9 @@ func TestGChordsSwitchViews(t *testing.T) {
 	if m.view != 0 || m.views[0].ID != "needs-me" {
 		t.Fatalf("g g: view %d", m.view)
 	}
-	chord(m, "gx")
-	if m.view != 0 || m.status != "g x: no such key" {
-		t.Fatalf("g x: view %d, status %q", m.view, m.status)
+	chord(m, "gy")
+	if m.view != 0 || m.status != "g y: no such key" {
+		t.Fatalf("g y: view %d, status %q", m.view, m.status)
 	}
 	if press(m, Key{Rune: 'V'}); m.prompt == nil || m.prompt.action != "review" {
 		t.Fatalf("the key after a cancelled chord is not a key again: %+v", m.prompt)
@@ -790,14 +790,14 @@ func squash(s string) string {
 	return s
 }
 
-func TestOutboxRetrySendsTheRevOnScreen(t *testing.T) {
+func TestAGatesViewRetrySendsTheRevOnScreen(t *testing.T) {
 	m := viewsModel(t)
-	e := viewTasks()["outbox"][0]
+	e := viewTasks()["held-drafts"][0]
 	failed := *draftOn(e)
 	failed.State = "failed"
 	e.Gates = draftGates(failed)
 	e.Verbs = []api.VerbState{{Verb: "retry", Enabled: true}}
-	m.SetTasks("outbox", []api.TaskView{e}, viewCounters())
+	m.SetTasks("held-drafts", []api.TaskView{e}, viewCounters())
 	chord(m, "go")
 	if c, ok := m.taskVerb("retry", 0); ok || c.verb != "" {
 		t.Fatalf("retried from the list: %+v", c)

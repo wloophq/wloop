@@ -1,0 +1,48 @@
+USAGE
+  {{command}} needs [<query>] [--kind <kind>]... [--open] [--color <when>]
+  {{command}} needs show <ref> [--color <when>]
+  {{command}} needs approve <ref> [--text <markdown> --rev <n>] [--payload <json> --rev <n>] [--confirm] [--yes]
+  {{command}} needs answer <ref> [<option>] [--text <answer>] [--yes]
+
+List Needs you, every decision that waits on you in the profile's order, the
+queue the cockpit, the menu bar and the floating widget show, or print one
+whole: what it asks, its options and the commands it takes. A query narrows it
+as the cockpit's lens does (source:github, @context, asked-by:<name>, free
+text), and --kind keeps the decisions of a kind (answer, approve-plan,
+send-draft, review-step, last-step, pick-someone, act); --open opens the cockpit
+on the same queue. Piped, the list is one tab-separated line per item: ref,
+kind, task, title, since, primary action and what it asks. An item's ref is its
+gate's id; a situation of a unit, which no gate decides, is <kind>@<unit>.
+approve resolves an item's gate with its primary action, as the cockpit's button
+does; a draft's shows it whole and posts once you say yes at a terminal, from an
+agent's shell only with --yes and a session you drive, whose agent asks you
+first, and a stale draft is refused; a failed delivery's posts it again. answer
+answers a question with one of its options, or your words with --text; an option
+that posts a draft shows it and asks first, as approve does.
+
+FLAGS
+  --kind <kind>      list: keep the items of this decision kind; repeat it for
+                     more
+  --open             list: open the cockpit on the same queue, narrowed by one
+                     kind at most
+  --color <when>     list, show: auto, always or never
+  --text <markdown>  approve: post this text instead of the draft's; answer:
+                     your answer, after the option when one is given
+  --payload <json>   approve: post this payload instead of the draft's, whole
+  --rev <n>          approve --text or --payload: the rev of the draft you read,
+                     as needs show prints it
+  --confirm          approve of a failed delivery: post again a draft that may
+                     have been posted
+  --yes              approve, answer: go ahead without asking, after showing the
+                     draft
+
+EXAMPLES
+  {{command}} needs
+  {{command}} needs source:github --kind send-draft
+  {{command}} needs show 412
+  {{command}} needs approve 412
+  {{command}} needs answer 398 b
+  {{command}} needs @ops --open
+
+DOCS
+  https://{{name}}hq.github.io/{{name}}/concepts/home/

@@ -904,11 +904,15 @@
         },
         "float": {
           "default": "off",
-          "description": "on shows the floating widget, which carries what waits on you: no Needs you banner posts while it is hidden for a while, or shown with a page that has loaded; they post while it is off, and while a shown widget's page has not loaded once a few seconds have passed since it was asked to. Needs the app's own window.",
+          "description": "on shows the floating widget, which carries what waits on you: no Needs you banner of what it shows posts while it is hidden for a while, or shown with a page that has loaded; they post while it is off, and while a shown widget's page has not loaded once a few seconds have passed since it was asked to. Needs the app's own window.",
           "enum": [
             "on",
             "off"
           ],
+          "type": "string"
+        },
+        "float_filter": {
+          "description": "The filter the floating widget starts with until you set one in its panel: a lens query as the cockpit's (source:github, @context, asked-by:<name>, free words). The widget counts, peeks at and comes back for only what it shows, and a Needs you banner of what it leaves out still posts.",
           "type": "string"
         },
         "float_hotkey": {

@@ -87,8 +87,9 @@ func (c *Controller) visibility() Visibility {
 }
 
 // muteNeeds says whether the float carries what waits on the user, so no
-// Needs you banner posts: while the user hid it for a while, or while it
-// shows a page that has reported in or is within floatLoadGrace of loading.
+// Needs you banner of what it shows posts (carriedTasks): while the user hid
+// it for a while, or while it shows a page that has reported in or is within
+// floatLoadGrace of loading.
 func (c *Controller) muteNeeds() bool {
 	if !c.floatOn() {
 		return false
@@ -113,6 +114,17 @@ func (c *Controller) FloatPageReady() {
 	if c.running && !c.stopped {
 		ctx := c.runCtx()
 		c.bg.Go(func() { c.redraw(ctx) })
+	}
+}
+
+// FloatFilterChanged reads the queue the float's new filter shows, off the
+// caller's goroutine, so the banners and a quiet float follow it.
+func (c *Controller) FloatFilterChanged() {
+	c.floatMu.Lock()
+	defer c.floatMu.Unlock()
+	if c.running && !c.stopped {
+		ctx := c.runCtx()
+		c.bg.Go(func() { c.refresh(ctx, false, true) })
 	}
 }
 
@@ -363,9 +375,9 @@ func (c *Controller) snoozeEnded(until time.Time) {
 
 // floatRefreshed follows a refresh that read the daemon. A snooze past its
 // time shows the float, since a sleeping Mac stops its timer. When the
-// refresh read the queue, a quiet float shows if the queue holds an item
-// the last read did not, and otherwise keeps the queue as the user last saw
-// it. The first read after launch only learns the queue, unless the float
+// refresh read the queue the float shows, a quiet float shows if that queue
+// holds an item the last read did not, and otherwise keeps the queue as the
+// user last saw it. The first read after launch only learns the queue, unless the float
 // starts quiet with a saved one. It runs under refreshMu.
 func (c *Controller) floatRefreshed(queueRead bool) {
 	if !c.floatOn() {
@@ -373,8 +385,9 @@ func (c *Controller) floatRefreshed(queueRead bool) {
 	}
 	var keys map[string]bool
 	if queueRead {
-		keys = make(map[string]bool, len(c.needs.Items))
-		for _, it := range c.needs.Items {
+		items := c.shownItems()
+		keys = make(map[string]bool, len(items))
+		for _, it := range items {
 			keys[queueKey(it)] = true
 		}
 	}

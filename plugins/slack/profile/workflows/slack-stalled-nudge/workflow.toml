@@ -20,7 +20,3 @@ reason = "moot"
 [[drafts.withdraw.rule]]
 when = 'draft.people_outside > 0'
 reason = "outside"
-
-[outbox]
-title = "Ask who hasn't answered"
-about = "Drafted when a conversation where you wait on someone goes quiet."

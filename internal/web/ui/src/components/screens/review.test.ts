@@ -1,12 +1,11 @@
 import { cleanup, fireEvent, render } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { flushSync } from "svelte";
-import { I18N } from "../../lib/i18n.svelte";
 import type { J } from "../../lib/util";
 import { net } from "../../state/api";
 import { loadReview, loadReviewStep } from "../../state/loaders.svelte";
 import { nav } from "../../state/route.svelte";
-import { outboxState, reviewState, tasksState } from "../../state/store.svelte";
+import { reviewState, tasksState } from "../../state/store.svelte";
 import { resetStore } from "../../testing/reset.svelte";
 import { fixture, task, useCatalogs } from "../rows/testdata/fixtures";
 import TaskViewPage from "./TaskViewPage.svelte";
@@ -19,7 +18,7 @@ afterEach(cleanup);
 function reviewFixture(): J {
   const step = (id: string, label: string, view: string, count: number, done: boolean) => ({ id, label, view, query: { view }, count, done });
   return { id: "r-1", started_at: "2026-10-22T12:00:00Z", done: false, steps: [
-    step("inbox", "Inbox to zero", "inbox", 2, false), step("outbox", "Outbox", "outbox", 0, true), step("waiting", "Waiting: nudge?", "waiting", 0, true),
+    step("inbox", "Inbox to zero", "inbox", 2, false), step("decide-send-draft", "Drafts to send", "decide-send-draft", 0, true), step("waiting", "Waiting: nudge?", "waiting", 0, true),
     step("projects", "Projects without a next action or past their review", "review", 1, false), step("someday", "Someday", "someday", 0, true), step("focus", "Prune Focus", "focus", 0, true),
   ] };
 }
@@ -61,7 +60,7 @@ describe("the review", () => {
     await reviewKey("done");
     await reviewKey("next");
     moves.push(reviewState.step);
-    expect(moves).toEqual(["waiting", "outbox", "waiting"]);
+    expect(moves).toEqual(["waiting", "decide-send-draft", "waiting"]);
     expect(gets).toEqual(expect.arrayContaining(["/api/tasks?view=inbox", "/api/tasks?view=review"]));
     reviewState.step = "projects";
     await loadReviewStep();
@@ -100,34 +99,23 @@ describe("the review", () => {
   });
 });
 
-describe("the Review's Outbox step", () => {
+describe("the Review's drafts step", () => {
   beforeEach(() => {
     resetStore(NOW, "#view=review");
     useCatalogs(fixture("catalog.github.json"), fixture("views.json"));
-    I18N.strings = { "{n} draft": { one: "{n} draft", other: "{n} drafts" } };
-    reviewState.review = { steps: [{ id: "outbox", view: "outbox", label: "Outbox", count: 4, done: false }] };
-    reviewState.step = "outbox";
+    reviewState.review = { steps: [{ id: "decide-send-draft", view: "decide-send-draft", label: "Drafts to send", count: 1, done: false }] };
+    reviewState.step = "decide-send-draft";
   });
 
-  it("reads the Outbox with the step's tasks", async () => {
+  it("lists the tasks with a draft to send, read as any step's", async () => {
     const gets: string[] = [];
     net.fetch = async (url: string) => {
       gets.push(url);
-      return new Response(JSON.stringify(url.startsWith("/api/outbox") ? fixture("outbox-page.json") : { tasks: [] }), { status: 200 });
+      return new Response(JSON.stringify({ tasks: [task("e-1", "next", (e) => Object.assign(e, { title: "Thank the reviewer" }))] }), { status: 200 });
     };
     await loadReviewStep();
-    expect(gets).toEqual(["/api/tasks?view=outbox", "/api/outbox?view=outbox"]);
-    expect(outboxState.page.drafts.map((d: J) => d.id)).toEqual([7, 8, 9, 10]);
-  });
-
-  it("draws the Outbox's list, grouped by who proposed each draft", () => {
-    tasksState.key = "review|outbox";
-    tasksState.tasks = [];
-    outboxState.page = fixture("outbox-page.json");
+    expect(gets).toEqual(["/api/tasks?view=decide-send-draft"]);
     const c = render(TaskViewPage).container;
-    const list = c.querySelector("#tasks-body .outbox")!;
-    expect(Array.from(list.querySelectorAll(".ob-title")).map((n) => n.textContent)).toEqual(["Reviews", "Written by hand", "Ask who hasn't answered"]);
-    expect(Array.from(list.querySelectorAll("[data-draft]")).map((n) => n.getAttribute("data-draft"))).toEqual(["10", "9", "7", "8"]);
-    expect(list.querySelectorAll(".ob-stop button").length).toBe(1);
+    expect(c.querySelector("#tasks-body")!.textContent).toContain("Thank the reviewer");
   });
 });

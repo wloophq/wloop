@@ -1,7 +1,7 @@
  Next 4    Waiting 4    Projects 0    Someday 0    Logbook 12   [Review]
 
  ▸ ○ Inbox to zero                                       2
-   ✓ Outbox                                              1
+   ✓ Drafts to send                                      1
    ○ Waiting: nudge?                                     4
    ○ Projects without a next action or past their review 1
    ✓ Someday                                             0

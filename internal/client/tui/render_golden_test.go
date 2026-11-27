@@ -65,7 +65,7 @@ func goldenModel(t *testing.T, color bool) *Model {
 }
 
 // viewsGolden is the golden model on task view, the Inbox with its first
-// task's detail open, the Outbox with its draft's.
+// task's detail open, the view over gates with its draft's.
 func viewsGolden(t *testing.T, color bool, view string) *Model {
 	m := goldenModel(t, color)
 	m.SetViews(viewsCatalog())
@@ -74,7 +74,7 @@ func viewsGolden(t *testing.T, color bool, view string) *Model {
 	}
 	m.navigate(view)
 	m.busy[taskUnit("e5")] = "done"
-	if view == "inbox" || view == "outbox" {
+	if view == "inbox" || view == "held-drafts" {
 		e, _ := m.selectedTask()
 		m.openTask(e, 0)
 		m.SetDetail(e.ID, e, nil)
@@ -129,7 +129,7 @@ func planGolden(t *testing.T, color bool) *Model {
 
 func TestRenderGolden(t *testing.T) {
 	models := map[string]func(*testing.T, bool) *Model{"render": goldenModel}
-	for _, v := range []string{"focus", "inbox", "outbox", "next", "waiting"} {
+	for _, v := range []string{"focus", "inbox", "held-drafts", "next", "waiting"} {
 		models["views-"+v] = func(t *testing.T, color bool) *Model { return viewsGolden(t, color, v) }
 	}
 	models["views-review"] = func(t *testing.T, color bool) *Model { return reviewModel(t, color) }

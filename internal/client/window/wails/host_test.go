@@ -129,10 +129,11 @@ func TestTheHostCallsTheBrandsGlobal(t *testing.T) {
 		return `(function(b){if(b&&b.` + method + `)b.` + method + `(` + args + `)})(window[` + string(name) + `])`
 	}
 	for _, c := range []struct{ got, want string }{
-		{floatPlaceJS(window.FloatPlace{Edge: window.EdgeLeft}), call("place", `{"edge":"left"}`)},
-		{panelShowJS(window.PanelPlace{Mode: window.ModePeek, Item: "gate:7", Side: window.SideLeft, MaxW: 1478, MaxH: 911}),
-			call("show", `"peek",{"item":"gate:7","side":"left","maxW":1478,"maxH":911}`)},
-		{panelShowJS(window.PanelPlace{}), call("show", `"",{"item":"","side":"","maxW":0,"maxH":0}`)},
+		{floatPlaceJS(window.FloatPlace{Edge: window.EdgeLeft}), call("place", `{"edge":"left","filter":{"q":""}}`)},
+		{floatPlaceJS(window.FloatPlace{Filter: window.FloatFilter{Q: "@work", Kinds: []string{"answer"}}}), call("place", `{"edge":"","filter":{"q":"@work","kinds":["answer"]}}`)},
+		{panelShowJS(window.PanelPlace{Mode: window.ModePeek, Item: "gate:7", Side: window.SideLeft, MaxW: 1478, MaxH: 911, Filter: window.FloatFilter{Q: "@work"}}),
+			call("show", `"peek",{"item":"gate:7","side":"left","maxW":1478,"maxH":911,"filter":{"q":"@work"}}`)},
+		{panelShowJS(window.PanelPlace{}), call("show", `"",{"item":"","side":"","maxW":0,"maxH":0,"filter":{"q":""}}`)},
 		{bridgeJS("leave"), call("leave", "")},
 		{bridgeJS("blur"), call("blur", "")},
 	} {

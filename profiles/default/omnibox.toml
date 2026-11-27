@@ -39,7 +39,12 @@ other = "Elsewhere"
 [[search.groups]]
 id    = "you"
 label = "Needs you"
-view  = "needs-me"
+view  = "needs-you"
+
+[[search.groups]]
+id    = "next"
+label = "Next actions"
+view  = "next"
 
 [[search.groups]]
 id    = "others"

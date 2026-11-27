@@ -62,6 +62,6 @@ Agent prose (questions, drafts, reasons) is `body` sans; mono stays for identifi
 ## Across surfaces
 
 - The **terminal client** keeps the rail sections as tab groups and the row grammar as columns, with each task's state in words.
-- The **menu bar** lists Focus, Inbox and Outbox first, then each plugin's menu section, then the loop.
+- The **menu bar** lists the views the profile's badge names first, then each plugin's menu section, then the loop.
 - **Notifications** use the waits-on hues: a question waits on you (`me`), a pending round on the loop (`loop`), held is `late`, blocked is `err`.
 - The **docs** use `me` as their accent and describe views in rail order.

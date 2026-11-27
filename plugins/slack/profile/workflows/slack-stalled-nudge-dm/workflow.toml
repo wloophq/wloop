@@ -26,7 +26,3 @@ reason = "moot"
 [[drafts.withdraw.rule]]
 when = 'draft.target_joined'
 reason = "joined"
-
-[outbox]
-title = "Ask who is not in the conversation"
-about = "Drafted in your direct conversation with someone a quiet conversation waits on, who cannot read it."

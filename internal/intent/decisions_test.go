@@ -196,7 +196,7 @@ func TestBundledDecisionViewsCoverEveryKind(t *testing.T) {
 			}
 		})
 	}
-	for _, id := range []string{"needs-me", "inbox"} {
+	for _, id := range []string{"needs-you", "next", "inbox"} {
 		if v, _ := l.Views.View(id); !v.Rail {
 			t.Errorf("%s left the rail", id)
 		}

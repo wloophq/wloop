@@ -78,7 +78,7 @@ func windowShow(ctx context.Context, wg *sync.WaitGroup, host window.Host, daemo
 	defaults, _ := host.(window.Defaults)
 	cfg := window.Config{Host: host, Daemon: daemon, CockpitURL: cockpit, Hotkey: win.Hotkey, Log: logf, Defaults: defaults}
 	if win.Float == config.FloatOn {
-		cfg.FloatHotkey, cfg.FloatOverFullScreen = win.FloatHotkey, win.FloatOverFullScreen
+		cfg.FloatHotkey, cfg.FloatOverFullScreen, cfg.FloatFilter = win.FloatHotkey, win.FloatOverFullScreen, win.FloatFilter
 	}
 	ctl := window.New(cfg)
 	wg.Go(func() { _ = ctl.Run(ctx) })
@@ -92,14 +92,14 @@ func withWindow(cfg menubar.Config, ctl *window.Controller, host window.Host, wi
 	if ctl == nil {
 		return cfg
 	}
-	cfg.Window, cfg.ShowFloat, cfg.HideFloat, cfg.FloatReady = ctl.Show, ctl.ShowFloat, ctl.HideFloat, ctl.FloatReady
+	cfg.Window, cfg.ShowFloat, cfg.HideFloat, cfg.FloatReady, cfg.FloatFilter = ctl.Show, ctl.ShowFloat, ctl.HideFloat, ctl.FloatReady, ctl.FloatFilter
 	cfg.Float, cfg.FloatMorning = win.Float == config.FloatOn, win.FloatMorning
 	cfg.Defaults, _ = host.(window.Defaults)
 	return cfg
 }
 
-// hookFloat hands the hides the float's page asks for and its hotkey to the
-// menu bar, which decides what the float shows.
+// hookFloat hands the hides the float's page asks for, its hotkey and its
+// filter's changes to the menu bar, which decides what the float shows.
 func hookFloat(ctl *window.Controller, c *menubar.Controller) {
 	if ctl == nil {
 		return
@@ -107,4 +107,5 @@ func hookFloat(ctl *window.Controller, c *menubar.Controller) {
 	ctl.OnFloatHide(c.FloatHide)
 	ctl.OnFloatHotkey(c.ToggleFloat)
 	ctl.OnFloatReady(c.FloatPageReady)
+	ctl.OnFloatFilter(c.FloatFilterChanged)
 }

@@ -171,7 +171,7 @@ func runOpen(ctx context.Context, e *Env, args []string) error {
 	fs := flag.NewFlagSet("open", flag.ContinueOnError)
 	fs.SetOutput(e.Err)
 	printURL := fs.Bool("print", false, "print the cockpit URL with its token instead of opening it")
-	view := fs.String("view", "", "the cockpit view, by its id, such as needs-me")
+	view := fs.String("view", "", "the cockpit view, by its id, such as next")
 	pos, err := parseInterspersed(fs, args)
 	if err != nil {
 		return err
@@ -215,12 +215,21 @@ func runOpen(ctx context.Context, e *Env, args []string) error {
 	if len(pos) == 1 && !isRoute {
 		route = strings.TrimPrefix(route+"&"+unitRoute(ref.Unit()), "&")
 	}
-	u, err := cockpitURL(e.StateDir, route)
-	if err != nil {
+	if *printURL {
+		u, err := cockpitURL(e.StateDir, route)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintln(e.Out, u)
 		return err
 	}
-	if *printURL {
-		_, err := fmt.Fprintln(e.Out, u)
+	return e.openCockpit(ctx, c, route)
+}
+
+// openCockpit opens the cockpit at route: in the app's window when the app runs, else in the browser.
+func (e *Env) openCockpit(ctx context.Context, c *client.Client, route string) error {
+	u, err := cockpitURL(e.StateDir, route)
+	if err != nil {
 		return err
 	}
 	if res, err := c.Window(ctx, api.WindowRequest{Action: api.WindowOpen, Route: route}); err == nil && res.Delivered {

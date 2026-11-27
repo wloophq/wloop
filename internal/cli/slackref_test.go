@@ -126,7 +126,7 @@ func TestSlackDraftOnARefPostsInItsThreadOnceApproved(t *testing.T) {
 	}
 }
 
-func TestOutboxNewReactsToTheMessageItNames(t *testing.T) {
+func TestDraftNewReactsToTheMessageItNames(t *testing.T) {
 	w := newSessionWiring(t)
 	storeRefThread(t, w)
 	ctx := context.Background()
@@ -142,7 +142,7 @@ func TestOutboxNewReactsToTheMessageItNames(t *testing.T) {
 	w.st.saveToken(t, tok)
 
 	ref := sessThreaded + "/" + refThird
-	if code := w.te.run("outbox", "new", ref, "--react", ":eyes:", "--send", "--yes"); code != 0 {
+	if code := w.te.run("draft", "new", ref, "--react", ":eyes:", "--send", "--yes"); code != 0 {
 		t.Fatalf("exit %d: %s %s", code, w.te.out, w.te.err)
 	}
 	ds := w.drafts(t)

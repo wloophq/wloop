@@ -82,15 +82,15 @@ From a terminal, an intent that serves Slack takes a message ref (`<conversation
 
 The drafts made for a task are its draft gates, listed in its detail, where you approve, edit or discard them. In the terminal, a digit picks one (when the task asks no question), then `a`, `i` or `Backspace` acts on it.
 
-**Reply yourself.** `r` on the task, **Save as draft** in the task page's composer, the Reply composer in the thread detail, or the Reply field of its notification writes a reply in the thread (or, in the cockpit, a reaction such as `eyes`). **Save to Outbox** keeps it there for your approval; **Send now** (Tab in the terminal prompt, then `y`; **Send reply** in the notification) approves it at once. The task page's composer also shows **Also send to the conversation**, checked as `drafts.toml` places a reply you write, and both buttons honor it. Either way it goes out through the Outbox like any draft, and counts as your reply for the thread's items. Ctrl+E in the terminal prompt writes it in `$EDITOR`.
+**Reply yourself.** `r` on the task, **Save as draft** in the task page's composer, the Reply composer in the thread detail, or the Reply field of its notification writes a reply in the thread (or, in the cockpit, a reaction such as `eyes`). **Save as draft** holds it for your approval in Needs you; **Send now** (Tab in the terminal prompt, then `y`; **Send reply** in the notification) approves it at once. The task page's composer also shows **Also send to the conversation**, checked as `drafts.toml` places a reply you write, and both buttons honor it. Either way it goes out through the Outbox like any draft, and counts as your reply for the thread's items. Ctrl+E in the terminal prompt writes it in `$EDITOR`.
 
 Write one, approve one with `a`, or from a terminal:
 
 ```sh
-{{command}} outbox new https://acme.slack.com/archives/C000/p1700000000000100 'Friday, after the freeze.'
-{{command}} outbox new https://acme.slack.com/archives/C000/p1700000000000100 --react eyes --send
-{{command}} outbox
-{{command}} outbox approve <id>
+{{command}} draft new https://acme.slack.com/archives/C000/p1700000000000100 'Friday, after the freeze.'
+{{command}} draft new https://acme.slack.com/archives/C000/p1700000000000100 --react eyes --send
+{{command}} needs --kind send-draft
+{{command}} needs approve <ref>
 ```
 
 **Close.** **Close** on a conversation's row in the Slack view, or on the page of a task that holds it, is offered while none of its items is open. It closes the conversation without a message and without asking: the tasks that hold it end and it leaves the Slack view until a message someone else writes there comes in, or an item opens. A conversation no item came from closes on its own once it has been quiet for `plugins.slack.ended_after` (7 days), unless an open task of yours holds it, through the `slack-ended-empty` workflow; turn it off with `[workflows.slack-ended-empty] enabled = false`. When it stops being watched is in [Closing a conversation](/concepts/slack/#closing-a-conversation).

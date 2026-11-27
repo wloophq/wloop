@@ -115,6 +115,9 @@ type Config struct {
 	Defaults            Defaults
 	FloatOverFullScreen bool
 	FloatHotkey         string
+	// FloatFilter is the lens query the float's filter starts with until the
+	// person sets one, window.float_filter.
+	FloatFilter string
 }
 
 // Controller keeps one main window, one panel and the floating widget.
@@ -135,6 +138,9 @@ type Controller struct {
 	screens     []Screen
 	floatHide   func(mode string)
 	floatHotkey func()
+	// filter narrows the queue the float shows; filterSet runs as it changes.
+	filter    FloatFilter
+	filterSet func()
 	// tabFrame is where the tab was last put; panel is its panel window.
 	tabFrame Rect
 	panel    floatPanel
@@ -165,9 +171,12 @@ func New(cfg Config) *Controller {
 	if cfg.After == nil {
 		cfg.After = time.After
 	}
-	c := &Controller{cfg: cfg}
+	c := &Controller{cfg: cfg, filter: FloatFilter{Q: cfg.FloatFilter}.clean()}
 	if cfg.Defaults != nil {
 		c.placement, c.placed = LoadPlacement(cfg.Defaults)
+		if f, ok := LoadFilter(cfg.Defaults); ok {
+			c.filter = f
+		}
 	}
 	return c
 }

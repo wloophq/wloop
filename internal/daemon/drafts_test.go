@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"maps"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -29,9 +31,12 @@ import (
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/keys"
 	"github.com/wloophq/wloop/internal/plugins/bundled/bundledtest"
+	"github.com/wloophq/wloop/internal/profile"
+	"github.com/wloophq/wloop/internal/turn"
 )
 
 var slackUnit = unit.Unit{Provider: "slack", Key: "C000AAA 1700000000.000100"}
@@ -132,8 +137,54 @@ type outboxRig struct {
 // publisher, and off names the plugins that are disabled.
 func newOutboxRig(t testing.TB, off ...unit.ProviderID) *outboxRig {
 	t.Helper()
+	return newOutboxRigOn(t, nil, off...)
+}
+
+// heldDraftsView is a view over gates a user profile declares: the draft gates that wait on the user, and the
+// approved ones whose delivery has not settled.
+const heldDraftsView = "held-drafts"
+
+// heldDraftsBody is the views.toml of a user layer that declares heldDraftsView.
+const heldDraftsBody = `[views.held-drafts]
+label         = "Held drafts"
+summary       = "Draft gates that wait on you, and approved drafts still sending or that failed to send."
+over          = "gates"
+when          = "gate.kind == 'draft' && (gate.status == 'open' || gate.delivery in ['sending', 'failed'])"
+hide_disabled = true
+opens         = { view = "needs-you", kind = "send-draft" }
+`
+
+// heldDraftsLoaded is the bundled profile with a user layer that declares heldDraftsView.
+func heldDraftsLoaded(t testing.TB) func() *intentload.Loaded {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, intentload.ViewsFile), []byte(heldDraftsBody), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	base, err := turn.Base()
+	if err != nil {
+		t.Fatal(err)
+	}
+	l, problems := intentload.Load(append(profile.BundledChain(), profile.Layer{Name: "user", Dir: dir}), turn.BundledFS(), base, turn.CheckTemplate)
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	return func() *intentload.Loaded { return l }
+}
+
+// newGatesViewRig is newOutboxRig over heldDraftsLoaded.
+func newGatesViewRig(t testing.TB, off ...unit.ProviderID) *outboxRig {
+	t.Helper()
+	return newOutboxRigOn(t, heldDraftsLoaded(t), off...)
+}
+
+func newOutboxRigOn(t testing.TB, loaded func() *intentload.Loaded, off ...unit.ProviderID) *outboxRig {
+	t.Helper()
 	r := &outboxRig{fx: &fakeFx{}, clock: &moveClock{now: tasksNow}}
 	r.tasksRig = newTasksRig(t, func(d *Deps) {
+		if loaded != nil {
+			d.Intents = loaded
+		}
 		if len(off) > 0 {
 			d.PluginEnabled = func(p unit.ProviderID) bool { return !slices.Contains(off, p) }
 		}
@@ -602,9 +653,9 @@ func TestSenderPlacesTheBroadcastOfDraftsHeldBeforeBroadcastsAtStart(t *testing.
 	}
 }
 
-func TestOutboxViewListsOpenDrafts(t *testing.T) {
+func TestAViewOverGatesListsOpenDrafts(t *testing.T) {
 	t.Parallel()
-	r := newOutboxRig(t)
+	r := newGatesViewRig(t)
 	a := r.propose(t, r7u, "one", draft.Wait)
 	b := r.propose(t, r7u, "two\nsecond line", draft.Wait)
 	sent := r.propose(t, r7u, "three", draft.Wait)
@@ -614,7 +665,7 @@ func TestOutboxViewListsOpenDrafts(t *testing.T) {
 	if _, _, err := r.o.Send(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	p := r.page(t, "view=outbox")
+	p := r.page(t, "view=held-drafts")
 	if got, want := taskIDs(p.Tasks), []string{fmt.Sprintf("draft:%d", a.ID), fmt.Sprintf("draft:%d", b.ID)}; !slices.Equal(got, want) {
 		t.Fatalf("tasks %v, want %v", got, want)
 	}
@@ -623,11 +674,11 @@ func TestOutboxViewListsOpenDrafts(t *testing.T) {
 		!slices.Equal(e.UnitLabels, []string{"acme/api#7"}) {
 		t.Fatalf("task %+v", e)
 	}
-	if p.Counters.Views["outbox"] != 2 {
+	if p.Counters.Views[heldDraftsView] != 2 {
 		t.Fatalf("counters %+v", p.Counters)
 	}
 	var c api.Counters
-	if get(t, r.s, api.CountersPath, &c); c.Views["outbox"] != 2 {
+	if get(t, r.s, api.CountersPath, &c); c.Views[heldDraftsView] != 2 {
 		t.Fatalf("counters route %+v", c)
 	}
 	var detail api.TaskView
@@ -642,17 +693,17 @@ func TestOutboxViewListsOpenDrafts(t *testing.T) {
 	if !verbs["approve"] || !verbs["edit"] || !verbs["dismiss"] || verbs["retry"] || verbs["next"] || verbs["done"] {
 		t.Fatalf("verbs %+v", detail.Verbs)
 	}
-	if p := r.page(t, "view=outbox&context=@reply"); len(p.Tasks) != 0 {
+	if p := r.page(t, "view=held-drafts&context=@reply"); len(p.Tasks) != 0 {
 		t.Fatalf("a context filter keeps %v", taskIDs(p.Tasks))
 	}
 }
 
 func TestSendingDraftStaysVisibleBeforeRecovery(t *testing.T) {
 	t.Parallel()
-	r := newOutboxRig(t)
+	r := newGatesViewRig(t)
 	d := r.stored(t, draft.Draft{Unit: r7u, Text: "in flight", State: draft.Sending, SendingAt: tasksNow})
-	p := r.page(t, "view=outbox")
-	if !slices.Equal(taskIDs(p.Tasks), []string{fmt.Sprintf("draft:%d", d.ID)}) || p.Counters.Views["outbox"] != 1 {
+	p := r.page(t, "view=held-drafts")
+	if !slices.Equal(taskIDs(p.Tasks), []string{fmt.Sprintf("draft:%d", d.ID)}) || p.Counters.Views[heldDraftsView] != 1 {
 		t.Fatalf("tasks %v counters %+v", taskIDs(p.Tasks), p.Counters)
 	}
 	for _, v := range p.Tasks[0].Verbs {
@@ -729,12 +780,12 @@ func TestOutboxVerbsRefuseADisabledPlugin(t *testing.T) {
 	}
 }
 
-func TestObservedDraftIsNotInTheOutbox(t *testing.T) {
+func TestObservedDraftIsInNoViewOverGates(t *testing.T) {
 	t.Parallel()
-	r := newOutboxRig(t)
+	r := newGatesViewRig(t)
 	r.propose(t, r7u, "watch only", draft.DryRun)
-	p := r.page(t, "view=outbox")
-	if len(p.Tasks) != 0 || p.Counters.Views["outbox"] != 0 {
+	p := r.page(t, "view=held-drafts")
+	if len(p.Tasks) != 0 || p.Counters.Views[heldDraftsView] != 0 {
 		t.Fatalf("tasks %v counters %+v", taskIDs(p.Tasks), p.Counters)
 	}
 }
@@ -775,7 +826,7 @@ func TestCatalogServesDraftActions(t *testing.T) {
 
 func TestDraftActionsDisabledWithPlugin(t *testing.T) {
 	t.Parallel()
-	r := newOutboxRig(t, "slack")
+	r := newGatesViewRig(t, "slack")
 	d := r.stored(t, draft.Draft{Unit: slackUnit, Text: "hi", State: draft.Held})
 	var got api.Draft
 	if code := r.getDraft(t, d.ID, &got); code != 200 {
@@ -789,8 +840,8 @@ func TestDraftActionsDisabledWithPlugin(t *testing.T) {
 			t.Errorf("state %+v", st)
 		}
 	}
-	if p := r.page(t, "view=outbox"); len(p.Tasks) != 0 || p.Counters.Views["outbox"] != 0 {
-		t.Fatalf("a disabled plugin's draft stays in the Outbox: %v", taskIDs(p.Tasks))
+	if p := r.page(t, "view=held-drafts"); len(p.Tasks) != 0 || p.Counters.Views[heldDraftsView] != 0 {
+		t.Fatalf("a disabled plugin's draft stays in a view over gates: %v", taskIDs(p.Tasks))
 	}
 }
 
@@ -914,7 +965,7 @@ func TestDraftsShowWhereTheyPost(t *testing.T) {
 func TestAHeldPublisherCostsOnePageBudget(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
-		r := newOutboxRig(t)
+		r := newGatesViewRig(t)
 		const budget = 200 * time.Millisecond
 		r.s.whereLookup, r.s.wherePage = time.Second, budget
 		r.fx.whereHangs = true
@@ -928,7 +979,7 @@ func TestAHeldPublisherCostsOnePageBudget(t *testing.T) {
 			}
 		}
 		for name, read := range map[string]func(){
-			"the outbox":            func() { r.page(t, "view=outbox") },
+			"a view over gates":     func() { r.page(t, "view=held-drafts") },
 			"the task of the gates": func() { get(t, r.s, api.TaskPath("t-0000000000000007"), nil) },
 			"the drafts":            func() { get(t, r.s, api.Drafts, nil) },
 			"the gates":             func() { get(t, r.s, api.GatesPath, nil) },
@@ -942,7 +993,7 @@ func TestAHeldPublisherCostsOnePageBudget(t *testing.T) {
 		}
 		before := r.fx.whereCalls()
 		start := time.Now()
-		p := r.page(t, "view=outbox")
+		p := r.page(t, "view=held-drafts")
 		if took := time.Since(start); took != 0 || r.fx.whereCalls() != before {
 			t.Fatalf("a refresh took %v and looked up %d again, want the failures kept", took, r.fx.whereCalls()-before)
 		}

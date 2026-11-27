@@ -8,7 +8,7 @@ import { net } from "../../state/api";
 import { applyTasksPage } from "../../state/loaders.svelte";
 import { closeOverlays, overlays } from "../../state/overlays.svelte";
 import { nav, readHash } from "../../state/route.svelte";
-import { catalog, collapsed, notice, outboxState, state, tasksState } from "../../state/store.svelte";
+import { catalog, collapsed, notice, state, tasksState } from "../../state/store.svelte";
 import { resetStore } from "../../testing/reset.svelte";
 import { fixture, task, useCatalogs } from "../rows/testdata/fixtures";
 import TaskViewPage from "./TaskViewPage.svelte";
@@ -42,7 +42,7 @@ const body = (c: Element) => c.querySelector("#tasks-body")!;
 
 describe("a task view", () => {
   it("groups by source and filters", () => {
-    mixed("#view=needs-me&q=" + encodeURIComponent("where:general") + "&g=source");
+    mixed("#view=next&q=" + encodeURIComponent("where:general") + "&g=source");
     const c = page();
     const groups = Array.from(body(c).querySelectorAll(".rows > section.group"));
     expect(groups.length).toBe(1);
@@ -53,7 +53,7 @@ describe("a task view", () => {
   });
 
   it("heads each group with its count, and shows a task's reason on its row alone", () => {
-    mixed("#view=needs-me&g=source", fixture("mixed-tasks.json").map((e: J) => (e.id === "g-1" ? { ...e, reason: "checks failing" } : e)));
+    mixed("#view=next&g=source", fixture("mixed-tasks.json").map((e: J) => (e.id === "g-1" ? { ...e, reason: "checks failing" } : e)));
     const c = page();
     const groups = Array.from(body(c).querySelectorAll(".rows > section.group"));
     expect(groups.length).toBeGreaterThanOrEqual(2);
@@ -67,7 +67,7 @@ describe("a task view", () => {
   });
 
   it("draws a lane per group on a board, each card's title its focus", () => {
-    mixed("#view=needs-me&g=source&layout=board");
+    mixed("#view=next&g=source&layout=board");
     const lanes = Array.from(body(page()).querySelectorAll(".board .lane")).map((l) => ({
       label: l.querySelector(".lane-head")!.firstElementChild!.textContent,
       focus: Array.from(l.querySelectorAll("li")).map((li) => (li.querySelector(".open")!.getAttribute("data-focus") === li.getAttribute("data-row") ? li.getAttribute("data-row") : "")),
@@ -85,23 +85,23 @@ describe("a task view", () => {
   });
 
   it("draws an ungrouped board as one lane titled by its view", () => {
-    mixed("#view=needs-me&layout=board&g=" + NO_GROUP);
-    expect(Array.from(body(page()).querySelectorAll(".lane-head")).map((h) => h.firstElementChild!.textContent)).toEqual(["Needs me"]);
+    mixed("#view=next&layout=board&g=" + NO_GROUP);
+    expect(Array.from(body(page()).querySelectorAll(".lane-head")).map((h) => h.firstElementChild!.textContent)).toEqual(["Next actions"]);
   });
 
   it("groups its board by the profile's strip facet, and not at all without it", () => {
-    mixed("#view=needs-me&layout=board");
+    mixed("#view=next&layout=board");
     const c = page();
     expect(Array.from(body(c).querySelectorAll(".lane")).length).toBeGreaterThan(0);
     expect(body(c).querySelector(".lane-head")!.className).toMatch(/w-/);
     tasksState.tasks = fixture("mixed-tasks.json").map((e: J) => ({ ...e, facets: { source: e.facets.source } }));
     tasksState.rev++;
     flushSync();
-    expect(Array.from(body(c).querySelectorAll(".lane-head")).map((h) => h.firstElementChild!.textContent)).toEqual(["Needs me"]);
+    expect(Array.from(body(c).querySelectorAll(".lane-head")).map((h) => h.firstElementChild!.textContent)).toEqual(["Next actions"]);
   });
 
   it("gives a task in two groups a focus slot per copy", () => {
-    mixed("#view=needs-me&g=tag:lang", fixture("mixed-tasks.json").map((e: J) => (e.id === "g-1" ? { ...e, facets: { ...e.facets, tag: ["lang:go", "lang:rust"] } } : e)));
+    mixed("#view=next&g=tag:lang", fixture("mixed-tasks.json").map((e: J) => (e.id === "g-1" ? { ...e, facets: { ...e.facets, tag: ["lang:go", "lang:rust"] } } : e)));
     const focus = Array.from(body(page()).querySelectorAll("[data-row]")).map((n) => n.getAttribute("data-focus"));
     expect(focus).toEqual(expect.arrayContaining(["task:g-1@lang:go", "task:g-1@lang:rust"]));
   });
@@ -111,10 +111,10 @@ describe("a task view", () => {
       e.title = id;
       e.facets = { state: [st], ...(ctx ? { contexts: [ctx] } : {}) };
     });
-    mixed("#view=needs-me&g=state", [mk("a", "done", ""), mk("b", "inbox", "computer"), mk("c", "next", "calls"), mk("d", "scheduled", "")]);
+    mixed("#view=next&g=state", [mk("a", "done", ""), mk("b", "inbox", "computer"), mk("c", "next", "calls"), mk("d", "scheduled", "")]);
     const c = page();
     expect(Array.from(body(c).querySelectorAll(".g-toggle")).map((b) => b.textContent!.slice(2))).toEqual(["Inbox", "Next", "Scheduled", "Done"]);
-    nav.hash = "#view=needs-me&g=contexts";
+    nav.hash = "#view=next&g=contexts";
     flushSync();
     expect(Array.from(body(c).querySelectorAll(".g-toggle")).map((b) => b.textContent!.slice(2))).toEqual(["calls", "computer", "no context"]);
   });
@@ -122,29 +122,29 @@ describe("a task view", () => {
   it("lists the tasks the daemon would count for the same query", () => {
     const want: Record<string, string[]> = { "where:general": ["s-1"], "source:github ci:failure": ["g-1"], "-source:slack": ["g-1", "g-2"], "tag:lang": ["g-1"], "conversation:thread": ["s-1"], "nothing:here": [] };
     for (const [q, ids] of Object.entries(want)) {
-      mixed("#view=needs-me&q=" + encodeURIComponent(q));
+      mixed("#view=next&q=" + encodeURIComponent(q));
       expect(groupedRows(pipelineOf(taskLensItems(), lensOf(readHash()), null).groups).map((it: J) => it.task.id).sort(), q).toEqual(ids);
     }
   });
 
   it("keeps a row's node and a collapsed group across a sync, and its board's scroll", async () => {
-    mixed("#view=needs-me&g=source");
+    mixed("#view=next&g=source");
     const c = page();
     const row = body(c).querySelector('[data-row="task:g-1"]')!;
     const toggle = body(c).querySelector('[data-focus="group:source:slack"]') as HTMLButtonElement;
     await fireEvent.click(toggle);
-    applyTasksPage(viewQueryKey("needs-me", "", []), { epoch: "e", rev: 2, full: true, tasks: fixture("mixed-tasks.json").map((e: J) => (e.id === "g-1" ? { ...e, title: "Fix the upload test" } : e)) });
+    applyTasksPage(viewQueryKey("next", "", []), { epoch: "e", rev: 2, full: true, tasks: fixture("mixed-tasks.json").map((e: J) => (e.id === "g-1" ? { ...e, title: "Fix the upload test" } : e)) });
     flushSync();
     expect(body(c).querySelector('[data-row="task:g-1"]')).toBe(row);
     expect(row.querySelector(".t")!.textContent).toBe("Fix the upload test");
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     expect(collapsed.has("source:slack")).toBe(true);
-    nav.hash = "#view=needs-me&g=source&layout=board";
+    nav.hash = "#view=next&g=source&layout=board";
     flushSync();
     const board = body(c).querySelector(".board") as HTMLElement;
     board.scrollLeft = 200;
     board.scrollTop = 30;
-    applyTasksPage(viewQueryKey("needs-me", "", []), { epoch: "e", rev: 3, full: true, tasks: fixture("mixed-tasks.json") });
+    applyTasksPage(viewQueryKey("next", "", []), { epoch: "e", rev: 3, full: true, tasks: fixture("mixed-tasks.json") });
     flushSync();
     expect(body(c).querySelector(".board")).toBe(board);
     expect([board.scrollLeft, board.scrollTop]).toEqual([200, 30]);
@@ -178,7 +178,7 @@ describe("a view's head", () => {
     resetStore(NOW, "#view=waiting");
     tasksState.catalog = { views: [
       { id: "waiting", label: "Waiting", summary: "What others owe you.", empty: "Nobody owes you anything.", when: "task.owed_by != 'me'", group: "task.owed_by", sort: "-task.since_movement" },
-      { id: "outbox", label: "Outbox", over: "gates", summary: "Drafts to approve.", empty: "No drafts wait on you." },
+      { id: "held-drafts", label: "Held drafts", over: "gates", summary: "Drafts to approve.", empty: "No drafts wait on you." },
       { id: "review", label: "Review", summary: "The weekly review." },
     ] };
     tasksState.key = viewQueryKey("waiting", "", []);
@@ -192,8 +192,8 @@ describe("a view's head", () => {
     flushSync();
     expect(body(c).querySelector(".empty")!.textContent).toBe('Nothing here matches "zzz".');
     cleanup();
-    nav.hash = "#view=outbox";
-    tasksState.key = viewQueryKey("outbox", "", []);
+    nav.hash = "#view=held-drafts";
+    tasksState.key = viewQueryKey("held-drafts", "", []);
     expect(body(page()).querySelector(".empty")!.textContent).toBe("No drafts wait on you.");
   });
 
@@ -300,14 +300,14 @@ describe("a task row", () => {
 describe("a view's layout", () => {
   it("picks the board or the list", () => {
     const cat = fixture("views.json");
-    cat.views = cat.views.map((v: J) => (v.id === "needs-me" ? { ...v, layout: "board" } : v));
-    mixed("#view=needs-me", fixture("mixed-tasks.json"), cat);
+    cat.views = cat.views.map((v: J) => (v.id === "next" ? { ...v, layout: "board" } : v));
+    mixed("#view=next", fixture("mixed-tasks.json"), cat);
     const classes = (c: Element) => Array.from(body(c).children).map((n) => n.className);
-    tasksState.key = viewQueryKey("needs-me", "", []);
+    tasksState.key = viewQueryKey("next", "", []);
     const board = classes(page());
     expect(board.length).toBe(1);
     expect(board[0]).toContain("board");
-    nav.hash = "#view=needs-me&layout=list";
+    nav.hash = "#view=next&layout=list";
     flushSync();
     const c = document.body;
     expect(classes(c)).toEqual(["rows task-list"]);

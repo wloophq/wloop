@@ -10,7 +10,7 @@ import (
 )
 
 // handleWorkflowDisable turns a loaded workflow off in the configuration, applied at once; its held drafts
-// stay in the Outbox.
+// stay held.
 func (s *Server) handleWorkflowDisable(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	if _, ok := s.forUser(w, r, "stopping a workflow"); !ok {

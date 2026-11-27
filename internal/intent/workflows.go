@@ -45,7 +45,6 @@ type wManifest struct {
 	Marks    map[string]string `toml:"marks"`
 	Drafts   *wDrafts          `toml:"drafts"`
 	Gates    *wGates           `toml:"gates"`
-	Outbox   *wOutbox          `toml:"outbox"`
 }
 
 // wGates is a workflow's [gates]: an intent's, and whether its drafts always wait.
@@ -59,11 +58,6 @@ type wGates struct {
 type wGateWithdraw struct {
 	When   *string `toml:"when"`
 	Reason *string `toml:"reason"`
-}
-
-type wOutbox struct {
-	Title *string `toml:"title"`
-	About *string `toml:"about"`
 }
 
 // wDrafts is the [drafts] table: when the open drafts the workflow's steps
@@ -372,14 +366,6 @@ func (s *sheet) defineWorkflow(name string, m wManifest, turnProblem func(intent
 	}
 	if d := m.Drafts; d != nil {
 		s.defineWithdraw(&w, d.Withdraw, slot)
-	}
-	if o := m.Outbox; o != nil {
-		if o.Title != nil {
-			w.Outbox.Title = strings.TrimSpace(*o.Title)
-		}
-		if o.About != nil {
-			w.Outbox.About = strings.TrimSpace(*o.About)
-		}
 	}
 	s.turnBudget(w, m.Limits)
 	return w

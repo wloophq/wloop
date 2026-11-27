@@ -19,11 +19,11 @@ func TestOmniboxLoadsTheBundledGroupsInEachLocale(t *testing.T) {
 	if len(problems) > 0 {
 		t.Fatal(problems)
 	}
-	if o := en.Omnibox; o.Limit != 5 || len(o.Groups) != 3 || o.Groups[0].View != "needs-me" || o.Groups[0].Label != "Needs you" || o.Other != "Elsewhere" {
+	if o := en.Omnibox; o.Limit != 5 || len(o.Groups) != 4 || o.Groups[0].View != "needs-you" || o.Groups[0].Label != "Needs you" || o.Groups[1].View != "next" || o.Other != "Elsewhere" {
 		t.Fatalf("omnibox %+v", o)
 	}
 	pt, _ := loadProfile(t, "pt-BR", nil)
-	if o := pt.Omnibox; o.Groups[1].Label != "Esperando outras pessoas" || o.Other != "Em outros lugares" {
+	if o := pt.Omnibox; o.Groups[1].Label != "Próximas ações" || o.Groups[2].Label != "Esperando outras pessoas" || o.Other != "Em outros lugares" {
 		t.Fatalf("pt-BR omnibox %+v", o)
 	}
 }

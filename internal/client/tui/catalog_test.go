@@ -135,7 +135,8 @@ var (
 )
 
 // servedKeys are the bindings GET /api/keys serves the terminal for specs:
-// the core keys, the views' keys, the GitHub plugin's, then the actions' keys.
+// the core keys, the views' keys and that of a user's view over gates, the
+// GitHub plugin's, then the actions' keys.
 func servedKeys(specs api.ActionsResponse) []api.KeyView {
 	help := bundledKeys()
 	var out []api.KeyView
@@ -152,6 +153,9 @@ func servedKeys(specs api.ActionsResponse) []api.KeyView {
 	for _, b := range keys.Views(views) {
 		v, _ := def.View(strings.TrimPrefix(b.Action, "nav:"))
 		out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: v.Label})
+	}
+	for _, b := range keys.Views([]keys.View{{ID: "held-drafts", Key: "g o"}}) {
+		out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: "Held drafts"})
 	}
 	for _, b := range keys.Views([]keys.View{{ID: "github", Key: "g g"}}) {
 		out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "github", Help: "GitHub"})

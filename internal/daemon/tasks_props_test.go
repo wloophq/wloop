@@ -44,7 +44,7 @@ func TestTaskViewServesPropsAndParent(t *testing.T) {
 	if !got.PropTime("due").Equal(due) || !slices.Equal(got.PropList("contexts"), []string{"@reply"}) {
 		t.Errorf("props %v", got.Props)
 	}
-	p := r.page(t, "view=needs-me")
+	p := r.page(t, "view=next")
 	i := slices.IndexFunc(p.Tasks, func(v api.TaskView) bool { return v.ID == "t-p" })
 	if i < 0 || !slices.Equal(p.Tasks[i].Children, []string{"t-c", "t-d"}) {
 		t.Fatalf("the project's children in %+v", p.Tasks)

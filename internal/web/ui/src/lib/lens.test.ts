@@ -7,7 +7,7 @@ import { resetStore } from "../testing/reset.svelte";
 import { applyCatalog } from "./catalog";
 import {
   byDefault, copySlot, fieldById, fieldOf, filtersOf, groupField, groupedRows, groupQualifier, itemValues, lensFields, lensOf, markedSpans, matches, multiCopy,
-  openSlot, outboxFields, passesFilters, pipeline, pipelineOf, qualifiers, rowByURL, rowParts, rowStrip, rowTip, rowWords, stripColor, stripOf, stripSpec, tagKeys, terms,
+  openSlot, passesFilters, pipeline, pipelineOf, qualifiers, rowByURL, rowParts, rowStrip, rowTip, rowWords, stripColor, stripOf, stripSpec, tagKeys, terms,
   toggledQualifier, viewStrip, waitCat, waitClass, waitingLabel, withoutQualifiers, reasonText, type Lens,
 } from "./lens";
 import { taskItemOf } from "./tasks";
@@ -380,20 +380,5 @@ describe("the Go lens", () => {
   test("the cockpit places pieces as the Go lens", () => {
     const now = Date.parse(table.now);
     for (const c of table.parts.cases) expect(rowParts(c.item, table.parts.specs, table.parts.words, now), JSON.stringify(c.item)).toEqual(c.want);
-  });
-});
-
-describe("the Outbox's fields", () => {
-  test("are read again only when the page holds other facets", () => {
-    const page = { facets: [{ id: "kind", label: "Kind", fact: "draft.kind", group: true }] };
-    const first = outboxFields(page);
-    const stringify = vi.spyOn(JSON, "stringify");
-    try {
-      expect(outboxFields(page)).toBe(first);
-      expect(stringify).not.toHaveBeenCalled();
-    } finally {
-      stringify.mockRestore();
-    }
-    expect(outboxFields({ facets: [{ ...page.facets[0], label: "Type" }] }).map((f) => f.label)).toEqual(["Type"]);
   });
 });

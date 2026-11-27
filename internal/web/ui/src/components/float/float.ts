@@ -2,7 +2,7 @@ import { brand } from "../../brand";
 import { conventionalLabel, tally, type Label, type LabelCount } from "../../lib/conventional";
 import { t } from "../../lib/i18n.svelte";
 import { isSet, safeURL, type J } from "../../lib/util";
-import { floatDeps, floatIdleWhileHidden, floatState, itemKey, openRoute, taskRoute, type FloatMode, type FloatPlace, type PanelPlace } from "../../state/float.svelte";
+import { floatDeps, floatIdleWhileHidden, floatState, itemKey, openRoute, taskRoute, type FloatFilter, type FloatMode, type FloatPlace, type PanelPlace } from "../../state/float.svelte";
 import { queueDeps, queueResolve, queueUnit, queueVerb, unitLink } from "../screens/queue";
 
 // The floating widget's ends: resolving an item through the gates endpoint, and the bridge to the window that
@@ -24,7 +24,7 @@ export interface TabBridge {
 }
 
 export interface PanelBridge {
-  show: (m: FloatMode, p?: Partial<PanelPlace> & { item?: string }) => void;
+  show: (m: FloatMode, p?: Partial<PanelPlace> & { item?: string; filter?: FloatFilter }) => void;
   shown: () => void;
   leave: () => void;
   blur: () => void;

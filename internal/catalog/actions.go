@@ -315,7 +315,7 @@ func gateTexted(in intentload.GateIntent, st api.ActionState, facts map[string]a
 	return st
 }
 
-// The draft actions of the Outbox's cards: close the conversation without the draft's message, and stop the
+// The draft actions of a draft's card: close the conversation without the draft's message, and stop the
 // draft's workflow on its conversation.
 const (
 	DraftCloseSilently = "draft.close-silently"

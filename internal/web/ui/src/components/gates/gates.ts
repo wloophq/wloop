@@ -14,7 +14,7 @@ import {
 } from "../../state/verbs";
 
 // The one decision card every surface draws: a task's open gate (a question, a plan, a post, a proposal) or a
-// draft, with its actions. The detail draws them; the Outbox and the queues draw the same components.
+// draft, with its actions. The detail draws them; the queues draw the same components.
 
 function changed(): void {
   scheduler.load({ tasks: true });
@@ -389,19 +389,12 @@ export function draftHead(d: J): string {
   return (purpose ? t("Draft {purpose}", { purpose }) : t("Draft")) + (st ? ` (${st}${why})` : "");
 }
 
-// itemStateWord is the word for an item's state, open or resolved.
-export function itemStateWord(st: string): string {
-  if (st === "open") return t("open");
-  if (st === "resolved") return t("resolved");
-  return st;
-}
-
 // draftDecided says d left the person's hands for good: posted, or dropped; its card then offers no action.
 export function draftDecided(d: J): boolean {
   return d.state === "sent" || d.state === "dropped";
 }
 
-// draftTarget is the Outbox task of the draft e carries: e itself, or draft:<id> when e only shows the draft.
+// draftTarget is the task of the draft e carries: e itself, or draft:<id> when e only shows the draft.
 export function draftTarget(e: J): J {
   const id = "draft:" + draftOf(e).id;
   return e.id === id ? e : { id, title: e.title, verbs: [] };

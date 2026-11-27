@@ -217,3 +217,42 @@ test("the tab says how its read went again every FLOAT_STATE_EVERY_MS, so the ho
   vi.advanceTimersByTime(FLOAT_STATE_EVERY_MS);
   expect(states()).toEqual(["ok", "ok", "ok"]);
 });
+
+// narrowing serves the queue as the daemon narrows it by its kind parameters.
+const narrowing = (c: { url: string }) => {
+  const u = new URL(c.url, "http://x");
+  if (u.pathname !== "/api/queue") throw new Error("unexpected");
+  const kinds = u.searchParams.getAll("kind");
+  return { ...served, items: served.items.filter((it: J) => !kinds.length || kinds.includes(it.kind)) };
+};
+const ofKind = (id: number, kind: string): J => ({ ...item(id), kind });
+
+test("under a filter the tab counts and peeks at only what the filter shows, and a filter change peeks at nothing", async () => {
+  daemon.fallback = narrowing;
+  floatDeps.peek = (it) => posted.push({ type: "float:peek", item: it.task.id });
+  served = { title: "Needs you", items: [ofKind(1, "answer"), ofKind(2, "review-step")] };
+  floatState().setPlace({ edge: "", filter: { q: "", kinds: ["answer"] } });
+  await floatLoad();
+  const c = render(FloatTab).container;
+  await settle();
+  expect(pill(c).querySelector(".fl-count")!.textContent).toBe("1");
+  expect(daemon.urls).toContain("/api/queue?kind=answer");
+
+  served = { title: "Needs you", items: [ofKind(1, "answer"), ofKind(2, "review-step"), ofKind(3, "review-step")] };
+  await floatLoad();
+  await settle();
+  expect(posted.filter((m) => m.type === "float:peek")).toEqual([]);
+  expect(pill(c).querySelector(".fl-count")!.textContent).toBe("1");
+
+  served = { title: "Needs you", items: [ofKind(1, "answer"), ofKind(2, "review-step"), ofKind(3, "review-step"), ofKind(4, "answer")] };
+  await floatLoad();
+  await settle();
+  expect(posted.filter((m) => m.type === "float:peek")).toEqual([{ type: "float:peek", item: "t-4" }]);
+  expect(pill(c).querySelector(".fl-count")!.textContent).toBe("2");
+
+  floatState().setPlace({ edge: "", filter: { q: "", kinds: [] } });
+  await floatLoad();
+  await settle();
+  expect(pill(c).querySelector(".fl-count")!.textContent).toBe("4");
+  expect(posted.filter((m) => m.type === "float:peek")).toHaveLength(1);
+});

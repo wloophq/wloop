@@ -39,17 +39,17 @@ func (c *Controller) draftButtons() []string {
 }
 
 // notify posts the attention of the tasks that are new, and withdraws the
-// notifications of what no longer waits on the user. A daily one's id holds
-// its day, so it is posted once a day.
+// notifications of what no longer waits on the user or that the float now
+// carries. A daily one's id holds its day, so it is posted once a day.
 func (c *Controller) notify() {
 	today := c.cfg.Now().Local().Format(time.DateOnly)
 	postedDaily := false
 	live := map[string]bool{}
 	notes := map[string]posted{}
 	buttons := c.draftButtons()
-	mute := c.muteNeeds()
+	mute, carried := c.muteNeeds(), c.carriedTasks()
 	for _, e := range c.notifying() {
-		if mute && Category(e.Attention.Category) == api.CategoryNeeds {
+		if mute && Category(e.Attention.Category) == api.CategoryNeeds && (carried == nil || carried[e.ID]) {
 			continue
 		}
 		n, p := notification(e, buttons)
@@ -227,7 +227,7 @@ func (c *Controller) reply(ctx context.Context, r Response, task string) error {
 		return nil
 	}
 	args := map[string]string{"text": r.Text, "send": "draft"}
-	title := c.words().T("Reply saved to the Outbox", nil)
+	title := c.words().T("Reply saved for your approval", nil)
 	if r.Send {
 		args["send"], title = "now", c.words().T("Reply sent", nil)
 	}

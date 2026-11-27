@@ -68,27 +68,3 @@ empty = "Nenhuma thread espera sua resposta."
 clause = { one = "{counter} precisa ser fechada", other = "{counter} precisam ser fechadas" }
 queue = "Threads para fechar"
 empty = "Nenhuma thread precisa ser fechada."
-
-[drafts.reply]
-label = "Resposta"
-
-[drafts.nudge]
-label = "Cutucada"
-
-[drafts.close]
-label = "Encerramento"
-
-[drafts.ask_owner]
-label = "Perguntar quem é o responsável"
-
-[drafts.react]
-label = "Reação"
-
-[drafts.unreact]
-label = "Remover uma reação"
-
-[drafts.edit]
-label = "Edição"
-
-[drafts.delete]
-label = "Exclusão"

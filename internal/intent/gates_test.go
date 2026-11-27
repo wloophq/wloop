@@ -393,29 +393,3 @@ func TestEffectWordsNameKnownEffects(t *testing.T) {
 		t.Errorf("an effect no effect is loads: %q", problems)
 	}
 }
-
-func TestPluginRuleWords(t *testing.T) {
-	plugin := t.TempDir()
-	if err := os.WriteFile(filepath.Join(plugin, GatesFile), []byte("[drafts.rules]\nacme-nudge = \"Nudge\"\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	user := t.TempDir()
-	if err := os.WriteFile(filepath.Join(user, GatesFile), []byte("[drafts.rules]\nacme-nudge = \"\"\nacme-sweep = \"Sweep\"\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	b, err := os.ReadFile("../../profiles/default/" + GatesFile)
-	if err != nil {
-		t.Fatal(err)
-	}
-	read := readerOf(fstest.MapFS{GatesFile: {Data: b}})
-	layers := []profile.Layer{{Name: profile.PluginLayer("acme"), Dir: plugin}}
-	d, problems := loadGates(layers, read)
-	if len(problems) > 0 || d.Drafts.Rules["acme-nudge"] != "Nudge" {
-		t.Fatalf("plugin rule words %v: %s", d.Drafts.Rules, problems.Error())
-	}
-	layers = append(layers, profile.Layer{Name: "user", Dir: user})
-	d, problems = loadGates(layers, read)
-	if len(problems) > 0 || d.Drafts.Rules["acme-nudge"] != "" || d.Drafts.Rules["acme-sweep"] != "Sweep" {
-		t.Fatalf("user rule words %v: %s", d.Drafts.Rules, problems.Error())
-	}
-}

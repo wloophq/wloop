@@ -35,7 +35,7 @@ func TestAReplyTypedInTheNotificationGoesToTheOutboxOrOut(t *testing.T) {
 		t.Fatalf("replies %q\nwant    %q", got, want)
 	}
 	notes := r.notes.snapshot()
-	if len(notes) != 2 || notes[0].Title != "Reply saved to the Outbox" || notes[0].Body != "draft 3 saved to the Outbox for your approval" || notes[1].Title != "Reply sent" {
+	if len(notes) != 2 || notes[0].Title != "Reply saved for your approval" || notes[0].Body != "draft 3 saved to the Outbox for your approval" || notes[1].Title != "Reply sent" {
 		t.Fatalf("notes %+v", notes)
 	}
 }

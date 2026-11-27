@@ -8,7 +8,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 )
 
-func TestOutboxShowSaysWhetherAThreadReplyBroadcasts(t *testing.T) {
+func TestPrintDraftSaysWhetherAThreadReplyBroadcasts(t *testing.T) {
 	t.Parallel()
 	for broadcast, want := range map[string]string{"on": "broadcast: on\n", "off": "broadcast: off\n", "": ""} {
 		var b bytes.Buffer

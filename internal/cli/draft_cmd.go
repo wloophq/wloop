@@ -16,7 +16,8 @@ import (
 	"github.com/wloophq/wloop/internal/transport/mcp"
 )
 
-const draftUsage = "usage: draft write --kind <kind> [--unit <provider>/<key>] [--target <t>] [--text <t> | --text-file <path>] [--payload <json> | --payload-file <path>] [--basis <b>] [--hold] [--draft=false] [--why <w>] [--item <id>]... | " +
+const draftUsage = "usage: draft new <unit|message> <markdown> [--react <emoji>] [--send] [--yes] | draft edit <id> <markdown> --rev <n> | draft discard <id> [--reason <why>] | draft retry <id> [--confirm] [--yes] | " +
+	"draft write --kind <kind> [--unit <provider>/<key>] [--target <t>] [--text <t> | --text-file <path>] [--payload <json> | --payload-file <path>] [--basis <b>] [--hold] [--draft=false] [--why <w>] [--item <id>]... | " +
 	"draft read <id> | draft update <id> --rev <rev> [--text <t> | --text-file <path>] [--payload <json> | --payload-file <path>] [--basis <b>] [--draft=false] | draft withdraw <id> --rev <rev> [--reason <r>]"
 
 // draftAgent is the part of the agent API the draft command calls.

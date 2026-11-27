@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -41,6 +42,19 @@ type floatHost struct {
 	shows, hides int
 	err          error
 	loading      bool
+	filter       window.FloatFilter
+}
+
+func (h *floatHost) floatFilter() window.FloatFilter {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.filter
+}
+
+func (h *floatHost) setFilter(f window.FloatFilter) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.filter = f
 }
 
 func (h *floatHost) show() error { h.mu.Lock(); defer h.mu.Unlock(); h.shows++; return h.err }
@@ -75,6 +89,7 @@ func floatRig(t *testing.T, d *fakeDefaults) (*rig, *floatHost) {
 		ShowFloat:    h.show,
 		HideFloat:    h.hide,
 		FloatReady:   h.ready,
+		FloatFilter:  h.floatFilter,
 	}
 	if d != nil {
 		cfg.Defaults = d
@@ -900,4 +915,130 @@ func TestAFailedFirstQueueReadInQuietChangesNothing(t *testing.T) {
 			t.Fatalf("shown %d, mode %q; want quiet: nothing arrived", shows, r2.mode())
 		}
 	})
+}
+
+// decisions is a queue of one item of each kind, the nth on pendingTask(n)'s
+// task.
+func decisions(kinds ...string) *api.Queue {
+	q := &api.Queue{Title: "Needs you", View: "needs-you", Total: len(kinds)}
+	for i, k := range kinds {
+		e := pendingTask(i + 1)
+		q.Items = append(q.Items, api.QueueItem{Kind: k, Task: api.TaskView{ID: e.ID, Title: e.Title}, Gate: &api.GateView{ID: int64(i + 1)}})
+	}
+	return q
+}
+
+func neededIDs(n *fakeNotifier) []string {
+	var ids []string
+	for _, p := range n.snapshot() {
+		if strings.HasPrefix(string(p.Category), string(api.CategoryNeeds)) {
+			ids = append(ids, p.ID)
+		}
+	}
+	return ids
+}
+
+// A shown float carries only what its filter shows: the banner of a decision
+// it leaves out posts, so no filter hides a decision from every surface; a
+// filter that changes moves the banners with it.
+func TestAFilteredOutDecisionPostsItsBannerWhileTheFloatShows(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r, h := floatRig(t, nil)
+		h.setFilter(window.FloatFilter{Kinds: []string{"answer"}})
+		r.d.events = make(chan api.Change)
+		r.d.tasks["inbox"] = []api.TaskView{pendingTask(1), pendingTask(2)}
+		r.d.queue = decisions("answer", "send-draft")
+		stop := run(t, r)
+		defer stop()
+		synctest.Wait()
+		if got, want := neededIDs(r.notes), []string{pendingTask(2).Attention.ID}; !slices.Equal(got, want) {
+			t.Fatalf("posted %q, want the banner of the draft the filter leaves out", got)
+		}
+		h.setFilter(window.FloatFilter{Kinds: []string{"send-draft"}})
+		r.c.FloatFilterChanged()
+		synctest.Wait()
+		if got, want := r.notes.withdrawnIDs(), []string{pendingTask(2).Attention.ID}; !slices.Equal(got, want) {
+			t.Fatalf("withdrew %q, want the draft's banner, which the float now carries", got)
+		}
+		if got, want := neededIDs(r.notes), []string{pendingTask(2).Attention.ID, pendingTask(1).Attention.ID}; !slices.Equal(got, want) {
+			t.Fatalf("posted %q, want the question's banner, which the filter now leaves out", got)
+		}
+	})
+}
+
+// A filter whose read fails carries nothing, so every banner posts.
+func TestAFilterTheDaemonCannotReadCarriesNoBanner(t *testing.T) {
+	r, h := floatRig(t, nil)
+	h.setFilter(window.FloatFilter{Q: "retry"})
+	r.c.vis, r.c.started = Visibility{Mode: VisibilityShown}, true
+	r.d.tasks["inbox"] = []api.TaskView{pendingTask(1)}
+	r.d.queue = decisions("answer")
+	r.d.narrowErr = errors.New("the lens does not read")
+	r.c.Refresh(context.Background())
+	if got := needsPosted(r.notes); got != 1 {
+		t.Fatalf("posted %d NEEDS banners, want the one the failed filter cannot carry", got)
+	}
+}
+
+// A quiet float comes back only for a decision its filter shows.
+func TestQuietWakesOnlyOnWhatTheFilterShows(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r, h := floatRig(t, nil)
+		h.setFilter(window.FloatFilter{Kinds: []string{"answer"}})
+		r.d.events = make(chan api.Change)
+		r.d.queue = decisions("answer")
+		stop := run(t, r)
+		defer stop()
+		synctest.Wait()
+		r.c.FloatHide(HideQuiet)
+		synctest.Wait()
+		r.change(decisions("answer", "send-draft"))
+		if shows, _ := h.counts(); shows != 1 || r.mode() != VisibilityQuiet {
+			t.Fatalf("a draft the filter leaves out showed the float: shown %d, mode %q", shows, r.mode())
+		}
+		time.Sleep(refreshMin)
+		r.change(decisions("answer", "send-draft", "answer"))
+		if shows, _ := h.counts(); shows != 2 || r.mode() != VisibilityShown {
+			t.Fatalf("a question the filter shows: shown %d, mode %q; want the float back", shows, r.mode())
+		}
+	})
+}
+
+// A task's one Needs you banner stands for every decision of it, so a float
+// whose filter shows only some of them does not carry it: the banner posts.
+func TestATaskWithADecisionTheFilterLeavesOutKeepsItsBanner(t *testing.T) {
+	r, h := floatRig(t, nil)
+	h.setFilter(window.FloatFilter{Kinds: []string{"answer"}})
+	r.c.vis, r.c.started = Visibility{Mode: VisibilityShown}, true
+	r.d.tasks["inbox"] = []api.TaskView{pendingTask(1)}
+	q := decisions("answer", "send-draft")
+	q.Items[1].Task = q.Items[0].Task
+	r.d.queue = q
+	r.c.Refresh(context.Background())
+	if got, want := neededIDs(r.notes), []string{pendingTask(1).Attention.ID}; !slices.Equal(got, want) {
+		t.Fatalf("posted %q, want the banner of the task whose draft the filter leaves out", got)
+	}
+}
+
+// A filtered float whose read of the whole queue failed cannot tell whether it
+// shows every decision of a task, so it carries none and every banner posts.
+func TestAFilteredFloatWithAStaleWholeQueueCarriesNoBanner(t *testing.T) {
+	r, h := floatRig(t, nil)
+	h.setFilter(window.FloatFilter{Kinds: []string{"answer"}})
+	r.c.vis, r.c.started = Visibility{Mode: VisibilityShown}, true
+	r.d.tasks["inbox"] = []api.TaskView{pendingTask(1)}
+	r.d.queue = decisions("answer")
+	r.c.Refresh(context.Background())
+	if got := neededIDs(r.notes); len(got) != 0 {
+		t.Fatalf("posted %q, want the question's banner carried", got)
+	}
+	q := decisions("answer", "send-draft")
+	q.Items[1].Task = q.Items[0].Task
+	r.d.mu.Lock()
+	r.d.queue, r.d.wholeErr = q, errors.New("the store is busy")
+	r.d.mu.Unlock()
+	r.c.Refresh(context.Background())
+	if got, want := neededIDs(r.notes), []string{pendingTask(1).Attention.ID}; !slices.Equal(got, want) {
+		t.Fatalf("posted %q, want the banner of the task whose new draft the filter hides", got)
+	}
 }

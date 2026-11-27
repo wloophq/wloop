@@ -30,15 +30,6 @@ func TaskFacets(defs []intentload.FacetDef, tasks intentload.TasksDef, contexts 
 	return out
 }
 
-// DraftFacets are the profile's draft facets as they are served, in the profile's order.
-func DraftFacets(defs []intentload.FacetDef) []api.FacetSpec {
-	out := make([]api.FacetSpec, 0, len(defs))
-	for _, f := range defs {
-		out = append(out, taskFacet(f))
-	}
-	return out
-}
-
 // deriveOrder gives spec the values of the fact its facet reads, in the order the profile declares them.
 func deriveOrder(spec *api.FacetSpec, f intentload.FacetDef, tasks intentload.TasksDef, contexts []string) {
 	labels := map[string]string{}

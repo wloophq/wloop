@@ -173,7 +173,7 @@ func TestGuidanceAndTextAreNotAskingForHelp(t *testing.T) {
 func TestAnUnknownCommandSuggestsTheClosest(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
-	for name, want := range map[string]string{"statuss": "did you mean 'status'?", "outbx": "did you mean 'outbox'?", "prof": "did you mean 'profile'?", "zzzzzz": ""} {
+	for name, want := range map[string]string{"statuss": "did you mean 'status'?", "neds": "did you mean 'needs'?", "prof": "did you mean 'profile'?", "zzzzzz": ""} {
 		te.out.Reset()
 		te.err.Reset()
 		if code := te.run(name); code != 2 {
@@ -249,7 +249,7 @@ func TestHelpGolden(t *testing.T) {
 	golden(t, "help_main_color.golden", bracketed(helpOut(t, te, "help", "--color=always")))
 	golden(t, "help_review.golden", helpOut(t, te, "review", "--help"))
 	golden(t, "help_review_color.golden", bracketed(helpOut(t, te, "help", "review", "--color", "always")))
-	golden(t, "help_outbox.golden", helpOut(t, te, "outbox", "approve", "--help"))
+	golden(t, "help_needs.golden", helpOut(t, te, "needs", "approve", "--help"))
 }
 
 func TestHelpDevListsTheDeveloperTools(t *testing.T) {

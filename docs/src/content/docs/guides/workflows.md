@@ -90,7 +90,7 @@ The comment each nudge drafts still waits for you, unless a rule that names its 
 
 ## Tune the Slack proposals
 
-`slack-stalled-nudge`, `slack-stalled-nudge-dm` and `slack-ask-owner` propose drafts in the Outbox, where they wait for you. A thread you started is closed without a message by `slack-closure-quiet`, with no approval, once the extraction read its newest message, and a conversation no item came from by `slack-ended-empty` once it ended; to propose a closing message instead, turn `slack-closure` on and the quiet one off:
+`slack-stalled-nudge`, `slack-stalled-nudge-dm` and `slack-ask-owner` propose drafts, which wait for you in Needs you. A thread you started is closed without a message by `slack-closure-quiet`, with no approval, once the extraction read its newest message, and a conversation no item came from by `slack-ended-empty` once it ended; to propose a closing message instead, turn `slack-closure` on and the quiet one off:
 
 ```toml
 [workflows.slack-closure]
@@ -134,7 +134,7 @@ Encerrando:
 - {{.Line}}: {{or .Resolution "resolvido"}}{{end}}
 ```
 
-Each also has a `why.md.tmpl`, the line the Outbox shows above the draft, rendered in your language; `.Since` is when the oldest of its items was asked, in your time zone, and `.People` everyone the draft is to, each with `.Key` and `.Name`. Both files translate as every other text does: `<profile>/locales/pt-BR/workflows/slack-closure/text.md.tmpl` is the closure in a thread written in Portuguese, and a copy of the English file you left unchanged keeps the bundled translations. A translation names only the fields and functions its English text does, `plural` included (`{{plural (len .Items) "one" "this" "other" "these"}}`).
+Each also has a `why.md.tmpl`, the line a draft's card shows above the draft, rendered in your language; `.Since` is when the oldest of its items was asked, in your time zone, and `.People` everyone the draft is to, each with `.Key` and `.Name`. Both files translate as every other text does: `<profile>/locales/pt-BR/workflows/slack-closure/text.md.tmpl` is the closure in a thread written in Portuguese, and a copy of the English file you left unchanged keeps the bundled translations. A translation names only the fields and functions its English text does, `plural` included (`{{plural (len .Items) "one" "this" "other" "these"}}`).
 
 With `slack-closure` turned on, your own `<profile>/workflows/slack-closure/workflow.toml` with `delivery = "reaction"`, `reaction = "white_check_mark"` and `target = "item"` in its step closes with a ✅ on the resolved message instead; its `effects = ["unit.closed"]` still records the closure and ends the thread's tasks. A reaction carries no text: the workflow's `text.md.tmpl` is not read, and a step that wants a text with its reaction names another file in `text`.
 

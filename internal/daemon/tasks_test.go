@@ -214,8 +214,8 @@ func TestTasksPageMatchesTheQuery(t *testing.T) {
 	r := newTasksRig(t, nil)
 	r.put(t, mixedTasks()...)
 	ctx := context.Background()
-	for _, q := range []task.Query{{View: "needs-me", Area: "OSS"}, {View: "needs-me"}, {View: "inbox", Area: "Hiring"},
-		{View: "needs-me", Area: "OSS", Contexts: []string{"@reply"}}, {View: "projects"}, {View: "someday", Area: "OSS"}} {
+	for _, q := range []task.Query{{View: "next", Area: "OSS"}, {View: "next"}, {View: "inbox", Area: "Hiring"},
+		{View: "next", Area: "OSS", Contexts: []string{"@reply"}}, {View: "projects"}, {View: "someday", Area: "OSS"}} {
 		v := url.Values{"view": {string(q.View)}, "area": {q.Area}, "context": {strings.Join(q.Contexts, ",")}}
 		p := r.page(t, v.Encode())
 		want, err := r.g.Tasks(ctx, q)
@@ -237,7 +237,7 @@ func TestTasksPageMatchesTheQuery(t *testing.T) {
 			t.Errorf("%+v: counters %+v, want %+v", q, got, want)
 		}
 	}
-	p := r.page(t, "view=needs-me&area=OSS")
+	p := r.page(t, "view=next&area=OSS")
 	if i := slices.Index(taskIDs(p.Tasks), "t-5"); i < 0 || p.Tasks[i].Parent != "t-p" || len(p.Tasks[i].Verbs) == 0 {
 		t.Fatalf("project action %+v", p.Tasks)
 	}
@@ -251,7 +251,7 @@ func TestTasksSinceIsIncremental(t *testing.T) {
 	r := newTasksRig(t, nil)
 	r.put(t, mixedTasks()...)
 	inbox := r.page(t, "view=inbox")
-	needs := r.page(t, "view=needs-me")
+	needs := r.page(t, "view=next")
 	if rec := post(t, r.s, api.TaskPath("t-4", "next"), `{"source":"cockpit"}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
@@ -260,7 +260,7 @@ func TestTasksSinceIsIncremental(t *testing.T) {
 	if got.Full || len(got.Tasks) != 0 || !slices.Equal(got.Removed, []string{"t-4"}) || got.Rev != inbox.Rev+1 {
 		t.Fatalf("inbox since: %+v", got)
 	}
-	got = r.page(t, "view=needs-me&since="+url.QueryEscape(since(needs)))
+	got = r.page(t, "view=next&since="+url.QueryEscape(since(needs)))
 	if !got.Full || !slices.Contains(taskIDs(got.Tasks), "t-4") || len(got.Tasks) != len(needs.Tasks)+1 {
 		t.Fatalf("needs me since, a view over who owes a task: full %v tasks %v", got.Full, taskIDs(got.Tasks))
 	}
@@ -319,7 +319,7 @@ func TestVerbPostMovesAndStreams(t *testing.T) {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
 	c := nextChange(t, sub)
-	if c.Type != "changed" || c.Counters.Views["needs-me"] != 1 || c.Counters.Views["inbox"] != 0 || !slices.Contains(c.Units, r7u) {
+	if c.Type != "changed" || c.Counters.Views["next"] != 1 || c.Counters.Views["inbox"] != 0 || !slices.Contains(c.Units, r7u) {
 		t.Fatalf("%+v %+v", c, c.Counters)
 	}
 }
@@ -464,7 +464,7 @@ func TestCountersShipWithChanges(t *testing.T) {
 		t.Fatalf("rows page counters %+v, want %+v", page.Counters, counters)
 	}
 	var oss api.Counters
-	if get(t, r.s, api.CountersPath+"?area=OSS", &oss); oss.Area != "OSS" || oss.Views["needs-me"] != 5 || oss.Areas["Hiring"] != 2 {
+	if get(t, r.s, api.CountersPath+"?area=OSS", &oss); oss.Area != "OSS" || oss.Views["next"] != 5 || oss.Areas["Hiring"] != 2 {
 		t.Fatalf("OSS counters %+v", oss)
 	}
 }
@@ -548,7 +548,7 @@ func TestSourceActivityReturnsASnoozedTaskWhereItWasNotToTheInbox(t *testing.T) 
 		if _, err := r.g.Do(ctx, "t-s", coretasks.Request{Actor: task.ActorWorkflow, Source: "task-wake", Verb: task.VerbWake}); err != nil {
 			t.Fatal(err)
 		}
-		if p := r.page(t, "view=needs-me"); len(p.Tasks) != 1 || p.Tasks[0].ID != "t-s" || !p.Tasks[0].Changed {
+		if p := r.page(t, "view=next"); len(p.Tasks) != 1 || p.Tasks[0].ID != "t-s" || !p.Tasks[0].Changed {
 			t.Fatalf("the woken task is not back in Next: %+v", p.Tasks)
 		}
 		if p := r.page(t, "view=inbox"); len(p.Tasks) != 0 {
@@ -832,8 +832,10 @@ func TestCountersWithTermsCountWhatTheFilteredListsShow(t *testing.T) {
 			if code := get(t, r.s, api.CountersPath+"?"+q.Encode(), &c); code != 200 {
 				t.Fatalf("%v: %d", terms, code)
 			}
+			def := bundledLoaded().Views
 			for _, view := range storedViews() {
-				if spec, _ := bundledLoaded().Views.View(view); !spec.Rail {
+				counted := slices.Contains(def.Badge, view) || slices.ContainsFunc(def.Review, func(st intentload.ReviewStepDef) bool { return st.View == view })
+				if spec, _ := def.View(view); !spec.Rail && !counted {
 					if _, counted := c.Views[view]; counted {
 						t.Errorf("%s is off the rail and counted", view)
 					}
@@ -1448,7 +1450,7 @@ func TestRailFalseViewsServedWithRail(t *testing.T) {
 	for _, v := range cat.Views {
 		rail[v.ID] = v.Rail
 	}
-	if rail["home-blocked"] || rail["decide-answer"] || !rail["needs-me"] || !rail["outbox"] {
+	if rail["home-stalled"] || rail["decide-answer"] || !rail["next"] || !rail["waiting"] {
 		t.Fatalf("rail = %v", rail)
 	}
 }

@@ -493,7 +493,7 @@ func TestSlackSendBroadcastToAThreadGoesThroughTheOutbox(t *testing.T) {
 	}
 }
 
-func TestSlackSendAndOutboxNewToADirectMessageRefReplyInItsSegment(t *testing.T) {
+func TestSlackSendAndDraftNewToADirectMessageRefReplyInItsSegment(t *testing.T) {
 	w := newSessionWiring(t)
 	ctx := context.Background()
 	d := w.deps
@@ -512,8 +512,8 @@ func TestSlackSendAndOutboxNewToADirectMessageRefReplyInItsSegment(t *testing.T)
 		t.Fatalf("slack send: exit %d: %s %s", code, w.te.out, w.te.err)
 	}
 	w.te.out.Reset()
-	if code := w.te.run("outbox", "new", ref, "later"); code != 0 || !strings.Contains(w.te.out.String(), "draft 2 saved") {
-		t.Fatalf("outbox new: exit %d: %s %s", code, w.te.out, w.te.err)
+	if code := w.te.run("draft", "new", ref, "later"); code != 0 || !strings.Contains(w.te.out.String(), "draft 2 saved") {
+		t.Fatalf("draft new: exit %d: %s %s", code, w.te.out, w.te.err)
 	}
 	ds := w.drafts(t)
 	if len(ds) != 2 || ds[0].Unit != segs[0] || ds[1].Unit != segs[0] {

@@ -65,7 +65,7 @@ Every action (built-in, a bundled intent, an intent the profile overrides or add
 | **Primary** | the daemon's recommended action, any verb | the one `primary` button of a row or a unit's detail |
 | **Gate** | a gate's intents, in the order of `gates.toml` | the GateCard, the first one `primary`, digits `1` to `9` picking them |
 | **Run** | a run's actions: open, enter, transcript | the RunCard |
-| **Draft** | scope `draft`, verbs `edit`, `retry` | the Outbox and the draft's gate |
+| **Draft** | scope `draft`, verbs `edit`, `retry` | Needs you's drafts and the draft's gate |
 | **By group** | everything else: `round`, `turn`, `control`, `workspace`, `brief`, `intake` | the actions bar, one cluster per group, in catalog order |
 
 Labels are the manifest's own words. A profile that renames `review` changes the button text; one that adds an intent adds a button to its group's cluster on the surfaces it names. An input of kind `text`, `duration` or `answer` gets the matching control (textarea, snooze picker, the gate's answer box). An action the daemon offers but marks unavailable stays visible as the `off` button with its reason in the tooltip.

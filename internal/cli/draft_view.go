@@ -32,10 +32,6 @@ func itemsVerb(d api.Draft) string {
 	return "Answers"
 }
 
-func groupTitle(purpose string) string {
-	return strings.ToUpper(purposeName(purpose))
-}
-
 // purposeName is one draft's purpose as a person reads it.
 func purposeName(purpose string) string {
 	return strings.ReplaceAll(purpose, "_", " ")
@@ -110,100 +106,6 @@ func draftAge(d api.Draft, now time.Time) string {
 	return shortAge(now.Sub(d.CreatedAt), d.CreatedAt.IsZero())
 }
 
-// constant says whether f gives every draft the same value.
-func constant(ds []api.Draft, f func(api.Draft) string) bool {
-	for _, d := range ds[1:] {
-		if f(d) != f(ds[0]) {
-			return false
-		}
-	}
-	return true
-}
-
-// writeOutbox lays the drafts out for a person: a group per kind, each draft with its id, its unit as its
-// row reads, who it mentions, its age and its gist; the state, the approval and the target show only where
-// the drafts differ in them.
-func writeOutbox(w io.Writer, t termfmt.Term, ds []api.Draft, now time.Time) {
-	drafts := "drafts"
-	if len(ds) == 1 {
-		drafts = "draft"
-	}
-	fmt.Fprintln(w, t.Bold("Outbox")+"  "+t.Dim(fmt.Sprintf("%d %s waiting on you", len(ds), drafts)))
-	showState := !constant(ds, func(d api.Draft) string { return d.State })
-	showApproval := !constant(ds, approvalOf)
-	showTarget := slices.ContainsFunc(ds, func(d api.Draft) bool { return d.Target != "" })
-	showMentions := slices.ContainsFunc(ds, func(d api.Draft) bool { return len(draftMentions(d)) > 0 })
-	width := reportWidth(t) - 2
-	cols := []termfmt.Column{{Right: true}, {Max: max(20, min(44, width*2/5))}}
-	if showMentions {
-		cols = append(cols, termfmt.Column{Max: max(10, min(24, width/6))})
-	}
-	cols = append(cols, termfmt.Column{Right: true})
-	if showState {
-		cols = append(cols, termfmt.Column{})
-	}
-	if showApproval {
-		cols = append(cols, termfmt.Column{})
-	}
-	if showTarget {
-		cols = append(cols, termfmt.Column{Max: 24})
-	}
-	cols = append(cols, termfmt.Column{Flex: true})
-	var rows [][]termfmt.Cell
-	var heads []int
-	for _, g := range purposesOf(ds) {
-		heads = append(heads, len(rows))
-		for _, d := range ds {
-			if d.Purpose != g {
-				continue
-			}
-			r := []termfmt.Cell{{Text: fmt.Sprintf("#%d", d.ID), Style: t.Cyan}, {Text: draftLabel(d)}}
-			if showMentions {
-				r = append(r, termfmt.Cell{Text: strings.Join(draftMentions(d), " "), Style: t.Dim})
-			}
-			r = append(r, termfmt.Cell{Text: draftAge(d, now), Style: t.Dim})
-			if showState {
-				r = append(r, termfmt.Cell{Text: d.State, Style: stateStyle(t, d.State)})
-			}
-			if showApproval {
-				r = append(r, termfmt.Cell{Text: approvalOf(d), Style: t.Dim})
-			}
-			if showTarget {
-				r = append(r, termfmt.Cell{Text: cmp.Or(d.Target, "the unit"), Style: t.Dim})
-			}
-			rows = append(rows, append(r, termfmt.Cell{Text: gist(d)}))
-		}
-	}
-	lines := t.Columns(width, 2, cols, rows)
-	for i, l := range lines {
-		if g := slices.Index(heads, i); g >= 0 {
-			purpose := purposesOf(ds)[g]
-			n := 0
-			for _, d := range ds {
-				if d.Purpose == purpose {
-					n++
-				}
-			}
-			fmt.Fprintln(w)
-			fmt.Fprintln(w, t.Bold(groupTitle(purpose))+" "+t.Dim(fmt.Sprint(n)))
-		}
-		fmt.Fprintln(w, "  "+l)
-	}
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, t.Dim("Next: "+brand.Command+" outbox show <id> · approve <id> · discard <id>"))
-}
-
-// purposesOf are the purposes of ds in the order they first appear.
-func purposesOf(ds []api.Draft) []string {
-	var out []string
-	for _, d := range ds {
-		if !slices.Contains(out, d.Purpose) {
-			out = append(out, d.Purpose)
-		}
-	}
-	return out
-}
-
 func stateStyle(t termfmt.Term, state string) func(string) string {
 	switch state {
 	case "failed":
@@ -216,37 +118,24 @@ func stateStyle(t termfmt.Term, state string) func(string) string {
 	return t.Dim
 }
 
-// writeOutboxPlain writes one tab-separated line per draft for scripts: id, kind, state, unit, its label,
-// the mentions, the creation time and the gist.
-func writeOutboxPlain(w io.Writer, ds []api.Draft) {
-	for _, d := range ds {
-		fields := []string{fmt.Sprint(d.ID), d.Kind, d.State, d.Unit, draftLabel(d), strings.Join(draftMentions(d), ","),
-			d.CreatedAt.UTC().Format(time.RFC3339), gist(d)}
-		for i, f := range fields {
-			fields[i] = strings.ReplaceAll(oneLine(f), "\t", " ")
-		}
-		fmt.Fprintln(w, strings.Join(fields, "\t"))
-	}
-}
+// draftCommands are the draft subcommands of a draft's delivery actions.
+var draftCommands = []string{"edit", "retry"}
 
-// outboxCommands are the outbox subcommands of a draft's actions: its gate's decisions, and its delivery's.
-var outboxCommands = []string{"approve", "edit", "discard", "retry"}
-
-// draftCommands are the commands d takes now: approve and discard while its gate waits, then its actions.
-func draftCommands(d api.Draft) []string {
+// draftCommandLines are the commands d takes now: approve and discard while its gate waits, then its actions.
+func draftCommandLines(d api.Draft) []string {
 	var out []string
 	if d.Intents[string(gate.Approved)] != "" {
-		out = append(out, fmt.Sprintf("%s outbox approve %d", brand.Command, d.ID))
+		out = append(out, fmt.Sprintf("%s needs approve %d", brand.Command, d.Gate))
 	}
 	if d.Intents[string(gate.Rejected)] != "" || d.State == string(draft.Queued) || d.State == string(draft.Failed) {
-		out = append(out, fmt.Sprintf("%s outbox discard %d", brand.Command, d.ID))
+		out = append(out, fmt.Sprintf("%s draft discard %d", brand.Command, d.ID))
 	}
 	for _, a := range d.Actions {
 		verb, ok := strings.CutPrefix(a.ID, "draft.")
-		if !a.Enabled || !ok || !slices.Contains(outboxCommands, verb) {
+		if !a.Enabled || !ok || !slices.Contains(draftCommands, verb) {
 			continue
 		}
-		line := fmt.Sprintf("%s outbox %s %d", brand.Command, verb, d.ID)
+		line := fmt.Sprintf("%s draft %s %d", brand.Command, verb, d.ID)
 		switch {
 		case verb == "edit":
 			line += fmt.Sprintf(" <markdown> --rev %d", d.Rev)
@@ -334,7 +223,7 @@ func writeDraftView(w io.Writer, t termfmt.Term, d api.Draft, now time.Time) {
 	if d.Permalink != "" {
 		field("Posted", d.Permalink)
 	}
-	if cmds := draftCommands(d); len(cmds) > 0 {
+	if cmds := draftCommandLines(d); len(cmds) > 0 {
 		fmt.Fprintln(w)
 		for _, c := range cmds {
 			fmt.Fprintln(w, t.Dim(c))

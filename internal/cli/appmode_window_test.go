@@ -229,7 +229,7 @@ func TestTheFloatKeyTurnsTheFloatOn(t *testing.T) {
 			defer func() { cancel(); close(events.release); wg.Wait() }()
 			host := &recHost{}
 			cockpit := func(string) (string, error) { return "http://127.0.0.1:1/", nil }
-			win := config.Window{Enabled: true, Float: float, FloatHotkey: "cmd+option+.", FloatMorning: "07:30"}
+			win := config.Window{Enabled: true, Float: float, FloatHotkey: "cmd+option+.", FloatMorning: "07:30", FloatFilter: "@work"}
 			ctl := windowShow(ctx, &wg, host, events, cockpit, win, func(string, ...any) {})
 			synctest.Wait()
 			cfg := withWindow(menubar.Config{Tray: &recTray{}, Notifier: silentNotifier{}}, ctl, host, win)
@@ -243,6 +243,9 @@ func TestTheFloatKeyTurnsTheFloatOn(t *testing.T) {
 			}
 			if !on {
 				return
+			}
+			if cfg.FloatFilter == nil || cfg.FloatFilter().Q != "@work" {
+				t.Fatalf("the menu bar reads no filter, or not window.float_filter's")
 			}
 			c := menubar.New(cfg)
 			hookFloat(ctl, c)

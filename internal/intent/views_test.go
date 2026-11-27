@@ -128,16 +128,50 @@ func TestEveryVerbAndViewIsWorded(t *testing.T) {
 }
 
 func TestListTextsComeFromTheProfile(t *testing.T) {
-	texts, problems := loadListsWith(t, string(defaultLists()), "[verbs.done]\nsummary = \"Close it\"\n\n[views.needs-me]\nlabel = \"Now\"\n")
+	texts, problems := loadListsWith(t, string(defaultLists()), "[verbs.done]\nsummary = \"Close it\"\n\n[views.next]\nlabel = \"Now\"\n")
 	if problems != "" {
 		t.Fatal(problems)
 	}
 	if got := texts.Verbs["done"]; got.Label != "Done" || got.Summary != "Close it" {
 		t.Errorf("done: %+v", got)
 	}
-	if got := texts.label("needs-me"); got != "Now" {
-		t.Errorf("needs-me view: %q", got)
+	if got := texts.label("next"); got != "Now" {
+		t.Errorf("next view: %q", got)
 	}
+}
+
+// The views the rail by question removed are gone with no alias: a user layer that names one gets the error of a
+// view the profile never declared.
+func TestARemovedViewIsUnknownToAUserProfile(t *testing.T) {
+	for _, id := range []string{"needs-me", "blocked-by-me", "home-blocked", "outbox"} {
+		if _, ok := mustBundledViews(t).View(id); ok {
+			t.Errorf("the bundled profile still declares %s", id)
+		}
+		_, problems := loadListsWith(t, string(defaultLists()), "[views."+id+"]\nlabel = \"Mine\"\n\n[badge]\nviews = [\""+id+"\"]\n")
+		for _, want := range []string{"views." + id + ".summary: is required", "badge.views[0]: names no view of views.toml"} {
+			if !strings.Contains(problems, want) {
+				t.Errorf("%s: no %q in:\n%s", id, want, problems)
+			}
+		}
+	}
+}
+
+func TestTheOutboxLensKeysFailAtLoad(t *testing.T) {
+	_, problems := loadListsWith(t, string(defaultLists()), "[draft_facets.kind]\nfact = \"draft.kind\"\nlabel = \"Kind\"\n\n[views.held]\nlabel = \"Held\"\nsummary = \"x\"\nlayout = \"outbox\"\n")
+	for _, want := range []string{"draft_facets: unknown key", `views.held.layout: "outbox" is not one of`} {
+		if !strings.Contains(problems, want) {
+			t.Errorf("no %q in:\n%s", want, problems)
+		}
+	}
+}
+
+func mustBundledViews(t *testing.T) ViewsDef {
+	t.Helper()
+	v, problems := BundledViews(os.DirFS("../../profiles/default"))
+	if len(problems) > 0 {
+		t.Fatalf("%v", problems)
+	}
+	return v
 }
 
 func TestAUserVerbAndViewNeedTheirLabels(t *testing.T) {
@@ -230,10 +264,10 @@ func TestTheReviewStepsAreWordedByTheProfile(t *testing.T) {
 }
 
 func TestAReviewStepNamesAView(t *testing.T) {
-	texts, problems := loadListsWith(t, string(defaultLists()), "[review.inbx]\nlabel = \"x\"\n\n[badge]\nviews = [\"inbox\", \"neds-me\"]\n")
+	texts, problems := loadListsWith(t, string(defaultLists()), "[review.inbx]\nlabel = \"x\"\n\n[badge]\nviews = [\"inbox\", \"nxt\"]\n")
 	for _, want := range []string{
 		"review.inbx: names no view of views.toml; did you mean \"inbox\"?",
-		"badge.views[1]: names no view of views.toml; did you mean \"needs-me\"?",
+		"badge.views[1]: names no view of views.toml; did you mean \"next\"?",
 	} {
 		if !strings.Contains(problems, want) {
 			t.Errorf("no %q in:\n%s", want, problems)
@@ -249,7 +283,7 @@ func TestAReviewStepNamesAView(t *testing.T) {
 		}
 		walked = append(walked, st.View)
 	}
-	if want := []string{"inbox", "outbox", "waiting", "review-projects", "someday", "focus"}; !slices.Equal(walked, want) {
+	if want := []string{"inbox", "decide-send-draft", "waiting", "review-projects", "someday", "focus"}; !slices.Equal(walked, want) {
 		t.Errorf("the review walks %v, want %v", walked, want)
 	}
 }
@@ -298,15 +332,15 @@ func TestViewsKeepTheirDeclaredOrderAcrossLayers(t *testing.T) {
 	if want := append(bundled.IDs(), "zeta", "alpha"); !slices.Equal(texts.IDs(), want) {
 		t.Errorf("views %v, want %v", texts.IDs(), want)
 	}
-	if want := []string{"needs-you", "inbox", "needs-me", "waiting", "chase", "fits-now", "blocked-by-me", "stalled", "in-loop", "approved", "snoozed", "focus", "projects", "someday", "logbook", "done", "outbox", "review-projects", "review",
-		"home-blocked", "home-stalled", "decide-answer", "decide-approve-plan", "decide-send-draft", "decide-review-step", "decide-last-step", "decide-pick-someone", "decide-act"}; !slices.Equal(bundled.IDs(), want) {
+	if want := []string{"needs-you", "next", "inbox", "focus", "fits-now", "waiting", "chase", "stalled", "in-loop", "approved", "projects", "review-projects", "snoozed", "someday", "done", "logbook", "review",
+		"home-stalled", "decide-answer", "decide-approve-plan", "decide-send-draft", "decide-review-step", "decide-last-step", "decide-pick-someone", "decide-act"}; !slices.Equal(bundled.IDs(), want) {
 		t.Errorf("bundled views %v, want %v", bundled.IDs(), want)
 	}
 	var steps []string
 	for _, st := range texts.Review {
 		steps = append(steps, st.View)
 	}
-	if want := []string{"inbox", "outbox", "waiting", "review-projects", "someday", "focus", "zeta", "alpha"}; !slices.Equal(steps, want) {
+	if want := []string{"inbox", "decide-send-draft", "waiting", "review-projects", "someday", "focus", "zeta", "alpha"}; !slices.Equal(steps, want) {
 		t.Errorf("steps %v, want %v", steps, want)
 	}
 }
@@ -689,103 +723,25 @@ func TestACopiedViewsFileFromTheLastReleaseLoads(t *testing.T) {
 	}
 }
 
-func draftFacetOf(d ViewsDef, id string) (FacetDef, bool) {
-	i := slices.IndexFunc(d.DraftFacets, func(f FacetDef) bool { return f.ID == id })
-	if i < 0 {
-		return FacetDef{}, false
-	}
-	return d.DraftFacets[i], true
-}
-
-func TestDraftFacetsLoad(t *testing.T) {
-	views, problems := loadFacets(t, "[draft_facets.kind]\nfact = \"draft.kind\"\nlabel = \"Kind\"\ngroup = true\n\n[draft_facets.age]\nfact = \"draft.created_at\"\nlabel = \"Age\"\nsort = \"time\"\n")
-	if len(problems) > 0 {
-		t.Fatal(problems.Error())
-	}
-	if f, ok := draftFacetOf(views, "kind"); !ok || f.Fact != "draft.kind" || !f.Group || !f.Menu || f.Label != "Kind" {
-		t.Errorf("kind: %+v", f)
-	}
-	if f, ok := draftFacetOf(views, "age"); !ok || f.Fact != "draft.created_at" || f.Label != "Age" || f.Sort != "time" {
-		t.Errorf("age: %+v", f)
-	}
-}
-
-func TestDraftFacetRejectsTaskFact(t *testing.T) {
-	views, problems := loadFacets(t, "[draft_facets.state]\nfact = \"task.state\"\nlabel = \"State\"\n\n[draft_facets.who]\nfact = \"draft.proposr\"\nlabel = \"Who\"\n\n[draft_facets.kind]\nfact = \"draft.kind\"\nlabel = \"Kind\"\nsort = \"time\"\n")
-	got := problems.Error()
-	for _, want := range []string{"draft_facets.state.fact: task.state names no draft fact", "draft.proposer", `did you mean "draft.proposer"?`, "draft_facets.kind.sort"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("problems lack %q:\n%s", want, got)
-		}
-	}
-	for _, id := range []string{"state", "who", "kind"} {
-		if _, ok := draftFacetOf(views, id); ok {
-			t.Errorf("draft facet %s with a problem is served", id)
-		}
-	}
-}
-
-func TestDraftFacetsSeparateFromTaskFacets(t *testing.T) {
-	user := "[draft_facets.where]\nfact = \"draft.where\"\nlabel = \"Place\"\n\n[facets.source]\nlabel = \"Origin\"\n"
-	bundled := "empty = \"x\"\ndefault_sort = \"y\"\n\n[facets.where]\nfact = \"task.placement\"\nlabel = \"Where\"\n\n[facets.source]\nfact = \"task.provider\"\nlabel = \"Source\"\n\n[draft_facets.where]\nfact = \"draft.where\"\nlabel = \"Where\"\n\n[draft_facets.source]\nfact = \"draft.provider\"\nlabel = \"Source\"\n"
-	texts, problems := loadListsWith(t, bundled, user)
-	if problems != "" {
-		t.Fatal(problems)
-	}
-	taskWhere, _ := facetOf(texts.ViewsDef, "where")
-	draftWhere, _ := draftFacetOf(texts.ViewsDef, "where")
-	taskSource, _ := facetOf(texts.ViewsDef, "source")
-	draftSource, _ := draftFacetOf(texts.ViewsDef, "source")
-	if taskWhere.Label != "Where" || taskWhere.Fact != "task.placement" || draftWhere.Label != "Place" || draftWhere.Fact != "draft.where" {
-		t.Errorf("where: task %+v, draft %+v", taskWhere, draftWhere)
-	}
-	if taskSource.Label != "Origin" || draftSource.Label != "Source" {
-		t.Errorf("source: task %q, draft %q", taskSource.Label, draftSource.Label)
-	}
-}
-
-func TestOutboxViewGroupsByDraftFact(t *testing.T) {
-	views, problems := loadFacets(t, "[views.outbox]\ngroup = \"draft.proposer\"\nsort = \"-draft.created_at\"\n")
-	if len(problems) > 0 {
-		t.Fatal(problems.Error())
-	}
-	if v, _ := views.View("outbox"); v.Group != "draft.proposer" || len(v.Sort) != 1 || v.Sort[0].Fact != "draft.created_at" || !v.Sort[0].Desc {
-		t.Errorf("outbox: group %q, sort %+v", v.Group, v.Sort)
-	}
-
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, ViewsFile), []byte("[views.outbox]\ngroup = \"task.state\"\nsort = \"gate.status\"\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	layers := []profile.Layer{{Name: "user", Dir: dir}}
-	_, _, ps := loadViews(layers, readerOf(os.DirFS("../../profiles/default")), nil)
-	got := ps.Error()
-	for _, want := range []string{"views.outbox.group", "task.state names no fact", "views.outbox.sort", "gate.status names no fact"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("problems lack %q:\n%s", want, got)
-		}
-	}
-}
-
-func TestPluginDraftKindLabel(t *testing.T) {
+func TestPluginDraftFieldWords(t *testing.T) {
 	plugin, user := t.TempDir(), t.TempDir()
 	write := func(dir, body string) {
 		if err := os.WriteFile(filepath.Join(dir, UIFile), []byte(body), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
-	write(plugin, "[drafts.note]\nlabel = \"Note\"\n\n[drafts.note.fields.body]\nlabel = \"Text\"\n")
-	write(user, "[drafts.note]\nlabel = \"Memo\"\n")
+	write(plugin, "[drafts.note]\ncomments = \"/comments\"\n\n[drafts.note.fields.body]\nlabel = \"Text\"\n")
+	write(user, "[drafts.note.fields.body]\nlabel = \"Memo\"\n")
 	layers := []profile.Layer{{Name: profile.PluginLayer("acme"), Dir: plugin}}
 	texts, problems := loadUI(layers, readerOf(nil))
 	if len(problems) > 0 {
 		t.Fatal(problems.Error())
 	}
-	if d := texts["acme"].Drafts["note"]; d.Label != "Note" || d.Fields["body"].Label != "Text" {
+	if d := texts["acme"].Drafts["note"]; d.Comments != "/comments" || d.Fields["body"].Label != "Text" {
 		t.Errorf("note: %+v", d)
 	}
 	texts, problems = loadUI(append(layers, profile.Layer{Name: "user:acme", Dir: user}), readerOf(nil))
-	if d := texts["acme"].Drafts["note"]; len(problems) > 0 || d.Label != "Memo" || d.Fields["body"].Label != "Text" {
+	if d := texts["acme"].Drafts["note"]; len(problems) > 0 || d.Comments != "/comments" || d.Fields["body"].Label != "Memo" {
 		t.Errorf("note over a user layer: %+v, %s", d, problems.Error())
 	}
 }
@@ -793,20 +749,79 @@ func TestPluginDraftKindLabel(t *testing.T) {
 // A view's opens names the view, and the decision kind narrowing it, that a
 // page of its own opens instead; it must name a view and a decision kind.
 func TestAViewOpensTheViewItNames(t *testing.T) {
-	texts, problems := loadListsWith(t, string(defaultLists()), "[views.outbox]\nopens = { view = \"inbox\" }\n")
+	texts, problems := loadListsWith(t, string(defaultLists()), "[views.waiting]\nopens = { view = \"inbox\" }\n")
 	if problems != "" {
 		t.Fatal(problems)
 	}
-	if v, _ := texts.View("outbox"); v.Opens != (ViewOpens{View: "inbox"}) {
-		t.Fatalf("outbox opens %+v, want the user's inbox", v.Opens)
+	if v, _ := texts.View("waiting"); v.Opens != (ViewOpens{View: "inbox"}) {
+		t.Fatalf("waiting opens %+v, want the user's inbox", v.Opens)
 	}
 	if v, _ := texts.View("inbox"); v.Opens != (ViewOpens{}) {
 		t.Fatalf("inbox opens %+v, want none", v.Opens)
 	}
-	_, problems = loadListsWith(t, string(defaultLists()), "[views.outbox]\nopens = { view = \"nowhere\", kind = \"sideways\" }\n")
-	for _, want := range []string{"views.outbox.opens.view: nowhere names no view", "views.outbox.opens.kind: sideways names no decision kind"} {
+	_, problems = loadListsWith(t, string(defaultLists()), "[views.waiting]\nopens = { view = \"nowhere\", kind = \"sideways\" }\n")
+	for _, want := range []string{"views.waiting.opens.view: nowhere names no view", "views.waiting.opens.kind: sideways names no decision kind"} {
 		if !strings.Contains(problems, want) {
 			t.Errorf("no %q in:\n%s", want, problems)
+		}
+	}
+}
+
+// A view names the rail section it sits in and whether the rail counts it; the rail's built-in entries name
+// theirs in the rail table.
+func TestAViewNamesItsRailSectionAndWhetherItIsCounted(t *testing.T) {
+	user := "[views.later]\nlabel = \"Later\"\nsummary = \"s\"\nwhen = \"true\"\nsection = \"Someday\"\ncounted = false\n\n" +
+		"[views.inbox]\nsection = \"Clarify\"\n\n[rail.plan]\nsection = \"Someday\"\ncounted = true\n"
+	texts, problems := loadListsWith(t, string(defaultLists()), user)
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	if later, _ := texts.View("later"); later.Section != "Someday" || later.Counted {
+		t.Errorf("later %+v, want section Someday, uncounted", later)
+	}
+	if inbox, _ := texts.View("inbox"); inbox.Section != "Clarify" || !inbox.Counted {
+		t.Errorf("inbox %+v, want section Clarify, counted", inbox)
+	}
+	if got := texts.Rail[PlanView]; got != (RailEntryDef{Section: "Someday", Counted: true}) {
+		t.Errorf("plan %+v, want in Someday and counted", got)
+	}
+	if got := texts.Rail[RecentView]; got != (RailEntryDef{Section: "Archive"}) {
+		t.Errorf("recent %+v, want the bundled Archive, uncounted", got)
+	}
+	_, problems = loadListsWith(t, string(defaultLists()), "[rail.logbook]\nsection = \"x\"\n")
+	if !strings.Contains(problems, "rail.logbook: names no built-in entry of the rail; the entries are plan, recent") {
+		t.Errorf("a rail entry that is no built-in loads: %s", problems)
+	}
+}
+
+// The bundled rail groups its views by what they ask of the user, the archive last and uncounted.
+func TestTheBundledRailIsSectionedByQuestion(t *testing.T) {
+	v := mustBundledViews(t)
+	var order []string
+	sections := map[string][]string{}
+	for _, def := range v.Views {
+		if !def.Rail {
+			continue
+		}
+		if _, ok := sections[def.Section]; !ok {
+			order = append(order, def.Section)
+		}
+		sections[def.Section] = append(sections[def.Section], def.ID)
+	}
+	if want := []string{"What's on you", "With other people", "With the loop", "Later", "Archive"}; !slices.Equal(order, want) {
+		t.Errorf("sections %v, want %v", order, want)
+	}
+	if want := []string{"needs-you", "next", "inbox", "focus", "fits-now"}; !slices.Equal(sections["What's on you"], want) {
+		t.Errorf("What's on you %v, want %v", sections["What's on you"], want)
+	}
+	for _, id := range sections["Archive"] {
+		if def, _ := v.View(id); def.Counted {
+			t.Errorf("%s in the archive is counted", id)
+		}
+	}
+	for _, id := range []string{PlanView, RecentView} {
+		if v.Rail[id] != (RailEntryDef{Section: "Archive"}) {
+			t.Errorf("%s %+v, want in the archive, uncounted", id, v.Rail[id])
 		}
 	}
 }

@@ -63,7 +63,7 @@ func TestMotionStopsUnderReducedMotion(t *testing.T) {
 	// The rules that move answer an action: opening the detail or the palette, resolving a decision card,
 	// and hover, focus or press on a control. The one exception is the float's peek, whose arrival and leave
 	// announce a decision that just arrived, once per burst. Any other class live data toggles moves nothing.
-	want := []string{"#detail", ".pal-back", ".d-gate, .d-draft", ".outbox .d-draft", ".find", ".views .nav", ".opt", ".tab", ".seg button", ".tools .pill",
+	want := []string{"#detail", ".pal-back", ".d-gate, .d-draft", ".find", ".views .nav", ".opt", ".tab", ".seg button", ".tools .pill",
 		".fl-flyout", `.fl-flyout[data-state="leaving"]`}
 	var got []string
 	for s := range moving {

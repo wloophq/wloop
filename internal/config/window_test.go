@@ -13,14 +13,15 @@ func TestConfigWindowDefaults(t *testing.T) {
 	}
 	with := func(f func(*Window)) Window { w := def; f(&w); return w }
 	for raw, want := range map[string]Window{
-		``:                                         def,
-		`window = {hotkey = ""}`:                   with(func(w *Window) { w.Hotkey = "" }),
-		`window = {enabled = false}`:               with(func(w *Window) { w.Enabled = false }),
-		`window = {hotkey = "cmd+k"}`:              with(func(w *Window) { w.Hotkey = "cmd+k" }),
-		`window = {float = "on"}`:                  with(func(w *Window) { w.Float = FloatOn }),
-		`window = {float_hotkey = "cmd+j"}`:        with(func(w *Window) { w.FloatHotkey = "cmd+j" }),
-		`window = {float_morning = "07:30"}`:       with(func(w *Window) { w.FloatMorning = "07:30" }),
-		`window = {float_over_full_screen = true}`: with(func(w *Window) { w.FloatOverFullScreen = true }),
+		``:                                          def,
+		`window = {hotkey = ""}`:                    with(func(w *Window) { w.Hotkey = "" }),
+		`window = {enabled = false}`:                with(func(w *Window) { w.Enabled = false }),
+		`window = {hotkey = "cmd+k"}`:               with(func(w *Window) { w.Hotkey = "cmd+k" }),
+		`window = {float = "on"}`:                   with(func(w *Window) { w.Float = FloatOn }),
+		`window = {float_hotkey = "cmd+j"}`:         with(func(w *Window) { w.FloatHotkey = "cmd+j" }),
+		`window = {float_morning = "07:30"}`:        with(func(w *Window) { w.FloatMorning = "07:30" }),
+		`window = {float_over_full_screen = true}`:  with(func(w *Window) { w.FloatOverFullScreen = true }),
+		`window = {float_filter = "source:github"}`: with(func(w *Window) { w.FloatFilter = "source:github" }),
 	} {
 		path := filepath.Join(t.TempDir(), "config.toml")
 		if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {

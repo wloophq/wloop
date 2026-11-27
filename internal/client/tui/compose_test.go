@@ -111,7 +111,7 @@ func TestEditADraftFromItsDetail(t *testing.T) {
 	one := task("draft:12", "Thanks", "inbox")
 	one.Verbs = []api.VerbState{{Verb: "edit", Enabled: true}}
 	one.Gates = draftGates(api.Draft{ID: 12, Rev: 1, Kind: "reply", Purpose: "reply", Text: "Thanks!", State: "held"})
-	m.SetTasks("outbox", []api.TaskView{one}, viewCounters())
+	m.SetTasks("held-drafts", []api.TaskView{one}, viewCounters())
 	m.Done(c, nil, nil)
 	press(m, Key{Name: KeyEnter}, Key{Rune: 'i'})
 	if m.prompt == nil || string(m.prompt.text) != "Thanks!" || !m.prompt.editor {

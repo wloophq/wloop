@@ -19,7 +19,7 @@ func lensViews(loaded func() *intentload.Loaded) func() coretasks.Views {
 		for _, v := range def.Views {
 			if catalog.Lists(def, v.ID) {
 				out.List = append(out.List, coretasks.ViewSpec{ID: task.View(v.ID), Over: v.Over, Paged: catalog.Paged(def, v.ID), HideDisabled: v.HideDisabled,
-					Uncounted: !v.Rail})
+					Uncounted: !v.Rail || !v.Counted})
 			}
 		}
 		for _, id := range def.Badge {

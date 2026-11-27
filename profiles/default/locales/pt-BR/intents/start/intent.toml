@@ -1,10 +1,6 @@
 label = "Começar"
 summary = "Começar trabalho novo a partir de um brief: num worktree novo de um repositório, ou sem checkout"
 
-[outbox]
-title = "Publicações de trabalho novo"
-about = "Rascunhado quando um trabalho que você começou anexa algo para publicar."
-
 [guidance]
 help = "o brief: o que construir ou dizer, e como saber que está pronto"
 
