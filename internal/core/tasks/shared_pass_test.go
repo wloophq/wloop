@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
@@ -17,17 +17,18 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/wake"
 	"github.com/wloophq/wloop/internal/domain/workflow"
+	"github.com/wloophq/wloop/internal/meter"
+	"github.com/wloophq/wloop/internal/meter/metertest"
 )
 
-// sharedRig is a setsRig whose service shares its pass while the store's generation, which the test moves,
-// holds.
+// sharedRig is a setsRig whose service shares its pass while the change log, which the test notes, holds.
 type sharedRig struct {
 	*setsRig
-	gen atomic.Uint64
+	log *change.Log
 }
 
 func newSharedRig(t *testing.T) *sharedRig {
-	r := &sharedRig{setsRig: newSetsRig()}
+	r := &sharedRig{setsRig: newSetsRig(), log: change.NewLog(change.DefaultWindow, nil)}
 	eval := func(ctx context.Context, view string, e task.Task) (bool, error) {
 		pass, ok := coretasks.PassOf(ctx)
 		if !ok {
@@ -43,7 +44,7 @@ func newSharedRig(t *testing.T) *sharedRig {
 	}
 	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, States: taskstest.BundledStates,
 		Authority: taskstest.BundledStates.Authority, Wakes: wakestest.NewStore(), Views: r.lens.Views, ViewEval: eval,
-		Gen: func() port.Generation { return port.Generation(r.gen.Load()) }})
+		Changes: r.log})
 	r.seed(t)
 	return r
 }
@@ -51,7 +52,11 @@ func newSharedRig(t *testing.T) *sharedRig {
 // screen is what one screen of the cockpit reads: a view's page, the counters and the sets of two views.
 func (r *sharedRig) screen(t testing.TB) {
 	t.Helper()
-	ctx := context.Background()
+	r.screenIn(t, context.Background())
+}
+
+func (r *sharedRig) screenIn(t testing.TB, ctx context.Context) {
+	t.Helper()
 	if _, err := r.svc.TasksSince(ctx, task.Query{View: "ready"}, coretasks.Since{}, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -75,10 +80,59 @@ func TestTheReadsOfOneGenerationShareOnePass(t *testing.T) {
 func TestAWriteToTheStoreStartsANewPass(t *testing.T) {
 	r := newSharedRig(t)
 	r.screen(t)
-	r.gen.Add(1)
+	r.log.Note(port.TopicTasks)
 	r.screen(t)
 	if r.reads != 8 || len(r.passes) != 2 {
 		t.Fatalf("facts read %d times over %d passes, want 8 over 2", r.reads, len(r.passes))
+	}
+}
+
+func TestANoteOfATopicTheFactsDoNotReadKeepsThePass(t *testing.T) {
+	r := newSharedRig(t)
+	r.screen(t)
+	r.log.Note(port.TopicApp)
+	r.log.Note(port.TopicJobs)
+	r.screen(t)
+	if r.reads != 4 || len(r.passes) != 1 {
+		t.Fatalf("facts read %d times over %d passes after notes the facts do not read, want 4 in one pass", r.reads, len(r.passes))
+	}
+	r.log.Note(port.TopicApp | port.TopicGates)
+	r.screen(t)
+	if len(r.passes) != 2 {
+		t.Fatalf("%d passes after a note that also moved the gates, want 2", len(r.passes))
+	}
+}
+
+func TestEveryTopicButThoseTheFactsDoNotReadStartsANewPass(t *testing.T) {
+	for _, name := range port.AllTopics.Names() {
+		var topic port.Topic
+		for i := range 64 {
+			if names := port.Topic(1 << i).Names(); len(names) == 1 && names[0] == name {
+				topic = port.Topic(1 << i)
+			}
+		}
+		r := newSharedRig(t)
+		r.screen(t)
+		r.log.Note(topic)
+		r.screen(t)
+		if want := map[bool]int{true: 1, false: 2}[coretasks.PassIgnores&topic != 0]; len(r.passes) != want {
+			t.Errorf("a note of %s: %d passes, want %d", name, len(r.passes), want)
+		}
+	}
+}
+
+func TestASharedPassMissCountsTheTopicsThatMoved(t *testing.T) {
+	r := newSharedRig(t)
+	ctx, sc := metertest.Start(t, context.Background())
+	r.screenIn(t, ctx)
+	r.log.Note(port.TopicTasks | port.TopicDrafts)
+	r.log.Note(port.TopicTasks)
+	r.screenIn(t, ctx)
+	got := sc.Tally()
+	for _, name := range []string{"tasks", "drafts"} {
+		if n := got[meter.Key{Res: meter.Work, Op: "pass missed: " + name}].Calls; n != 1 {
+			t.Errorf("%d misses counted for %s, want 1 (tally %v)", n, name, got)
+		}
 	}
 }
 
@@ -130,19 +184,20 @@ func BenchmarkScreen(b *testing.B) {
 				}
 				return r.lens.Eval(ctx, view, e)
 			}
-			var gen func() port.Generation
+			r.log = change.NewLog(change.DefaultWindow, nil)
+			var changes port.Changes
 			if shared {
-				gen = func() port.Generation { return port.Generation(r.gen.Load()) }
+				changes = r.log
 			}
 			r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock,
 				States: taskstest.BundledStates, Authority: taskstest.BundledStates.Authority, Wakes: wakestest.NewStore(),
-				Views: r.lens.Views, ViewEval: eval, Gen: gen})
+				Views: r.lens.Views, ViewEval: eval, Changes: changes})
 			for i := range 1300 {
 				r.put(b, task.Task{ID: task.ID(fmt.Sprintf("t-%d", i)), State: "next", Category: task.CategoryReady, Title: "a task"})
 			}
 			b.ResetTimer()
 			for range b.N {
-				r.gen.Add(1)
+				r.log.Note(port.TopicTasks)
 				r.screen(b)
 			}
 		})

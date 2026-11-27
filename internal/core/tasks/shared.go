@@ -7,13 +7,18 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/meter"
 )
+
+// PassIgnores are the topics no fact and no load of a pass reads: a note of them alone leaves the shared pass
+// current. A topic left out of it costs a new pass, never a stale answer, so it lists only what is known.
+const PassIgnores = port.TopicApp | port.TopicUsage | port.TopicJobs | port.TopicViews
 
 // passReuse bounds how long a pass serves the reads that start while the store's generation holds, so a
 // fact a write forgets to note, or one that moves with the clock, is late by no more than it.
 const passReuse = 2 * time.Second
 
-// sharedPass is the last pass the service read and the store's generation before its tasks were read.
+// sharedPass is the last pass the service read and the change log's generation before its tasks were read.
 type sharedPass struct {
 	mu       sync.Mutex
 	pass     *Pass
@@ -22,22 +27,24 @@ type sharedPass struct {
 	building chan struct{}
 }
 
-// pass is a pass over every stored task: the one ctx carries when it holds every task, else the shared one while the store's generation
-// holds and it is younger than passReuse, else a new one, which the reads that start while it is read wait for
-// and share.
+// pass is a pass over every stored task: the one ctx carries when it holds every task, else the shared one while
+// no note but of PassIgnores followed it and it is younger than passReuse, else a new one, which the reads that
+// start while it is read wait for and share.
 func (s *Service) pass(ctx context.Context) (*Pass, error) {
 	if p, ok := PassOf(ctx); ok && p.all {
 		return p, nil
 	}
-	if s.d.Gen == nil {
+	if s.d.Changes == nil {
 		return s.newPass(ctx)
 	}
 	sh := &s.shared
 	for {
 		sh.mu.Lock()
-		gen, now := s.d.Gen(), s.d.Clock.Now()
-		if sh.pass != nil && sh.gen == gen && now.Sub(sh.at) < passReuse {
+		gen, now := s.d.Changes.Gen(), s.d.Clock.Now()
+		young := sh.pass != nil && now.Sub(sh.at) < passReuse
+		if young && (sh.gen == gen || s.d.Changes.Since(sh.gen, port.AllTopics&^PassIgnores).Empty()) {
 			p := sh.pass
+			sh.gen = gen
 			sh.mu.Unlock()
 			return p, nil
 		}
@@ -52,6 +59,9 @@ func (s *Service) pass(ctx context.Context) (*Pass, error) {
 		}
 		done := make(chan struct{})
 		sh.building = done
+		if young {
+			s.missed(ctx, sh.gen)
+		}
 		sh.mu.Unlock()
 		p, err := s.newPass(ctx)
 		sh.mu.Lock()
@@ -85,4 +95,12 @@ func (p *Pass) covers(page Page) bool {
 		}
 	}
 	return true
+}
+
+// missed counts a shared pass, still young at gen, that a note left behind, once per topic the notes since moved
+// that the pass reads.
+func (s *Service) missed(ctx context.Context, gen port.Generation) {
+	for _, name := range s.d.Changes.Since(gen, port.AllTopics&^PassIgnores).Topics.Names() {
+		meter.Add(ctx, meter.Sample{Res: meter.Work, Op: "pass missed: " + name})
+	}
 }
