@@ -260,6 +260,50 @@ describe("omnibox_test.go", () => {
     expect(st.answered).toBe("retries");
   });
 
+  test("a pasted address shows its unit and operations before a slow search answers", async () => {
+    const r = pastedUnit();
+    r[ADDRESS].preview = { operations: [{ op: "action", unit: r[ADDRESS].unit.unit, action: "track" }] };
+    const f = fake({ resolve: r });
+    let answer!: (v: J) => void;
+    const get = f.env.get;
+    f.env.get = (url, signal) => (url.startsWith("/api/search") ? new Promise<J>((ok) => { answer = ok; }) : get(url, signal));
+    const st = omniboxNew(false, []);
+    const typed = omniboxType(st, ADDRESS, f.env);
+    await settle();
+    expect(st.answered).toBe(ADDRESS);
+    expect(st.resolved.kind).toBe("unit");
+    expect(st.ops.map((o) => o.action)).toEqual(["track"]);
+    expect(st.search).toBeNull();
+    answer({ groups: [] });
+    await typed;
+    expect(st.search).toEqual({ groups: [] });
+  });
+
+  test("Enter on a pasted address runs its choice without waiting for search", async () => {
+    const r = pastedUnit({ id: "t-4", title: "Review the export" });
+    const f = fake({ resolve: r });
+    f.env.get = () => new Promise<J>(() => {});
+    const st = omniboxNew(false, []);
+    void omniboxType(st, ADDRESS, f.env);
+    await omniboxEnter(st, f.env, false);
+    expect(f.log.opened).toEqual(["#task=t-4"]);
+  });
+
+  test("Enter waits for search when resolve offers no choice of its own", async () => {
+    const f = fake({ search: retriesSearch() });
+    let answer!: (v: J) => void;
+    const get = f.env.get;
+    f.env.get = (url, signal) => (url.startsWith("/api/search") ? new Promise<J>((ok) => { answer = ok; }) : get(url, signal));
+    const st = omniboxNew(false, []);
+    void omniboxType(st, "retries", f.env);
+    const entered = omniboxEnter(st, f.env, false);
+    await settle();
+    expect(f.log.opened).toEqual([]);
+    answer(retriesSearch().retries);
+    await entered;
+    expect(f.log.opened).toEqual(["#task=t-1"]);
+  });
+
   test("the hint to ask again stays drawn after the agent failed", async () => {
     const o = mount({ resolve: { "what waits": { kind: "agent" } }, ask: ["the agent is away"] });
     await o.type("what waits");
