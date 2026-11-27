@@ -53,7 +53,8 @@ type Resolution struct {
 }
 
 // Resolve is text as a pasted address, a known verb's operations on what it names, or a search; a ref that
-// names more than one thing goes to the agent, never guessed.
+// names more than one thing goes to the agent, never guessed. The text after a verb's last ref is the guidance
+// of each action it runs.
 func (r Resolver) Resolve(ctx context.Context, text string) (Resolution, error) {
 	fields := strings.Fields(text)
 	if len(fields) == 0 {
@@ -67,18 +68,18 @@ func (r Resolver) Resolve(ctx context.Context, text string) (Resolution, error) 
 		return Resolution{Kind: KindSearch}, nil
 	}
 	rest := fields[1:]
-	var refs []string
-	for _, f := range rest {
-		if looksLikeRef(f) {
-			refs = append(refs, f)
-		}
-	}
+	refs, guidance := splitGuidance(text, rest)
 	if len(refs) == 0 {
 		return r.onText(verb, strings.Join(rest, " ")), nil
 	}
 	var ops []AskOp
-	for _, token := range refs {
+	for _, rt := range refs {
+		token := rt.token
 		found, err := r.Refs.Find(ctx, token)
+		if err == nil && len(found) == 0 && rt.joined >= 0 {
+			guidance = strings.TrimSpace(text[rt.joined:])
+			break
+		}
 		switch {
 		case err != nil:
 			return Resolution{}, err
@@ -90,6 +91,11 @@ func (r Resolver) Resolve(ctx context.Context, text string) (Resolution, error) 
 			return Resolution{Kind: KindSearch, Why: WhyNoRef, Params: map[string]string{"ref": token}}, nil
 		}
 		ops = append(ops, op)
+	}
+	for i := range ops {
+		if ops[i].Op == OpAction {
+			ops[i].Guidance = guidance
+		}
 	}
 	return Resolution{Kind: KindVerb, Operations: ops}, nil
 }
@@ -143,7 +149,38 @@ func operation(verb Verb, found []Ref) (AskOp, bool) {
 	return AskOp{}, false
 }
 
+// refToken is a ref a verb names; joined is where the guidance starts when it names nothing and a lone word
+// joined it to the ref before ("a#1 and a#2", "a#1 read https://..."), -1 when no word did.
+type refToken struct {
+	token  string
+	joined int
+}
+
+// splitGuidance reads the fields after a verb as its refs, then its guidance: the guidance starts at the first
+// plain word after a ref that is not a lone word joining two refs, and runs to the end of text, refs and paths
+// included.
+func splitGuidance(text string, fields []string) (refs []refToken, guidance string) {
+	at, join := 0, -1
+	for i, f := range fields {
+		start := strings.Index(text[at:], f) + at
+		at = start + len(f)
+		switch {
+		case looksLikeRef(f):
+			refs = append(refs, refToken{token: f, joined: join})
+			join = -1
+		case len(refs) > 0 && (i+1 == len(fields) || !looksLikeRef(fields[i+1])):
+			return refs, strings.TrimSpace(text[start:])
+		case len(refs) > 0:
+			join = start
+		}
+	}
+	return refs, ""
+}
+
 // looksLikeRef says whether token is written as an address, a unit or a task id rather than a word.
 func looksLikeRef(token string) bool {
+	if strings.HasSuffix(token, ":") {
+		return false
+	}
 	return strings.ContainsAny(token, "#/:") || strings.HasPrefix(token, task.IDPrefix)
 }

@@ -8,7 +8,8 @@
   import { scheduleLoad } from "../../state/sync.svelte";
   import Markdown from "../common/Markdown.svelte";
   import {
-    OMNI_STOPS, omniboxActed, omniboxAct, omniboxActiveID, omniboxChoices, omniboxEdits, omniboxFollow, omniboxIsOption, omniboxKey, omniboxNew,
+    OMNI_STOPS, omniboxActed, omniboxAct, omniboxActiveID, omniboxChoices, omniboxEdits, omniboxFollow, omniboxGuide, omniboxGuideReady, omniboxGuideRun,
+    omniboxIsOption, omniboxKey, omniboxNew, omniboxOpInput,
     omniboxOpLabel, omniboxOptionID, omniboxRun, omniboxSelected, omniboxStatus, omniboxStatusSaid, omniboxTrap, omniboxType, omniboxUnitAction, omniFetch, settleCopy,
     type OmniEnv,
   } from "./omnibox";
@@ -48,7 +49,7 @@
       win.location().hash = href;
       if (!panel) close();
     },
-    act: (u, id, copies, row) => omniboxAct(u, id, copies, row),
+    act: (u, id, copies, row, guidance) => omniboxAct(u, id, copies, row, guidance),
     claim: () => claimCopy(),
     settle: (name, out, claim) => settleCopy(name, out, claim),
     confirm: (q) => askConfirm(q),
@@ -66,6 +67,7 @@
   const acted = $derived(omniboxActed(st));
   const checkedCount = $derived(st.checked.filter(Boolean).length);
   const editable = $derived(!!(st.answer && st.answer.proposal));
+  const guide = $derived(omniboxGuide(st));
 
   // opt are the attributes that make the element of choice id an option, selected or not; a choice that is no
   // option is marked with data-selected.
@@ -90,6 +92,13 @@
   }
 
   function boxKey(e: KeyboardEvent) {
+    if (e.key === "Escape" && st.guide && (e.target as HTMLElement).closest(".omni-guide")) {
+      e.preventDefault();
+      e.stopPropagation();
+      st.guide = null;
+      input.focus();
+      return;
+    }
     if (e.key === "Escape") {
       e.preventDefault();
       e.stopPropagation();
@@ -108,6 +117,24 @@
   async function run() {
     await omniboxRun(st, env);
     if (!st.ops.length) input.focus();
+  }
+
+  // guide runs the card's guidance; the field it leaves gives the focus back to the omnibox's.
+  function runGuide() {
+    const ran = omniboxGuideRun(st, env);
+    if (!st.guide) input.focus();
+    return ran;
+  }
+
+  function guideKey(e: KeyboardEvent) {
+    if (e.key !== "Enter" || e.isComposing) return;
+    e.preventDefault();
+    e.stopPropagation();
+    void runGuide();
+  }
+
+  function focusNow(el: HTMLElement) {
+    el.focus();
   }
 
   function replyKey(e: KeyboardEvent) {
@@ -164,6 +191,13 @@
             <button type="button" class="act" onclick={() => omniboxUnitAction(st, env, a.id)}>{a.label || a.id}</button>
           {/each}
         </div>
+        {#if guide && st.guide}
+          <div class="omni-guide">
+            <input type="text" class="omni-edit" aria-label={guide.input.label || t("Guidance")} placeholder={guide.input.placeholder || ""} maxlength={guide.input.max || undefined}
+              data-focus="omni:guide" bind:value={st.guide.text} onkeydown={guideKey} {@attach focusNow} />
+            <button type="button" class="act primary" disabled={!omniboxGuideReady(st)} onclick={runGuide}><kbd>↵</kbd> {guide.label || guide.id}</button>
+          </div>
+        {/if}
         {#if resolved.unit.why}<p class="omni-why">{t(resolved.unit.why, resolved.unit.params || {})}</p>{/if}
         {#if acted}
           <p class="err omni-copy-error">{acted.error}</p>
@@ -201,6 +235,11 @@
               <label><input type="checkbox" data-focus={`omni:op:${i}`} bind:checked={st.checked[i]} /> {omniboxOpLabel(op)}</label>
               {#if op.reason && op.op !== "action"}<p class="why">{op.reason}</p>{/if}
               {#if op.confirm}<p class="why">{op.confirm}</p>{/if}
+              {#if omniboxOpInput(op)}
+                {@const asks = omniboxOpInput(op)}
+                <input type="text" class="omni-edit" aria-label={asks.label || t("Guidance")} placeholder={asks.placeholder || ""} maxlength={asks.max || undefined}
+                  data-focus={`omni:edit:${i}:guide`} bind:value={op.guidance} />
+              {/if}
               {#if editable}
                 {#each omniboxEdits(op) as f (f.name)}
                   <input type="text" class="omni-edit" aria-label={f.label} data-focus={`omni:edit:${i}:${f.name}`} bind:value={op[f.name]} />

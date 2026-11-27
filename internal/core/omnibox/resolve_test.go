@@ -148,3 +148,44 @@ func TestResolveOtherTextIsSearch(t *testing.T) {
 		t.Fatalf("%+v", got)
 	}
 }
+
+func TestResolveVerbKeepsTheTextAfterItsRefsAsGuidance(t *testing.T) {
+	r, _ := resolver()
+	ctx := context.Background()
+	got, _ := r.Resolve(ctx, "review https://forge.example/acme/api/pull/8  focus on the migration, then the TODOs ")
+	if got.Kind != omnibox.KindVerb || len(got.Operations) != 1 || got.Operations[0].Guidance != "focus on the migration, then the TODOs" {
+		t.Fatalf("%+v", got)
+	}
+	got, _ = r.Resolve(ctx, "revise acme/api#8 and acme/api#9 look at the retries")
+	for i, op := range got.Operations {
+		if op.Guidance != "look at the retries" {
+			t.Errorf("operation %d carries %q", i, op.Guidance)
+		}
+	}
+	got, _ = r.Resolve(ctx, "revise acme/api#8 and acme/api#9")
+	for i, op := range got.Operations {
+		if op.Guidance != "" {
+			t.Errorf("words between refs became guidance of operation %d: %q", i, op.Guidance)
+		}
+	}
+	if got, _ := r.Resolve(ctx, "done t-3f9a since it merged"); len(got.Operations) != 1 || got.Operations[0].Guidance != "" {
+		t.Errorf("a task verb took guidance: %+v", got)
+	}
+}
+
+func TestResolveGuidanceMayNameRefsAndPaths(t *testing.T) {
+	r, _ := resolver()
+	ctx := context.Background()
+	for text, want := range map[string]string{
+		"review acme/api#8 focus on internal/core first":                             "focus on internal/core first",
+		"review acme/api#8 note: the retries":                                        "note: the retries",
+		"review acme/api#8 see issue #12 before merging":                             "see issue #12 before merging",
+		"review acme/api#8 compare with acme/api#9":                                  "compare with acme/api#9",
+		"review https://forge.example/acme/api/pull/8 read https://docs.example/x/y": "read https://docs.example/x/y",
+	} {
+		got, _ := r.Resolve(ctx, text)
+		if got.Kind != omnibox.KindVerb || len(got.Operations) != 1 || *got.Operations[0].Unit != api8 || got.Operations[0].Guidance != want {
+			t.Errorf("%q: %+v", text, got)
+		}
+	}
+}

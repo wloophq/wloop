@@ -365,3 +365,53 @@ func TestOmniboxResolveNeverGuessesAShortLabelWhileTheRowsCannotBeRead(t *testin
 		}
 	}
 }
+
+func TestOmniboxResolveVerbCarriesTheActionsGuidanceAndItsInput(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	op := resolve(t, r, "revisar acme/api#99 focus on the migration").Preview.Operations[0]
+	if op.Guidance != "focus on the migration" {
+		t.Errorf("guidance %q", op.Guidance)
+	}
+	var spec api.ActionSpec
+	for _, s := range r.s.servedSpecs() {
+		if s.ID == "review" {
+			spec = s
+		}
+	}
+	if spec.Input == nil || op.Input == nil || *op.Input != *spec.Input {
+		t.Errorf("the operation asks %+v, the action's spec %+v", op.Input, spec.Input)
+	}
+}
+
+func TestOmniboxPreviewDropsGuidanceAnActionDoesNotTake(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	var plain string
+	for _, s := range r.s.servedSpecs() {
+		if s.Input == nil {
+			plain = s.ID
+			break
+		}
+	}
+	if plain == "" {
+		t.Fatal("every served action takes guidance")
+	}
+	ops := r.s.asking(context.Background(), []api.OmniboxOperation{{Op: "action", Unit: &unheldPR, Action: plain, Guidance: "stray words"}})
+	if ops[0].Guidance != "" || ops[0].Input != nil {
+		t.Errorf("%s: %+v", plain, ops[0])
+	}
+}
+
+func TestOmniboxPreviewCutsGuidanceAtItsMax(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	nudge, _ := r.s.loaded().Registry.Get("nudge")
+	if nudge.Guidance.Max == 0 {
+		t.Fatal("the nudge manifest sets no guidance.max")
+	}
+	ops := r.s.asking(context.Background(), []api.OmniboxOperation{{Op: "action", Unit: &unheldPR, Action: "nudge", Guidance: strings.Repeat("é", nudge.Guidance.Max+100)}})
+	if n := len([]rune(ops[0].Guidance)); n != nudge.Guidance.Max {
+		t.Errorf("guidance of %d runes, max %d", n, nudge.Guidance.Max)
+	}
+}

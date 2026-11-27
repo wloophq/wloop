@@ -46,6 +46,7 @@ export interface Omni {
   took: number;
   acting: boolean;
   acted: { resolved: J; error: string; text: string } | null;
+  guide: { id: string; text: string } | null;
 }
 
 // OmniEnv is what the omnibox reaches: the daemon, the timers, the page it opens links in, the unit actions it
@@ -57,7 +58,7 @@ export interface OmniEnv {
   clear: (id: unknown) => void;
   now: () => number;
   open: (href: string) => void;
-  act: (u: Unit, id: string, copies: boolean, row?: J) => Promise<unknown>;
+  act: (u: Unit, id: string, copies: boolean, row?: J, guidance?: string) => Promise<unknown>;
   claim: () => Claim;
   settle: (name: string, out: J, claim: Claim) => Promise<boolean>;
   confirm: (text: string) => Promise<boolean> | boolean;
@@ -70,7 +71,7 @@ export function omniboxNew(panel = false, items: PaletteItem[] = []): Omni {
   return {
     panel: !!panel, items: items || [], text: "", seq: 0, askSeq: 0, abort: null, timer: null, search: null, resolved: null,
     answer: null, askError: "", asking: false, follow: [], reply: "", ops: [], checked: [], ran: null, runError: "", sel: "",
-    answered: "", searched: "", answering: Promise.resolve(), pending: Promise.resolve(), took: 0, acting: false, acted: null,
+    answered: "", searched: "", answering: Promise.resolve(), pending: Promise.resolve(), took: 0, acting: false, acted: null, guide: null,
   };
 }
 
@@ -86,6 +87,7 @@ function omniboxOps(st: Omni, ops: OmniOp[]): void {
 export function omniboxType(st: Omni, text: string, env: OmniEnv): Promise<void> {
   st.text = text;
   st.sel = "";
+  st.guide = null;
   st.answer = null;
   st.askError = "";
   st.ran = null;
@@ -191,18 +193,45 @@ export function omniboxUnitHref(unit: J): string {
   return "#" + routeHash("", unit.unit.provider + ":" + unit.unit.key);
 }
 
+// omniboxGuided says whether a unit action asks its guidance in the unit's card: one whose input is free text.
+export const omniboxGuided = (spec: J): boolean => !!spec && !!spec.input && spec.input.kind === "text";
+
+// omniboxGuide is the action whose guidance the unit's card asks now, with its spec, or null.
+export function omniboxGuide(st: Omni): J {
+  const unit = omniboxUnit(st);
+  if (!st.guide || !unit) return null;
+  const id = st.guide.id;
+  return (unit.actions || []).find((a: J) => a.id === id) || null;
+}
+
+// omniboxGuideReady says whether the card's guidance may run: any text, or some when the action requires it.
+export function omniboxGuideReady(st: Omni): boolean {
+  const spec = omniboxGuide(st);
+  return !!spec && !(spec.input.required && !st.guide!.text.trim());
+}
+
 // omniboxUnitAction runs one of a resolved unit's catalog actions as its detail would, then refreshes; a unit
-// the loop does not hold has no detail, and acts on the row its resolution carries. The
-// floating panel holds no detail and asks for no input: it runs the action itself, one whose guidance is
-// optional without it, and hands one that needs an input to the main window.
-export async function omniboxUnitAction(st: Omni, env: OmniEnv, id: string): Promise<void> {
+// the loop does not hold has no detail, and acts on the row its resolution carries. An action that takes free
+// text first asks it in the unit's card, and runs when omniboxGuideRun sends it. The floating panel holds no
+// detail: it runs the action itself, and hands one that needs another input to the main window.
+export async function omniboxUnitAction(st: Omni, env: OmniEnv, id: string, guidance?: string): Promise<void> {
   const unit = omniboxUnit(st);
   const spec = (unit.actions || []).find((a: J) => a.id === id) || { id };
-  const needsInput = !!spec.input && (spec.input.kind !== "text" || !!spec.input.required);
-  if (st.panel) return needsInput ? env.open(omniboxUnitHref(unit)) : omniboxPanelAct(st, env, spec);
-  await env.act(unit.unit, id, !!spec.copies, unit.row);
+  if (omniboxGuided(spec) && guidance === undefined) {
+    if (!st.guide || st.guide.id !== id) st.guide = { id, text: "" };
+    return;
+  }
+  st.guide = null;
+  if (st.panel) return spec.input && !omniboxGuided(spec) ? env.open(omniboxUnitHref(unit)) : omniboxPanelAct(st, env, spec, guidance);
+  await env.act(unit.unit, id, !!spec.copies, unit.row, guidance);
   if (env.changed) env.changed();
   if (!unit.held) await omniboxResolveAgain(st, env);
+}
+
+// omniboxGuideRun runs the action the card asks guidance for, with the text typed there; empty runs it without.
+export function omniboxGuideRun(st: Omni, env: OmniEnv): Promise<void> {
+  if (!omniboxGuideReady(st) || st.acting) return Promise.resolve();
+  return omniboxUnitAction(st, env, st.guide!.id, st.guide!.text.trim());
 }
 
 // omniboxResolveAgain asks for the text's resolution again, after an action changed what the loop holds; an
@@ -224,7 +253,7 @@ export function omniboxActed(st: Omni): { error: string; text: string } | null {
 // posts the action on the basis that row rests on and hides the panel. An action that copies claims the
 // clipboard while the click lasts and puts its copy there. A failed action says why, and a refused write shows
 // the text to copy by hand.
-async function omniboxPanelAct(st: Omni, env: OmniEnv, spec: J): Promise<void> {
+async function omniboxPanelAct(st: Omni, env: OmniEnv, spec: J, guidance?: string): Promise<void> {
   if (st.acting) return;
   st.acting = true;
   st.acted = null;
@@ -244,7 +273,10 @@ async function omniboxPanelAct(st: Omni, env: OmniEnv, spec: J): Promise<void> {
         if (claim) claim.pending.reject(new Error("cancelled"));
         return;
       }
-      out = await env.post(unitPath(u, spec.id), offered.basis ? { source: "cockpit", basis: offered.basis } : { source: "cockpit" });
+      const body: J = { source: "cockpit" };
+      if (offered.basis) body.basis = offered.basis;
+      if (guidance) body.guidance = guidance;
+      out = await env.post(unitPath(u, spec.id), body);
       if (out.error) throw new Error(out.error);
     } catch (err) {
       if (claim) claim.pending.reject(err);
@@ -262,16 +294,17 @@ async function omniboxPanelAct(st: Omni, env: OmniEnv, spec: J): Promise<void> {
 }
 
 // omniboxAct runs action id on u as the unit's detail does: through act, on the row the detail serves, which
-// asks for the action's confirm and input, or on row when the unit serves no detail. An action that copies
-// claims the clipboard before the first await.
-export async function omniboxAct(u: Unit, id: string, copies: boolean = !!(state.specs.byId[id] || {}).copies, row?: J): Promise<boolean | undefined> {
+// asks for the action's confirm and input, or on row when the unit serves no detail. Guidance given is the
+// input, and none is asked. An action that copies claims the clipboard before the first await.
+export async function omniboxAct(u: Unit, id: string, copies: boolean = !!(state.specs.byId[id] || {}).copies, row?: J, guidance?: string): Promise<boolean | undefined> {
   const claim = copies ? claimCopy() : null;
   try {
     const d = row ? { row } : await getJSON(unitPath(u));
     await refreshSpecs([d.row]);
     const input = (state.specs.byId[id] || {}).input;
     const extra: ActExtra = claim ? { claim } : {};
-    if (input && (input.kind === "text" || input.kind === "answer")) {
+    if (guidance !== undefined) extra.guidance = guidance;
+    else if (input && (input.kind === "text" || input.kind === "answer")) {
       const v = await askInput({ label: input.label || id, placeholder: input.placeholder });
       if (v === null || v === undefined) return undefined;
       extra.guidance = String(v).trim();
@@ -397,11 +430,16 @@ export function omniboxOpLabel(op: OmniOp): string {
   return op.op;
 }
 
-// omniboxEdits are the fields of a proposed operation a person may change before running it.
+// omniboxEdits are the fields of an operation the agent proposed that a person may change before running it.
 export function omniboxEdits(op: OmniOp): { name: string; label: string }[] {
   if (op.op === "start") return [{ name: "brief", label: t("Brief") }, { name: "repo", label: t("Repository") }];
   if (op.op === "capture") return [{ name: "title", label: t("Title") }];
   return [];
+}
+
+// omniboxOpInput is the free-text guidance an action operation takes, worded by its spec, or null.
+export function omniboxOpInput(op: OmniOp): J {
+  return op.op === "action" && op.input && op.input.kind === "text" ? op.input : null;
 }
 
 // omniboxOptionID is the element id of the choice at i.
