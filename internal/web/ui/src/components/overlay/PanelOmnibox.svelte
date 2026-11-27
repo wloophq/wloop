@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { followStrings } from "../../lib/i18n.svelte";
   import { getJSON } from "../../state/api";
+  import { closeOverlays } from "../../state/overlays.svelte";
   import { checkPanelBuild } from "../../state/build.svelte";
   import Omnibox from "./Omnibox.svelte";
   import OverlayStack from "./OverlayStack.svelte";
@@ -17,7 +18,10 @@
   onMount(() => {
     document.body.classList.add("panel-omnibox");
     const stop = panelFollow(window, document, {
-      reset: () => shown++,
+      reset: () => {
+        closeOverlays();
+        shown++;
+      },
       health: () => getJSON("/api/health"),
       strings: (stamp) => followStrings(stamp, getJSON),
       build: checkPanelBuild,

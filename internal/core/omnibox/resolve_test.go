@@ -172,3 +172,20 @@ func TestResolveVerbKeepsTheTextAfterItsRefsAsGuidance(t *testing.T) {
 		t.Errorf("a task verb took guidance: %+v", got)
 	}
 }
+
+func TestResolveGuidanceMayNameRefsAndPaths(t *testing.T) {
+	r, _ := resolver()
+	ctx := context.Background()
+	for text, want := range map[string]string{
+		"review acme/api#8 focus on internal/core first":                             "focus on internal/core first",
+		"review acme/api#8 note: the retries":                                        "note: the retries",
+		"review acme/api#8 see issue #12 before merging":                             "see issue #12 before merging",
+		"review acme/api#8 compare with acme/api#9":                                  "compare with acme/api#9",
+		"review https://forge.example/acme/api/pull/8 read https://docs.example/x/y": "read https://docs.example/x/y",
+	} {
+		got, _ := r.Resolve(ctx, text)
+		if got.Kind != omnibox.KindVerb || len(got.Operations) != 1 || *got.Operations[0].Unit != api8 || got.Operations[0].Guidance != want {
+			t.Errorf("%q: %+v", text, got)
+		}
+	}
+}

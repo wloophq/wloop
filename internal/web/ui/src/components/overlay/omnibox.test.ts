@@ -508,6 +508,76 @@ describe("omnibox_test.go", () => {
     expect(o.log.opened).toEqual([]);
   });
 
+  test("the main window's own act runs the card's guidance and asks for nothing more", async () => {
+    net.fetch = async () => new Response(JSON.stringify({ row: { unit: { provider: "alpha", key: "acme/api#8" }, actions: [{ id: "review", enabled: true }] } }));
+    vi.mocked(loaders.refreshSpecs).mockResolvedValue();
+    const extras: J[] = [];
+    vi.mocked(actions.act).mockImplementation(async (_row: J, _id: string, extra: J) => { extras.push(extra); return true; });
+    state.specs = { version: "", byId: { review: REVIEW } };
+    const f = fake({ resolve: unitWith(REVIEW) });
+    const env: Partial<OmniEnv> = { ...f.env };
+    delete env.act;
+    const r = render(Omnibox, { onclose: () => {}, env });
+    const field = r.container.querySelector(".omni-input") as HTMLInputElement;
+    field.value = ADDRESS;
+    await fireEvent.input(field);
+    await settle();
+    const review = [...r.container.querySelectorAll("button")].find((b) => b.textContent === "Review")!;
+    await fireEvent.click(review);
+    await settle();
+    const guide = r.container.querySelector(".omni-guide input") as HTMLInputElement;
+    guide.value = "focus on X";
+    await fireEvent.input(guide);
+    await fireEvent.keyDown(guide, { key: "Enter" });
+    await settle();
+    expect(extras).toEqual([{ guidance: "focus on X" }]);
+    expect(overlays.stack).toEqual([]);
+  });
+
+  test("running the card's guidance gives the focus back to the omnibox's field", async () => {
+    for (const panel of [false, true]) {
+      const o = mount({ resolve: unitWith(REVIEW) }, { panel });
+      await o.type(ADDRESS);
+      await fireEvent.click(o.button("Review"));
+      await settle();
+      await fireEvent.keyDown(o.q(".omni-guide input")[0], { key: "Enter" });
+      await settle();
+      expect(document.activeElement).toBe(o.field);
+      cleanup();
+    }
+  });
+
+  test("clicking the action again keeps what the card's guidance holds", async () => {
+    const o = mount({ resolve: unitWith(REVIEW) });
+    await o.type(ADDRESS);
+    await fireEvent.click(o.button("Review"));
+    await settle();
+    const field = o.q(".omni-guide input")[0] as HTMLInputElement;
+    field.value = "keep me";
+    await fireEvent.input(field);
+    await fireEvent.click(o.button("Review"));
+    await settle();
+    expect((o.q(".omni-guide input")[0] as HTMLInputElement).value).toBe("keep me");
+    expect(o.log.acts).toEqual([]);
+  });
+
+  test("the panel keeps the card's guidance while an action is still running", async () => {
+    const o = mount({ resolve: unitWith(REVIEW), actions: { "/api/units/alpha/acme%2Fapi%238/review": new Promise(() => {}) } }, { panel: true });
+    await o.type(ADDRESS);
+    await fireEvent.click(o.button("Review"));
+    await settle();
+    await fireEvent.keyDown(o.q(".omni-guide input")[0], { key: "Enter" });
+    await settle();
+    await fireEvent.click(o.button("Review"));
+    await settle();
+    const field = o.q(".omni-guide input")[0] as HTMLInputElement;
+    field.value = "later";
+    await fireEvent.input(field);
+    await fireEvent.keyDown(field, { key: "Enter" });
+    await settle();
+    expect((o.q(".omni-guide input")[0] as HTMLInputElement).value).toBe("later");
+  });
+
   test("Esc in the card's guidance puts it away and keeps the omnibox open", async () => {
     const o = mount({ resolve: unitWith(REVIEW) }, { panel: true });
     await o.type(ADDRESS);
@@ -643,6 +713,18 @@ describe("omnibox_test.go", () => {
     state.specs = { version: "", byId: { review: { id: "review", input: { kind: "text" } } } };
     await omniboxAct({ provider: "alpha", key: "acme/api#8" }, "review", false, undefined, "focus on X");
     expect(extras).toEqual([{ guidance: "focus on X" }]);
+    expect(overlays.stack).toEqual([]);
+  });
+
+  test("the panel drops a question it asked when it shows again", async () => {
+    net.fetch = async () => new Response(JSON.stringify({ strings: "", build: "" }));
+    render(PanelOmnibox, { hide: () => {} });
+    const asked = askConfirm("Take it over?");
+    flushSync();
+    window.dispatchEvent(new Event("blur"));
+    window.dispatchEvent(new Event("focus"));
+    await settle();
+    expect(await asked).toBe(false);
     expect(overlays.stack).toEqual([]);
   });
 

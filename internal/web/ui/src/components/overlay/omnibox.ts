@@ -206,7 +206,7 @@ export async function omniboxUnitAction(st: Omni, env: OmniEnv, id: string, guid
   const unit = omniboxUnit(st);
   const spec = (unit.actions || []).find((a: J) => a.id === id) || { id };
   if (omniboxGuided(spec) && guidance === undefined) {
-    st.guide = { id, text: "" };
+    if (!st.guide || st.guide.id !== id) st.guide = { id, text: "" };
     return;
   }
   st.guide = null;
@@ -218,7 +218,7 @@ export async function omniboxUnitAction(st: Omni, env: OmniEnv, id: string, guid
 
 // omniboxGuideRun runs the action the card asks guidance for, with the text typed there; empty runs it without.
 export function omniboxGuideRun(st: Omni, env: OmniEnv): Promise<void> {
-  if (!omniboxGuideReady(st)) return Promise.resolve();
+  if (!omniboxGuideReady(st) || st.acting) return Promise.resolve();
   return omniboxUnitAction(st, env, st.guide!.id, st.guide!.text.trim());
 }
 

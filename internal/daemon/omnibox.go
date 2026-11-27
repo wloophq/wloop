@@ -129,7 +129,7 @@ func (s *Server) omniboxRow(ctx context.Context, u unit.Unit) (row api.Row, held
 
 // asking are ops, each action with what its unit's row asks before it runs and the guidance its spec takes; a
 // row that cannot be read asks nothing here, and the run answers for it. An action that takes no guidance
-// carries none.
+// carries none, and one that does carries it cut at its max, as it will run.
 func (s *Server) asking(ctx context.Context, ops []api.OmniboxOperation) []api.OmniboxOperation {
 	rows := map[unit.Unit]api.Row{}
 	specs := s.servedSpecs()
@@ -142,6 +142,9 @@ func (s *Server) asking(ctx context.Context, ops []api.OmniboxOperation) []api.O
 		if j := slices.IndexFunc(specs, func(sp api.ActionSpec) bool { return sp.ID == op.Action }); j >= 0 && takesGuidance(specs[j].Input) {
 			in := *specs[j].Input
 			op.Input = &in
+			if r := []rune(op.Guidance); in.Max > 0 && len(r) > in.Max {
+				op.Guidance = string(r[:in.Max])
+			}
 		} else {
 			op.Guidance = ""
 		}

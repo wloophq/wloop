@@ -402,3 +402,16 @@ func TestOmniboxPreviewDropsGuidanceAnActionDoesNotTake(t *testing.T) {
 		t.Errorf("%s: %+v", plain, ops[0])
 	}
 }
+
+func TestOmniboxPreviewCutsGuidanceAtItsMax(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	nudge, _ := r.s.loaded().Registry.Get("nudge")
+	if nudge.Guidance.Max == 0 {
+		t.Fatal("the nudge manifest sets no guidance.max")
+	}
+	ops := r.s.asking(context.Background(), []api.OmniboxOperation{{Op: "action", Unit: &unheldPR, Action: "nudge", Guidance: strings.Repeat("é", nudge.Guidance.Max+100)}})
+	if n := len([]rune(ops[0].Guidance)); n != nudge.Guidance.Max {
+		t.Errorf("guidance of %d runes, max %d", n, nudge.Guidance.Max)
+	}
+}

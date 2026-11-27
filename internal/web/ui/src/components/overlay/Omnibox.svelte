@@ -49,7 +49,7 @@
       win.location().hash = href;
       if (!panel) close();
     },
-    act: (u, id, copies, row) => omniboxAct(u, id, copies, row),
+    act: (u, id, copies, row, guidance) => omniboxAct(u, id, copies, row, guidance),
     claim: () => claimCopy(),
     settle: (name, out, claim) => settleCopy(name, out, claim),
     confirm: (q) => askConfirm(q),
@@ -119,11 +119,18 @@
     if (!st.ops.length) input.focus();
   }
 
+  // guide runs the card's guidance; the field it leaves gives the focus back to the omnibox's.
+  function runGuide() {
+    const ran = omniboxGuideRun(st, env);
+    if (!st.guide) input.focus();
+    return ran;
+  }
+
   function guideKey(e: KeyboardEvent) {
     if (e.key !== "Enter" || e.isComposing) return;
     e.preventDefault();
     e.stopPropagation();
-    void omniboxGuideRun(st, env);
+    void runGuide();
   }
 
   function focusNow(el: HTMLElement) {
@@ -188,7 +195,7 @@
           <div class="omni-guide">
             <input type="text" class="omni-edit" aria-label={guide.input.label || t("Guidance")} placeholder={guide.input.placeholder || ""} maxlength={guide.input.max || undefined}
               data-focus="omni:guide" bind:value={st.guide.text} onkeydown={guideKey} {@attach focusNow} />
-            <button type="button" class="act primary" disabled={!omniboxGuideReady(st)} onclick={() => omniboxGuideRun(st, env)}><kbd>↵</kbd> {guide.label || guide.id}</button>
+            <button type="button" class="act primary" disabled={!omniboxGuideReady(st)} onclick={runGuide}><kbd>↵</kbd> {guide.label || guide.id}</button>
           </div>
         {/if}
         {#if resolved.unit.why}<p class="omni-why">{t(resolved.unit.why, resolved.unit.params || {})}</p>{/if}
