@@ -218,6 +218,34 @@ func PageOnce[T any](ctx context.Context, key string, load func() (T, error)) (T
 	return Once(WithPass(ctx, p), key, load)
 }
 
+// PageLookup is Lookup over a page: in a page, when all is not nil, every value is loaded once for the page
+// under key with all, and a k it does not hold has none; one reads k alone otherwise.
+func PageLookup[K comparable, V any](ctx context.Context, key string, k K, all func() (map[K]V, error), one func() (V, bool, error)) (V, bool, error) {
+	if !InPage(ctx) || all == nil {
+		return one()
+	}
+	m, err := PageOnce(ctx, key, all)
+	v, held := m[k]
+	return v, held && err == nil, err
+}
+
+// PageLookupSome is PageLookup over an all that loads some of the values, such as the open ones: one reads a k
+// it does not hold alone. Each value all holds equals what one reads.
+func PageLookupSome[K comparable, V any](ctx context.Context, key string, k K, all func() (map[K]V, error), one func() (V, bool, error)) (V, bool, error) {
+	if !InPage(ctx) || all == nil {
+		return one()
+	}
+	m, err := PageOnce(ctx, key, all)
+	if err != nil {
+		var zero V
+		return zero, false, err
+	}
+	if v, held := m[k]; held {
+		return v, true, nil
+	}
+	return one()
+}
+
 // PageTask is task id as the pass of the page ctx serves holds it; false outside a page or a pass, or when the
 // pass does not hold it, as for an alias of a merged task.
 func PageTask(ctx context.Context, id task.ID) (task.Task, bool) {

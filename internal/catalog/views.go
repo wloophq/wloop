@@ -18,14 +18,25 @@ import (
 )
 
 // View says whether task t, whose facts f holds, is in view id of def, as its when says now. A view over
-// gates, one that lists nothing and one def does not declare hold no task.
+// gates, one that lists nothing and one def does not declare hold no task, and a view that does not ask for
+// closed tasks holds no closed one the loop no longer holds.
 func View(def intentload.ViewsDef, id string, t task.Task, f workflow.Facts) (bool, error) {
 	return ViewAt(def, id, t, f, time.Now())
 }
 
 // ViewAt is View with now the time the view's when reads as now.
-func ViewAt(def intentload.ViewsDef, id string, _ task.Task, f workflow.Facts, now time.Time) (bool, error) {
+func ViewAt(def intentload.ViewsDef, id string, t task.Task, f workflow.Facts, now time.Time) (bool, error) {
+	if !admits(def, id, t, HeldBy(f)) {
+		return false, nil
+	}
 	return match(def, id, task.OverTasks, f, now)
+}
+
+// admits says whether view id of def may hold t as far as t's category goes: t is open, the loop still holds
+// it, or the view lists closed tasks too.
+func admits(def intentload.ViewsDef, id string, t task.Task, held bool) bool {
+	v, ok := def.View(id)
+	return ok && (v.Closed || t.Open() || held)
 }
 
 // GateView says whether gate g, whose facts f holds, is in view id of def. A view over tasks, one that lists
@@ -185,22 +196,63 @@ func compareFact(a, b any) int {
 type Lens struct {
 	Loaded func() *intentload.Loaded
 	Facts  func(ctx context.Context, t task.Task) (workflow.Facts, error)
-	Now    func() time.Time
+	// Held says whether the loop still holds t: an open gate or a failed delivery waits on the user over it,
+	// or an agent's turn runs on it; nil: what Facts says of them.
+	Held func(ctx context.Context, t task.Task) (bool, error)
+	Now  func() time.Time
 }
 
 // Eval says whether t is in view.
 func (l Lens) Eval(ctx context.Context, view string, t task.Task) (bool, error) {
+	def := l.Loaded().Views
+	if v, ok := def.View(view); ok && !v.Closed && !t.Open() {
+		held, err := l.held(ctx, t)
+		if err != nil {
+			return false, err
+		}
+		if !admits(def, view, t, held) {
+			return false, nil
+		}
+	}
 	f, err := l.facts(ctx, view, t)
 	if err != nil {
 		return false, err
 	}
-	return ViewAt(l.Loaded().Views, view, t, f, l.Now())
+	return match(def, view, task.OverTasks, f, l.Now())
 }
 
 // Sort orders a view's tasks as the profile sorts it.
 func (l Lens) Sort(ctx context.Context, view string, ts []task.Task) error {
 	return Sort(l.Loaded().Views, view, ts, func(t task.Task) (workflow.Facts, error) { return l.facts(ctx, view, t) })
 }
+
+// held is l.Held, else what t's facts say of its open gates, its decisions and its running turns.
+func (l Lens) held(ctx context.Context, t task.Task) (bool, error) {
+	if l.Held != nil {
+		return l.Held(ctx, t)
+	}
+	if l.Facts == nil {
+		return false, nil
+	}
+	f, err := l.Facts(HeldReads(ctx), t)
+	if err != nil {
+		return false, err
+	}
+	return HeldBy(f), nil
+}
+
+// HeldBy says whether facts f hold an open gate, a decision the user owes or a running turn.
+func HeldBy(f workflow.Facts) bool {
+	gates, _ := f["task.gates_open"].(int)
+	decisions, _ := f["task.decisions"].([]string)
+	turns, _ := f["task.turns_running"].(int)
+	return gates > 0 || len(decisions) > 0 || turns > 0
+}
+
+var heldReads = []string{"task.gates_open", "task.decisions", "task.turns_running"}
+
+// HeldReads narrows ctx's reads to those HeldBy reads.
+func HeldReads(ctx context.Context) context.Context { return workflow.WithReads(ctx, heldReads...) }
 
 func (l Lens) facts(ctx context.Context, view string, t task.Task) (workflow.Facts, error) {
 	in := l.Loaded()

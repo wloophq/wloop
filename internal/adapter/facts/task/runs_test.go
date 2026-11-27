@@ -1,9 +1,11 @@
 package facttask_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
@@ -56,4 +58,44 @@ func TestAProjectHasANextActionOfMineOnlyWhenAReadyChildIsOwedByMe(t *testing.T)
 			t.Errorf("%s: children_ready %v, children_mine %v, want true and %v", id, f["task.children_ready"], f["task.children_mine"], want)
 		}
 	}
+}
+
+// TestASequentialProjectsNextIsItsFirstOpenChild holds task.sequential_next on the open child of a sequential
+// project first by position, a closed child before it aside, alone and in a pass over every task.
+func TestASequentialProjectsNextIsItsFirstOpenChild(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	e.task(task.Task{ID: "p-seq", State: "next", Category: task.CategoryReady, Title: "p", Sequential: true, Props: task.Props{task.PropKind: {Text: task.KindProject}}})
+	e.task(task.Task{ID: "p-any", State: "next", Category: task.CategoryReady, Title: "q", Props: task.Props{task.PropKind: {Text: task.KindProject}}})
+	e.task(task.Task{ID: "c-done", State: "done", Category: task.CategoryDone, Title: "done first", Parent: "p-seq", Position: 0})
+	e.task(task.Task{ID: "c-two", State: "next", Category: task.CategoryReady, Title: "second", Parent: "p-seq", Position: 2})
+	e.task(task.Task{ID: "c-one", State: "next", Category: task.CategoryReady, Title: "first open", Parent: "p-seq", Position: 1})
+	e.task(task.Task{ID: "c-any", State: "next", Category: task.CategoryReady, Title: "any", Parent: "p-any", Position: 0})
+	want := map[task.ID]bool{"c-one": true, "c-two": false, "c-any": false}
+	all, err := e.db.Tasks().Tasks(context.Background(), task.Query{All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pass := coretasks.WithPass(context.Background(), &coretasks.Pass{Tasks: all})
+	for id, next := range want {
+		alone := e.facts(id)
+		in, err := e.p.TaskFacts(pass, taskOf(t, all, id))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if alone["task.sequential_next"] != next || in["task.sequential_next"] != next {
+			t.Errorf("%s: sequential_next alone %v, in a pass %v, want %v", id, alone["task.sequential_next"], in["task.sequential_next"], next)
+		}
+	}
+}
+
+func taskOf(t *testing.T, all []task.Task, id task.ID) task.Task {
+	t.Helper()
+	for _, e := range all {
+		if e.ID == id {
+			return e
+		}
+	}
+	t.Fatalf("no task %s", id)
+	return task.Task{}
 }

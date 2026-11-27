@@ -580,6 +580,11 @@
         "additionalProperties": false,
         "description": "A view, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.",
         "properties": {
+          "closed": {
+            "default": false,
+            "description": "The view lists closed tasks too, those of a done or dropped category. Without it the view lists the open tasks and the closed ones the loop still holds (an open gate or a failed delivery waits on the user over it, or an agent's turn runs on it), and reads no fact of any other closed task: its `when` never sees one.",
+            "type": "boolean"
+          },
           "counted": {
             "default": true,
             "description": "The rail draws the view's number; false draws none, and the daemon counts the view only when the badge or a review step names it.",

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/placement"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -30,7 +31,7 @@ func (s *Service) Place(ctx context.Context, u unit.Unit, item string) (placemen
 
 func (s *Service) place(ctx context.Context, u unit.Unit, item string) (placement.Placement, error) {
 	if s.Overrides != nil {
-		p, ok, err := s.Overrides.Override(ctx, u)
+		p, ok, err := s.override(ctx, u)
 		if err != nil {
 			return placement.Placement{}, fmt.Errorf("reading the placement override of %s: %w", u.Label(), err)
 		}
@@ -65,4 +66,13 @@ func (s *Service) place(ctx context.Context, u unit.Unit, item string) (placemen
 		}
 	}
 	return placement.Placement{}, fmt.Errorf("%s: %w", u.Label(), ErrUnplaced)
+}
+
+// override is u's override; in a page, every override is read once for all when the store reads them so.
+func (s *Service) override(ctx context.Context, u unit.Unit) (placement.Placement, bool, error) {
+	var all func() (map[unit.Unit]placement.Placement, error)
+	if a, ok := s.Overrides.(placement.AllOverrides); ok {
+		all = func() (map[unit.Unit]placement.Placement, error) { return a.All(ctx) }
+	}
+	return coretasks.PageLookup(ctx, "placement.overrides", u, all, func() (placement.Placement, bool, error) { return s.Overrides.Override(ctx, u) })
 }

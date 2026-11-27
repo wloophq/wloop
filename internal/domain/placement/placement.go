@@ -30,6 +30,11 @@ type Overrides interface {
 	SetOverride(ctx context.Context, u unit.Unit, p Placement) error // zero Placement clears
 }
 
+// AllOverrides is an optional capability of Overrides: every unit's override, which a page reads once for all.
+type AllOverrides interface {
+	All(ctx context.Context) (map[unit.Unit]Placement, error)
+}
+
 // Hints is the extraction's suggestion; nil none.
 type Hints interface {
 	Suggested(ctx context.Context, u unit.Unit, item string) (Placement, bool, error)

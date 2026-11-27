@@ -92,13 +92,14 @@ const facetsTable = "facets"
 // itself, such as the review; Group the fact it groups by, Sort the facts it
 // sorts by, Key the key that jumps to it, HideDisabled whether it leaves out
 // what a disabled plugin holds, RemoveClean whether it offers to remove its
-// tasks' clean workspaces, and Empty what it shows when it lists nothing.
+// tasks' clean workspaces, Closed whether it lists closed tasks besides the
+// open ones, and Empty what it shows when it lists nothing.
 // WhenText and SortText are its when and sort as the profile writes them.
 type ViewDef struct {
 	ID, Label, Summary, Over, Group, Key, Empty string
 	WhenText, SortText                          string
 	Sort                                        []SortKey
-	HideDisabled, RemoveClean                   bool
+	HideDisabled, RemoveClean, Closed           bool
 	// Rail says that the rail lists the view; a view only the home, a queue or search reads has it false.
 	Rail     bool
 	When     workflow.Predicate
@@ -208,6 +209,7 @@ type mView struct {
 	Key          *string `toml:"key"`
 	HideDisabled *bool   `toml:"hide_disabled"`
 	RemoveClean  *bool   `toml:"remove_clean"`
+	Closed       *bool   `toml:"closed"`
 	Rail         *bool   `toml:"rail"`
 	Layout       *string `toml:"layout"`
 	Section      *string `toml:"section"`
@@ -575,6 +577,9 @@ func (l *viewsLoad) mergeViews(s *sheet, views map[string]mView) {
 		}
 		if m.RemoveClean != nil {
 			v.RemoveClean = *m.RemoveClean
+		}
+		if m.Closed != nil {
+			v.Closed = *m.Closed
 		}
 		if m.Rail != nil {
 			v.Rail = *m.Rail
