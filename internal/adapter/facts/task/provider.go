@@ -565,33 +565,34 @@ func (p *Provider) family(ctx context.Context, e task.Task, f workflow.Facts) er
 		return nil
 	}
 	f["task.review_due"] = e.IsProject() && e.Open() && e.ReviewDue(p.d.Clock.Now())
-	var all []task.Task
-	if pass, ok := coretasks.PassOf(ctx); ok {
-		all = pass.Tasks
-	} else {
-		var err error
-		if all, err = p.d.Tasks.Tasks(ctx, task.Query{}); err != nil {
-			return err
+	fam, err := coretasks.Once(ctx, passFamily, func() (families, error) {
+		if pass, ok := coretasks.PassOf(ctx); ok {
+			return familiesOf(pass.Tasks), nil
 		}
+		all, err := p.d.Tasks.Tasks(ctx, task.Query{})
+		return familiesOf(all), err
+	})
+	if err != nil {
+		return err
 	}
-	var first *task.Task
 	var ready []task.Task
-	sequential := false
-	for i, o := range all {
-		switch {
-		case o.ID == e.Parent:
-			sequential = o.Sequential && o.IsProject()
-		case !o.Open():
-		case o.Parent == e.ID && o.Category == task.CategoryReady:
+	for _, o := range fam.open[e.ID] {
+		if o.Category == task.CategoryReady {
 			f["task.children_ready"] = true
 			ready = append(ready, o)
 		}
-		if e.Parent != "" && o.Parent == e.Parent && o.Open() &&
-			(first == nil || cmp.Or(cmp.Compare(o.Position, first.Position), cmp.Compare(o.ID, first.ID)) < 0) {
-			first = &all[i]
-		}
 	}
-	f["task.sequential_next"] = sequential && first != nil && first.ID == e.ID
+	if e.Parent != "" {
+		parent, ok := fam.byID[e.Parent]
+		sequential := ok && parent.Sequential && parent.IsProject()
+		var first *task.Task
+		for i, o := range fam.open[e.Parent] {
+			if first == nil || cmp.Or(cmp.Compare(o.Position, first.Position), cmp.Compare(o.ID, first.ID)) < 0 {
+				first = &fam.open[e.Parent][i]
+			}
+		}
+		f["task.sequential_next"] = sequential && first != nil && first.ID == e.ID
+	}
 	for _, c := range ready {
 		cf, err := p.TaskFacts(ctx, c)
 		if err != nil {
@@ -603,6 +604,23 @@ func (p *Provider) family(ctx context.Context, e task.Task, f workflow.Facts) er
 		}
 	}
 	return nil
+}
+
+// families are tasks by id and the open ones by their parent, as family reads them.
+type families struct {
+	byID map[task.ID]task.Task
+	open map[task.ID][]task.Task
+}
+
+func familiesOf(all []task.Task) families {
+	f := families{byID: make(map[task.ID]task.Task, len(all)), open: map[task.ID][]task.Task{}}
+	for _, o := range all {
+		f.byID[o.ID] = o
+		if o.Parent != "" && o.Open() {
+			f.open[o.Parent] = append(f.open[o.Parent], o)
+		}
+	}
+	return f
 }
 
 // placement is the repository of the first unit of us that has one.
@@ -851,6 +869,7 @@ const (
 	passTurns     = "facts.turns"
 	passSettled   = "facts.settled."
 	passTask      = "facts.task."
+	passFamily    = "facts.family"
 )
 
 // items are the items of units; those of the pass ctx carries are read once for every unit of it.
