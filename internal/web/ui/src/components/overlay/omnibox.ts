@@ -118,6 +118,7 @@ export function omniboxType(st: Omni, text: string, env: OmniEnv): Promise<void>
       });
       const resolved = env.post("/api/omnibox/resolve", { text }, ctl.signal).catch(() => null).then((resolved) => {
         if (seq === st.seq) {
+          if (st.searched !== text) st.search = null;
           st.resolved = resolved;
           st.answered = text;
           st.took = env.now() - started;
@@ -329,18 +330,21 @@ function resolvedChoice(id: string): boolean {
 }
 
 // omniboxEnter is Enter in the field: run the selected choice once the answer to the text typed is in, and the
-// search too when the choice is one of its results; with Cmd it asks the agent.
+// search too when the choice is one of its results, and nothing when that result left the newer search; with Cmd
+// it asks the agent.
 export async function omniboxEnter(st: Omni, env: OmniEnv, ask: boolean): Promise<unknown> {
   if (ask) return omniboxAsk(st, env);
   const text = st.text;
   if (st.answered !== text) await st.answering;
   if (st.answered !== text || st.text !== text) return undefined;
+  const sel = st.sel;
   let choices = omniboxChoices(st, env);
-  if (st.searched !== text && !resolvedChoice(omniboxSelected(st, choices))) {
+  if (st.searched !== text && !resolvedChoice(sel || omniboxSelected(st, choices))) {
     await st.pending;
     if (st.text !== text) return undefined;
     choices = omniboxChoices(st, env);
   }
+  if (sel && !choices.some((c) => c.id === sel)) return undefined;
   const pick = choices.find((c) => c.id === omniboxSelected(st, choices));
   return pick ? pick.run() : undefined;
 }

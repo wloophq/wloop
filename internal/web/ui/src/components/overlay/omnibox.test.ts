@@ -9,7 +9,7 @@ import * as actions from "../../state/actions.svelte";
 import * as loaders from "../../state/loaders.svelte";
 import { resetStore } from "../../testing/reset.svelte";
 import Omnibox from "./Omnibox.svelte";
-import { omniboxAct, omniboxEnter, omniboxNew, omniboxTrap, omniboxType, panelFollow, type OmniEnv } from "./omnibox";
+import { omniboxAct, omniboxChoices, omniboxEnter, omniboxNew, omniboxTrap, omniboxType, panelFollow, type OmniEnv } from "./omnibox";
 import PanelOmnibox from "./PanelOmnibox.svelte";
 import { settle } from "../../testing/settle";
 
@@ -302,6 +302,42 @@ describe("omnibox_test.go", () => {
     answer(retriesSearch().retries);
     await entered;
     expect(f.log.opened).toEqual(["#task=t-1"]);
+  });
+
+  test("a resolution for newer text drops the older text's search", async () => {
+    const r = pastedUnit();
+    r[ADDRESS].preview = { operations: [{ op: "action", unit: r[ADDRESS].unit.unit, action: "track" }] };
+    const f = fake({ search: retriesSearch(), resolve: r });
+    const st = omniboxNew(false, []);
+    await omniboxType(st, "retries", f.env);
+    expect(st.search.groups.length).toBe(2);
+    const get = f.env.get;
+    f.env.get = (url, signal) => (url.startsWith("/api/search") ? new Promise<J>(() => {}) : get(url, signal));
+    void omniboxType(st, ADDRESS, f.env);
+    await settle();
+    expect(st.answered).toBe(ADDRESS);
+    expect(st.search).toBeNull();
+    expect(omniboxChoices(st, f.env).map((c) => c.id)).toEqual(["ops", "unit"]);
+  });
+
+  test("Enter on a result the newer search no longer lists runs nothing", async () => {
+    const r = pastedUnit();
+    r[ADDRESS].preview = { operations: [{ op: "action", unit: r[ADDRESS].unit.unit, action: "track" }] };
+    const f = fake({ search: retriesSearch(), resolve: r });
+    const st = omniboxNew(false, []);
+    await omniboxType(st, "retries", f.env);
+    let answer!: (v: J) => void;
+    const get = f.env.get;
+    f.env.get = (url, signal) => (url.startsWith("/api/search") ? new Promise<J>((ok) => { answer = ok; }) : get(url, signal));
+    const typed = omniboxType(st, ADDRESS, f.env);
+    st.sel = "task:t-1";
+    const entered = omniboxEnter(st, f.env, false);
+    await settle();
+    answer({ groups: [] });
+    await typed;
+    await entered;
+    expect(f.log.posts.filter((p) => p.url === "/api/omnibox/run")).toEqual([]);
+    expect(f.log.opened).toEqual([]);
   });
 
   test("the hint to ask again stays drawn after the agent failed", async () => {
