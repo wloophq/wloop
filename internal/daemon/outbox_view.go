@@ -235,30 +235,63 @@ func (ev *taskViewer) unitItems() map[unit.Unit][]items.Item {
 	return ev.items
 }
 
-// withDraft sets a draft task's gate on v, its subject the draft, and its verbs: approve and dismiss while its gate
-// is open, dismiss also while its delivery may still go, edit and retry as the draft's actions stand; the others
-// are refused.
-func (ev *taskViewer) withDraft(ctx context.Context, e task.Task, v *api.TaskView) error {
+// draftShown is what a draft task shows of its draft: the draft, its gate and the draft as clients offer it.
+type draftShown struct {
+	d  draft.Draft
+	g  gate.Gate
+	dv api.Draft
+}
+
+// draftOf is draft task e's draft; false for a task of no draft. Each task's is read once per viewer.
+func (ev *taskViewer) draftOf(ctx context.Context, e task.Task) (draftShown, bool, error) {
 	s := ev.s
 	if e.Origin != task.OriginDraft || s.deps.Outbox == nil {
-		return nil
+		return draftShown{}, false, nil
 	}
 	n, ok := draftIDOf(e.ID)
 	if !ok {
-		return nil
+		return draftShown{}, false, nil
 	}
-	d, err := s.deps.Outbox.Store.Get(ctx, n)
+	if dt, ok := ev.draftTasks[e.ID]; ok {
+		return dt, true, nil
+	}
+	d, err := s.pageDraft(ctx, n)
 	if err != nil {
+		return draftShown{}, false, err
+	}
+	g, err := s.pageDraftGate(ctx, d)
+	if err != nil {
+		return draftShown{}, false, err
+	}
+	dt := draftShown{d: d, g: g, dv: s.draftDetail(ctx, d, g, ev.unitItems())}
+	if ev.draftTasks == nil {
+		ev.draftTasks = map[task.ID]draftShown{}
+	}
+	ev.draftTasks[e.ID] = dt
+	return dt, true, nil
+}
+
+// draftGate sets a draft task's gate on v, its subject the draft.
+func (ev *taskViewer) draftGate(ctx context.Context, e task.Task, v *api.TaskView) error {
+	dt, ok, err := ev.draftOf(ctx, e)
+	if err != nil || !ok {
 		return err
 	}
-	g, _, err := s.deps.Outbox.GateOf(ctx, d)
-	if err != nil {
+	if dt.g.ID != 0 {
+		v.Gates = []api.GateView{ev.s.draftGateView(dt.g, dt.dv)}
+	}
+	return nil
+}
+
+// draftVerbs sets a draft task's verbs: approve and dismiss while its gate is open, dismiss also while its
+// delivery may still go, edit and retry as the draft's actions stand; the others are refused.
+func (ev *taskViewer) draftVerbs(ctx context.Context, e task.Task, v *api.TaskView) error {
+	s := ev.s
+	dt, ok, err := ev.draftOf(ctx, e)
+	if err != nil || !ok {
 		return err
 	}
-	dv := s.draftDetail(ctx, d, g, ev.unitItems())
-	if g.ID != 0 {
-		v.Gates = []api.GateView{s.draftGateView(g, dv)}
-	}
+	d, g, dv := dt.d, dt.g, dt.dv
 	actions := map[string]api.ActionState{}
 	for _, st := range dv.Actions {
 		actions[strings.TrimPrefix(st.ID, "draft.")] = st

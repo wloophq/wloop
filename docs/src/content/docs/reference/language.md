@@ -352,6 +352,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `views.<name>.group` (string): The fact the view groups by, such as task.owed_by.
 - `views.<name>.sort` (string): The facts the view sorts by, comma-separated; a leading - sorts one descending. A view's tasks start oldest first, a parent's children in their sibling order.
 - `views.<name>.key` (string): The key that jumps to the view: `g`, a space and a key that no core key uses, such as `g i`. Its help is the view's label, and its help line the view's summary.
+- `views.<name>.closed` (bool, default `false`): The view lists closed tasks too, those of a done or dropped category. Without it the view lists the open tasks and the closed ones the loop still holds (an open gate or a failed delivery waits on the user over it, or an agent's turn runs on it), and reads no fact of any other closed task: its `when` never sees one.
 - `views.<name>.hide_disabled` (bool, default `false`): The view hides the tasks whose units are all of a disabled plugin, and the gates on a disabled plugin's units.
 - `views.<name>.opens` (table): What a page of the view opens instead of its own, such as one that opens what waits on you narrowed to the drafts to send; none opens its own.
 - `views.<name>.opens.view` (string): The view it opens, such as needs-you.

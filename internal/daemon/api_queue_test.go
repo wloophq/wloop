@@ -780,7 +780,7 @@ func TestTheQueueComputesEachTasksFactsOnce(t *testing.T) {
 	}
 }
 
-// countedMessages are openMessages that count the reads of one message.
+// countedMessages are openMessages that count the reads of messages, of one or of every open one.
 type countedMessages struct {
 	openMessages
 	reads *atomic.Int64
@@ -789,6 +789,11 @@ type countedMessages struct {
 func (c countedMessages) Message(ctx context.Context, id int64) (dmessage.Message, bool, error) {
 	c.reads.Add(1)
 	return c.openMessages.Message(ctx, id)
+}
+
+func (c countedMessages) Open(ctx context.Context) ([]dmessage.Message, error) {
+	c.reads.Add(1)
+	return c.openMessages.Open(ctx)
 }
 
 func TestTheQueueReadsEachQuestionsMessageOnce(t *testing.T) {
@@ -803,7 +808,7 @@ func TestTheQueueReadsEachQuestionsMessageOnce(t *testing.T) {
 		t.Fatalf("%d items, want the question", len(got.Items))
 	}
 	if got := reads.Load(); got != 1 {
-		t.Errorf("%d reads of the question's message for one queue page, want 1", got)
+		t.Errorf("%d reads of messages for one queue page, want 1", got)
 	}
 }
 

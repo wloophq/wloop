@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"sync"
 	"time"
@@ -142,6 +143,11 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 	if err != nil {
 		return nil, err
 	}
+	if pass, ok := p.sharedPass(ctx); ok && !v.loaded(ref) {
+		if err := v.primeClosed(ctx, pass, u); err != nil {
+			return nil, err
+		}
+	}
 	if err := v.loadEvents(ctx, []unit.Unit{u}); err != nil {
 		return nil, err
 	}
@@ -151,38 +157,117 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 	return v.facts(ref, p.now()), nil
 }
 
-// passView is the view every unit's facts read in the page ctx serves, with the events and reports of each pull
-// request its pass's open tasks link read at once; outside a page, such as in the sweep's pass, whose List renews
-// the view between reads, the view each call finds current.
+// passView is the view a unit's facts read in the pass ctx carries, primed with the events and reports of every
+// pull request the pass's open tasks link, read at once: in a page, one view for the whole page; outside one,
+// such as in the sweep's pass, whose List renews the view between reads, the view each call finds current.
 func (p *Provider) passView(ctx context.Context) (*view, error) {
-	pass, ok := coretasks.PassOf(ctx)
-	if !ok || !coretasks.InPage(ctx) {
+	pass, ok := p.sharedPass(ctx)
+	if !ok {
 		return p.fresh(ctx, false)
 	}
-	return coretasks.PageOnce(ctx, sharedViewKey, func() (*view, error) {
-		v, err := p.fresh(ctx, false)
-		if err != nil {
-			return nil, err
-		}
-		var prs []unit.Unit
-		seen := map[unit.Unit]bool{}
-		for _, e := range pass.Tasks {
-			if !e.Open() {
-				continue
+	if coretasks.InPage(ctx) {
+		return coretasks.PageOnce(ctx, sharedViewKey, func() (*view, error) {
+			v, err := p.fresh(ctx, false)
+			if err != nil {
+				return nil, err
 			}
-			for _, u := range e.LinkedUnits() {
-				if u.Provider == unit.GitHub && !seen[u] {
-					seen[u] = true
-					prs = append(prs, u)
-				}
-			}
-		}
-		if err := v.loadEvents(ctx, prs); err != nil {
-			return nil, err
-		}
-		return v, v.loadReports(ctx, prs)
-	})
+			return v, v.prime(ctx, pass)
+		})
+	}
+	v, err := p.fresh(ctx, false)
+	if err != nil {
+		return nil, err
+	}
+	return v, v.prime(ctx, pass)
 }
+
+// sharedPass is the pass ctx carries when the calls in it share a view: in a page, or over a change log that
+// keeps the view fresh between calls; with no change log every call builds its own view, which priming would read
+// every pull request into.
+func (p *Provider) sharedPass(ctx context.Context) (*coretasks.Pass, bool) {
+	pass, ok := coretasks.PassOf(ctx)
+	return pass, ok && (coretasks.InPage(ctx) || p.d.Changes != nil)
+}
+
+// prime reads the events and reports of every pull request pass's open tasks link into v, once per pass.
+func (v *view) prime(ctx context.Context, pass *coretasks.Pass) error {
+	v.mu.Lock()
+	primed := v.primed == pass
+	v.mu.Unlock()
+	if primed {
+		return nil
+	}
+	prs, err := coretasks.Once(ctx, openPRsOnce, func() ([]unit.Unit, error) { return linkedPRs(pass, true), nil })
+	if err != nil {
+		return err
+	}
+	if err := v.load(ctx, prs); err != nil {
+		return err
+	}
+	v.mu.Lock()
+	v.primed = pass
+	v.mu.Unlock()
+	return nil
+}
+
+// primeClosed reads the events and reports of every pull request pass's closed tasks link into v, once per
+// pass, when u is one of them: the facts of one such pull request are asked for most often by a view over closed
+// tasks, which asks for them all.
+func (v *view) primeClosed(ctx context.Context, pass *coretasks.Pass, u unit.Unit) error {
+	v.mu.Lock()
+	primed := v.closedPrimed == pass
+	v.mu.Unlock()
+	if primed {
+		return nil
+	}
+	prs, err := coretasks.Once(ctx, closedPRsOnce, func() (map[unit.Unit]bool, error) {
+		set := map[unit.Unit]bool{}
+		for _, pr := range linkedPRs(pass, false) {
+			set[pr] = true
+		}
+		return set, nil
+	})
+	if err != nil || !prs[u] {
+		return err
+	}
+	if err := v.load(ctx, slices.Collect(maps.Keys(prs))); err != nil {
+		return err
+	}
+	v.mu.Lock()
+	v.closedPrimed = pass
+	v.mu.Unlock()
+	return nil
+}
+
+func (v *view) load(ctx context.Context, prs []unit.Unit) error {
+	if err := v.loadEvents(ctx, prs); err != nil {
+		return err
+	}
+	return v.loadReports(ctx, prs)
+}
+
+// linkedPRs are the pull requests pass's open tasks link, or its closed ones, each once.
+func linkedPRs(pass *coretasks.Pass, open bool) []unit.Unit {
+	var prs []unit.Unit
+	seen := map[unit.Unit]bool{}
+	for _, e := range pass.Tasks {
+		if e.Open() != open {
+			continue
+		}
+		for _, u := range e.LinkedUnits() {
+			if u.Provider == unit.GitHub && !seen[u] {
+				seen[u] = true
+				prs = append(prs, u)
+			}
+		}
+	}
+	return prs
+}
+
+const (
+	openPRsOnce   = "facts.github.prs"
+	closedPRsOnce = "facts.github.closed-prs"
+)
 
 const sharedViewKey = "facts.github.view"
 

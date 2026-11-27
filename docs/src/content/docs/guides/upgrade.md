@@ -55,6 +55,8 @@ The Outbox view is gone: the drafts that wait on you, and those you approved tha
 
 `{{command}} outbox` is gone, with no alias: `{{command}} needs` lists Needs you, every decision that waits on you, drafts among them, and `needs show`, `needs approve` and `needs answer` read and resolve one by its gate's id; your own drafts are `{{command}} draft new`, `edit`, `discard` and `retry`. A script that read `outbox`'s tab-separated lines reads `needs --kind send-draft` instead, whose first field is the gate's id (see [The home and decision queues](/concepts/home/#in-the-terminal)).
 
+A view lists open tasks, and the closed ones an open gate, a failed delivery or a running turn still holds: a view of your own `views.toml` that lists finished or trashed tasks, such as one whose `when` reads `task.category == 'done'`, sets `closed = true` or lists none.
+
 A view of your own `views.toml` needs its `summary`, one line on what it lists: a view without one fails at load naming `views.<id>.summary`, and one that changes a bundled view keeps the bundled summary.
 
 The words for tasks have new names in the profile and the configuration. Each old name fails at load with a problem naming the new one:

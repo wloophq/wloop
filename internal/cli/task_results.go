@@ -18,14 +18,9 @@ import (
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
-// allOverrides is an optional capability of placement.Overrides: every unit's override, which a pass reads once.
-type allOverrides interface {
-	All(ctx context.Context) (map[unit.Unit]placement.Placement, error)
-}
-
 func override(ctx context.Context, o placement.Overrides, u unit.Unit) (placement.Placement, bool, error) {
 	var all func() (map[unit.Unit]placement.Placement, error)
-	if a, ok := o.(allOverrides); ok {
+	if a, ok := o.(placement.AllOverrides); ok {
 		all = func() (map[unit.Unit]placement.Placement, error) { return a.All(ctx) }
 	}
 	return coretasks.Lookup(ctx, "cli.placements", u, all, func() (placement.Placement, bool, error) { return o.Override(ctx, u) })

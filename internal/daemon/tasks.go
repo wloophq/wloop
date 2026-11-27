@@ -825,9 +825,9 @@ func (s *Server) lensKeep(ctx context.Context, g *coretasks.Service, text string
 	return s.lensKeepIn(s.taskViews(ctx, g, false), text, nil)
 }
 
-// lensKeepIn is lensKeep building each task's view with vs, and keeping in kept the view of each task it keeps
-// when kept is not nil.
-func (s *Server) lensKeepIn(vs *taskViewer, text string, kept map[task.ID]api.TaskView) coretasks.Keep {
+// lensKeepIn is lensKeep building each task's match view with vs, and keeping in kept the match view of each
+// task it keeps when kept is not nil.
+func (s *Server) lensKeepIn(vs taskViews, text string, kept map[task.ID]api.TaskView) coretasks.Keep {
 	specs := s.taskFacetSpecs()
 	query, now := lens.Parse(text, specs), s.deps.Now()
 	preloaded := false
@@ -836,7 +836,7 @@ func (s *Server) lensKeepIn(vs *taskViewer, text string, kept map[task.ID]api.Ta
 			preloaded = true
 			vs.readRows(ctx, pass.Tasks)
 		}
-		v, err := vs.view(ctx, e)
+		v, err := vs.matchView(ctx, e)
 		if err != nil {
 			return false, err
 		}
@@ -935,6 +935,13 @@ func wireCounters(c task.Counters) api.Counters {
 	return out
 }
 
+// taskViews builds tasks' wire views: the part a lens query matches on, and the whole of one.
+type taskViews interface {
+	readRows(ctx context.Context, es []task.Task)
+	matchView(ctx context.Context, e task.Task) (api.TaskView, error)
+	view(ctx context.Context, e task.Task) (api.TaskView, error)
+}
+
 // taskViewer maps tasks to their wire views; detail expands the cards and the items.
 type taskViewer struct {
 	s        *Server
@@ -959,6 +966,8 @@ type taskViewer struct {
 	whereBy time.Time
 	// as is who the page is for, whose verbs it offers.
 	as requester
+	// draftTasks are the drafts of the draft tasks viewed, each read once.
+	draftTasks map[task.ID]draftShown
 }
 
 func (s *Server) taskViews(ctx context.Context, g *coretasks.Service, detail bool) *taskViewer {
@@ -1005,7 +1014,9 @@ func (ev *taskViewer) accepts(e task.Task, verb task.Verb) error {
 	return ev.g.Accepts(e, verb, ev.as.Actor)
 }
 
-func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, error) {
+// matchView is the part of e's view a lens query matches on, its Texts and its Facets, which view builds on:
+// its own fields, its units' labels, its row's, its brief, its facets and its open gates.
+func (ev *taskViewer) matchView(ctx context.Context, e task.Task) (api.TaskView, error) {
 	ctx = whereBy(ctx, ev.whereBy)
 	v := api.TaskView{ID: string(e.ID), State: string(e.State), Category: string(e.Category), Title: e.Title,
 		Notes: e.Notes, Parent: string(e.Parent), Props: propsView(ev.s.loaded().Tasks, e.Props), Changed: e.Changed,
@@ -1014,6 +1025,28 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 		v.Units = []unit.Unit{}
 	}
 	v.UnitLabels = ev.unitLabels(ctx, v.Units)
+	if err := ev.row(ctx, e, &v); err != nil {
+		return api.TaskView{}, err
+	}
+	if err := ev.brief(ctx, e, &v); err != nil {
+		return api.TaskView{}, err
+	}
+	ev.facets(ctx, e, &v)
+	if err := ev.openGates(ctx, e, &v); err != nil {
+		return api.TaskView{}, err
+	}
+	if err := ev.draftGate(ctx, e, &v); err != nil {
+		return api.TaskView{}, err
+	}
+	return v, nil
+}
+
+func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, error) {
+	v, err := ev.matchView(ctx, e)
+	if err != nil {
+		return api.TaskView{}, err
+	}
+	ctx = whereBy(ctx, ev.whereBy)
 	v.Drafts = ev.pendingDrafts(ctx, e.ID)
 	if w, ok, err := ev.g.WakeOf(ctx, e.ID); err != nil {
 		return api.TaskView{}, err
@@ -1027,9 +1060,6 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 		return api.TaskView{}, err
 	}
 	if err := ev.mergedFromOf(ctx, e, &v); err != nil {
-		return api.TaskView{}, err
-	}
-	if err := ev.row(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
 	if ev.detail {
@@ -1053,14 +1083,7 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 	if err := ev.project(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
-	if err := ev.brief(ctx, e, &v); err != nil {
-		return api.TaskView{}, err
-	}
-	ev.facets(ctx, e, &v)
-	if err := ev.openGates(ctx, e, &v); err != nil {
-		return api.TaskView{}, err
-	}
-	if err := ev.withDraft(ctx, e, &v); err != nil {
+	if err := ev.draftVerbs(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
 	return v, nil

@@ -60,9 +60,9 @@ type world struct {
 	snap      *wsdomain.Snapshot
 	git       *fakeGit
 	branches  *fakeBranches
-	// factReads counts the Facts queries, eventReads the EventsByPR ones and snapReads the workspace reads, one
-	// per view built.
-	factReads, eventReads, snapReads int
+	// factReads counts the Facts queries, eventReads the EventsByPR ones, eventRefs the pull requests they
+	// asked for and snapReads the workspace reads, one per view built.
+	factReads, eventReads, eventRefs, snapReads int
 }
 
 func newWorld() *world {
@@ -161,6 +161,7 @@ func (w *world) FirstRoundBlocks(context.Context) (map[unit.Unit]port.Event, err
 
 func (w *world) EventsByPR(_ context.Context, refs []pr.Ref) (map[pr.Ref][]dinv.Event, error) {
 	w.eventReads++
+	w.eventRefs += len(refs)
 	out := map[pr.Ref][]dinv.Event{}
 	for _, r := range refs {
 		out[r] = w.events[r]

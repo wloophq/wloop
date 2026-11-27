@@ -147,3 +147,51 @@ func TestAPageReadsTasksFromItsPass(t *testing.T) {
 		t.Error("PageTasksOf read a page without a pass")
 	}
 }
+
+func TestAPageLooksUpSomeKeysInOneLoadAndReadsAMissAlone(t *testing.T) {
+	var loads, ones int
+	all := func() (map[int]string, error) { loads++; return map[int]string{1: "one", 2: "two"}, nil }
+	one := func(k int) func() (string, bool, error) {
+		return func() (string, bool, error) { ones++; return "alone", k != 9, nil }
+	}
+	page := WithPage(context.Background())
+	for _, k := range []int{1, 2, 1} {
+		if got, ok, err := PageLookupSome(page, "words", k, all, one(k)); err != nil || !ok || got == "alone" {
+			t.Fatalf("key %d in a page: %q, %v, %v", k, got, ok, err)
+		}
+	}
+	if got, ok, err := PageLookupSome(page, "words", 3, all, one(3)); err != nil || !ok || got != "alone" {
+		t.Fatalf("a key the load misses: %q, %v, %v; want it read alone", got, ok, err)
+	}
+	if got, ok, _ := PageLookupSome(page, "words", 9, all, one(9)); ok || got != "alone" {
+		t.Fatalf("a key nothing holds: %q, %v", got, ok)
+	}
+	if loads != 1 || ones != 2 {
+		t.Fatalf("%d loads and %d single reads in a page, want 1 and 2", loads, ones)
+	}
+	if got, _, _ := PageLookupSome(context.Background(), "words", 1, all, one(1)); got != "alone" || loads != 1 {
+		t.Fatalf("outside a page: %q after %d loads; want it read alone", got, loads)
+	}
+	if got, _, _ := PageLookupSome(page, "other", 1, nil, one(1)); got != "alone" {
+		t.Fatalf("with no load: %q; want it read alone", got)
+	}
+}
+
+func TestAPageLooksUpEveryKeyInOneLoad(t *testing.T) {
+	var loads, ones int
+	all := func() (map[int]string, error) { loads++; return map[int]string{1: "one"}, nil }
+	one := func() (string, bool, error) { ones++; return "alone", true, nil }
+	page := WithPage(context.Background())
+	for _, k := range []int{1, 2, 1, 2} {
+		got, ok, err := PageLookup(page, "words", k, all, one)
+		if err != nil || ok != (k == 1) || ok && got != "one" {
+			t.Fatalf("key %d in a page: %q, %v, %v", k, got, ok, err)
+		}
+	}
+	if loads != 1 || ones != 0 {
+		t.Fatalf("%d loads and %d single reads in a page, want 1 and 0", loads, ones)
+	}
+	if got, _, _ := PageLookup(context.Background(), "words", 1, all, one); got != "alone" {
+		t.Fatalf("outside a page: %q; want it read alone", got)
+	}
+}

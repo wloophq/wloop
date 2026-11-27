@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"slices"
 	"strconv"
@@ -193,7 +194,7 @@ func writeGateError(w http.ResponseWriter, err error) {
 func (s *Server) gateView(ctx context.Context, g gate.Gate, byUnit map[unit.Unit][]items.Item) api.GateView {
 	if o := s.deps.Outbox; o != nil && g.Kind == gate.KindDraft {
 		if id, err := strconv.ParseInt(g.Subject, 10, 64); err == nil {
-			if d, err := o.Store.Get(ctx, draft.ID(id)); err == nil {
+			if d, err := s.pageDraft(ctx, draft.ID(id)); err == nil {
 				return s.draftGateView(g, s.draftDetail(ctx, d, g, byUnit))
 			}
 		}
@@ -209,6 +210,56 @@ func (s *Server) gateView(ctx context.Context, g gate.Gate, byUnit map[unit.Unit
 		v.Units = s.stepUnits(ctx, g)
 	}
 	return v
+}
+
+// pageDraft is draft id; in a page, the held drafts are read once for all, and any other alone.
+func (s *Server) pageDraft(ctx context.Context, id draft.ID) (draft.Draft, error) {
+	st := s.deps.Outbox.Store
+	held := func() (map[draft.ID]draft.Draft, error) { return s.heldDrafts(ctx) }
+	d, _, err := coretasks.PageLookupSome(ctx, "drafts.held", id, held, func() (draft.Draft, bool, error) {
+		d, err := st.Get(ctx, id)
+		return d, err == nil, err
+	})
+	return d, err
+}
+
+// heldDrafts are the held drafts by id.
+func (s *Server) heldDrafts(ctx context.Context) (map[draft.ID]draft.Draft, error) {
+	ds, err := s.deps.Outbox.Store.List(ctx, outbox.Filter{States: []draft.State{draft.Held}})
+	out := make(map[draft.ID]draft.Draft, len(ds))
+	for _, d := range ds {
+		out[d.ID] = d
+	}
+	return out, err
+}
+
+// pageDraftGate is d's gate; in a page, the gates of the held drafts are read once for all, and any other
+// draft's alone.
+func (s *Server) pageDraftGate(ctx context.Context, d draft.Draft) (gate.Gate, error) {
+	o := s.deps.Outbox
+	all := func() (map[draft.ID]gate.Gate, error) {
+		held, err := coretasks.PageOnce(ctx, "drafts.held", func() (map[draft.ID]draft.Draft, error) { return s.heldDrafts(ctx) })
+		if err != nil {
+			return nil, err
+		}
+		gs, err := o.GatesOf(ctx, slices.Collect(maps.Values(held)))
+		if err != nil {
+			return nil, err
+		}
+		out := make(map[draft.ID]gate.Gate, len(held))
+		for id := range held {
+			out[id] = gs[id]
+		}
+		return out, nil
+	}
+	if d.State != draft.Held {
+		all = nil
+	}
+	g, _, err := coretasks.PageLookupSome(ctx, "drafts.held.gates", d.ID, all, func() (gate.Gate, bool, error) {
+		g, _, err := o.GateOf(ctx, d)
+		return g, true, err
+	})
+	return g, err
 }
 
 // stepUnits are the units step gate g's task holds, as their rows present them, those not ended first; none for

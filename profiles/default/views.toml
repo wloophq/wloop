@@ -448,6 +448,7 @@ summary       = "Finished tasks that still hold a workspace on disk, to remove."
 empty         = "No finished task holds a workspace."
 key           = "g d"
 when          = "task.category == 'done' && task.link_signal.workspace"
+closed        = true
 hide_disabled = true
 remove_clean  = true
 section       = "Archive"
@@ -458,6 +459,7 @@ label         = "Logbook"
 summary       = "What you finished, the latest first."
 empty         = "Nothing finished yet."
 when          = "task.category == 'done'"
+closed        = true
 sort          = "task.since_movement"
 section       = "Archive"
 counted       = false

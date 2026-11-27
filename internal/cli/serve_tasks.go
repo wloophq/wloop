@@ -39,17 +39,17 @@ func (e *Env) newTasks(db *sqlite.DB, cfg config.Config, its coretasks.Items) *c
 			Views: lensViews(e.loadedIntents), ViewEval: e.lens().Eval, ViewSort: e.lens().Sort,
 			Activity: func(ctx context.Context, id task.ID) error {
 				return e.wakes.Event(ctx, id, wake.OnActivity, "")
-			}, Survives: catalog.Survives(e.loadedIntents, e.factsOfTask), GateText: verbGateText(e.loadedIntents), TakenApart: e.pairTakenApart, Gen: e.storeGen()})
+			}, Survives: catalog.Survives(e.loadedIntents, e.factsOfTask), GateText: verbGateText(e.loadedIntents), TakenApart: e.pairTakenApart, Changes: e.storeChanges()})
 	}
 	return e.tasks
 }
 
-// storeGen is the change log's generation; nil outside the daemon, which keeps none.
-func (e *Env) storeGen() func() port.Generation {
+// storeChanges is the change log; nil outside the daemon, which keeps none.
+func (e *Env) storeChanges() port.Changes {
 	if e.changes == nil {
 		return nil
 	}
-	return e.changes.Gen
+	return e.changes
 }
 
 // factsOfTask are task t's facts a wake's condition reads: the task subject's, else those its own fields hold.

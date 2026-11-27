@@ -46,6 +46,25 @@ const (
 	TopicPlan                           // what the plan serves: plan_items as served, and the closed sessions it lists
 )
 
+// AllTopics is every topic.
+const AllTopics = TopicPlan<<1 - 1
+
+// topicNames name the topics in bit order.
+var topicNames = [...]string{"prs", "follow", "source_events", "loop_events", "overrides", "turns", "sessions", "intakes",
+	"briefs", "usage", "rounds", "pause", "views", "meta", "pending", "agents", "config", "viewer", "refusals", "app", "jobs",
+	"links", "items", "cards", "tasks", "drafts", "marks", "gates", "wakes", "timeline", "runs", "records", "placements", "plan"}
+
+// Names are the names of t's topics, in bit order.
+func (t Topic) Names() []string {
+	var out []string
+	for i, name := range topicNames {
+		if t&(1<<i) != 0 {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
 // pr_seen notes nothing. A write that inserts events notes SourceEvents or
 // LoopEvents by who writes them: the source's snapshot, append and merge
 // fills note SourceEvents, every other event writer LoopEvents.

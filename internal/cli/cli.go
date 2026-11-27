@@ -254,6 +254,8 @@ type Env struct {
 	// serve wired the task subject.
 	wakes     *wakes.Service
 	wakeFacts func(ctx context.Context, t task.Task) (workflow.Facts, error)
+	// taskHeld says whether the loop still holds a task, once serve wired the task subject.
+	taskHeld func(ctx context.Context, t task.Task) (bool, error)
 	// takenApart says whether the user took a pair of tasks apart, once serve wired the task subject.
 	takenApart coretasks.TakenApart
 	// pluginsOff holds the plugins the daemon serves disabled, by config or build; empty until serveTasks.
