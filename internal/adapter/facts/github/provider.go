@@ -142,6 +142,11 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 	if err != nil {
 		return nil, err
 	}
+	if pass, ok := coretasks.PassOf(ctx); ok && !v.loaded(ref) {
+		if err := v.primeClosed(ctx, pass); err != nil {
+			return nil, err
+		}
+	}
 	if err := v.loadEvents(ctx, []unit.Unit{u}); err != nil {
 		return nil, err
 	}
@@ -183,14 +188,11 @@ func (v *view) prime(ctx context.Context, pass *coretasks.Pass) error {
 	if primed {
 		return nil
 	}
-	prs, err := coretasks.Once(ctx, openPRsOnce, func() ([]unit.Unit, error) { return openPRs(pass), nil })
+	prs, err := coretasks.Once(ctx, openPRsOnce, func() ([]unit.Unit, error) { return linkedPRs(pass, true), nil })
 	if err != nil {
 		return err
 	}
-	if err := v.loadEvents(ctx, prs); err != nil {
-		return err
-	}
-	if err := v.loadReports(ctx, prs); err != nil {
+	if err := v.load(ctx, prs); err != nil {
 		return err
 	}
 	v.mu.Lock()
@@ -199,12 +201,42 @@ func (v *view) prime(ctx context.Context, pass *coretasks.Pass) error {
 	return nil
 }
 
-// openPRs are the pull requests pass's open tasks link, each once.
-func openPRs(pass *coretasks.Pass) []unit.Unit {
+// primeClosed reads the events and reports of every pull request pass's closed tasks link into v, once per
+// pass: the facts of one such pull request are asked for most often by a view over closed tasks, which asks for
+// them all.
+func (v *view) primeClosed(ctx context.Context, pass *coretasks.Pass) error {
+	v.mu.Lock()
+	primed := v.closedPrimed == pass
+	v.mu.Unlock()
+	if primed {
+		return nil
+	}
+	prs, err := coretasks.Once(ctx, closedPRsOnce, func() ([]unit.Unit, error) { return linkedPRs(pass, false), nil })
+	if err != nil {
+		return err
+	}
+	if err := v.load(ctx, prs); err != nil {
+		return err
+	}
+	v.mu.Lock()
+	v.closedPrimed = pass
+	v.mu.Unlock()
+	return nil
+}
+
+func (v *view) load(ctx context.Context, prs []unit.Unit) error {
+	if err := v.loadEvents(ctx, prs); err != nil {
+		return err
+	}
+	return v.loadReports(ctx, prs)
+}
+
+// linkedPRs are the pull requests pass's open tasks link, or its closed ones, each once.
+func linkedPRs(pass *coretasks.Pass, open bool) []unit.Unit {
 	var prs []unit.Unit
 	seen := map[unit.Unit]bool{}
 	for _, e := range pass.Tasks {
-		if !e.Open() {
+		if e.Open() != open {
 			continue
 		}
 		for _, u := range e.LinkedUnits() {
@@ -217,7 +249,10 @@ func openPRs(pass *coretasks.Pass) []unit.Unit {
 	return prs
 }
 
-const openPRsOnce = "facts.github.prs"
+const (
+	openPRsOnce   = "facts.github.prs"
+	closedPRsOnce = "facts.github.closed-prs"
+)
 
 const sharedViewKey = "facts.github.view"
 

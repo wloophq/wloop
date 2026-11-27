@@ -11,10 +11,10 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// TestAPageReadsTheViewAndItsOpenTasksEventsOnce builds one view for every unit's facts a page reads, however
-// many times each is read, and reads the events of every pull request its open tasks link at once; a pull
-// request only a closed task links is read when its facts are.
-func TestAPageReadsTheViewAndItsOpenTasksEventsOnce(t *testing.T) {
+// TestAPageReadsTheViewItsOpenTasksEventsAndItsClosedTasksEventsOnce builds one view for every unit's facts a
+// page reads, however many times each is read, and reads the events of every pull request its open tasks link at
+// once; those of the pull requests its closed tasks link are read at once when the facts of one of them are.
+func TestAPageReadsTheViewItsOpenTasksEventsAndItsClosedTasksEventsOnce(t *testing.T) {
 	t.Parallel()
 	w := newWorld()
 	var es []task.Task
@@ -23,9 +23,11 @@ func TestAPageReadsTheViewAndItsOpenTasksEventsOnce(t *testing.T) {
 		es = append(es, task.Task{ID: task.ID("t-" + string(rune('a'+i))), State: "next", Category: task.CategoryReady, Units: []unit.Unit{ref(n).Unit()}})
 	}
 	w.add(4, "ana", nil)
-	done := task.Task{ID: "t-z", State: "done", Category: task.CategoryDone, Units: []unit.Unit{ref(4).Unit()}}
+	w.add(5, "bea", nil)
+	done := task.Task{ID: "t-y", State: "done", Category: task.CategoryDone, Units: []unit.Unit{ref(4).Unit()}}
+	dropped := task.Task{ID: "t-z", State: "trash", Category: task.CategoryDropped, Units: []unit.Unit{ref(5).Unit()}}
 	p := w.provider()
-	ctx := coretasks.WithPage(coretasks.WithPass(context.Background(), &coretasks.Pass{Tasks: append(es, done)}))
+	ctx := coretasks.WithPage(coretasks.WithPass(context.Background(), &coretasks.Pass{Tasks: append(es, done, dropped)}))
 	for range 2 {
 		for _, e := range es {
 			if _, err := p.Facts(ctx, e.Units[0]); err != nil {
@@ -37,8 +39,13 @@ func TestAPageReadsTheViewAndItsOpenTasksEventsOnce(t *testing.T) {
 		t.Errorf("%d views built and %d event reads for the facts of three pull requests read twice in a page, want 1 and 1",
 			w.snapReads, w.eventReads)
 	}
-	if _, err := p.Facts(ctx, ref(4).Unit()); err != nil || w.eventReads != 2 {
-		t.Errorf("the facts of a closed task's pull request: %d event reads, %v, want one more", w.eventReads, err)
+	for _, n := range []int{4, 5, 4} {
+		if _, err := p.Facts(ctx, ref(n).Unit()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if w.eventReads != 2 {
+		t.Errorf("the facts of two closed tasks' pull requests: %d event reads, want one more for both", w.eventReads)
 	}
 }
 

@@ -52,6 +52,24 @@ type view struct {
 	reports map[pr.Ref]*prrow.Report
 	// primed is the last pass whose pull requests' events and reports were read into the view.
 	primed *coretasks.Pass
+	// closedPrimed is the last pass whose closed tasks' pull requests' events and reports were read into the view.
+	closedPrimed *coretasks.Pass
+}
+
+// loaded says whether ref's events, when the store holds it, and its report are in v.
+func (v *view) loaded(ref pr.Ref) bool {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if _, stored := v.byRef[ref]; stored {
+		if _, ok := v.events[ref]; !ok {
+			return false
+		}
+	}
+	if v.p.d.Reports == nil {
+		return true
+	}
+	_, ok := v.reports[ref]
+	return ok
 }
 
 func (p *Provider) build(ctx context.Context, now time.Time) (*view, error) {
