@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"maps"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
@@ -66,7 +67,7 @@ func (g githubPlacement) Default(ctx context.Context, u unit.Unit, _ string) (pl
 	if g.store == nil {
 		return p, true, nil
 	}
-	viewer, err := g.store.Viewer(ctx, unit.GitHub)
+	viewer, err := coretasks.PageOnce(ctx, "placement.github.viewer", func() (string, error) { return g.store.Viewer(ctx, unit.GitHub) })
 	if err != nil {
 		return placement.Placement{}, false, err
 	}

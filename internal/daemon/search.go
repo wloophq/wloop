@@ -26,7 +26,11 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	ctx, l := r.Context(), s.loaded()
+	ctx, ok := s.queuePass(r.Context(), w, g)
+	if !ok {
+		return
+	}
+	l := s.loaded()
 	def := l.Omnibox
 	var rail, views []task.View
 	for _, v := range l.Views.Views {

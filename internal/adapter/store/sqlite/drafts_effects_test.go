@@ -2,8 +2,10 @@ package sqlite
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/domain/draft"
 )
 
@@ -53,5 +55,29 @@ func TestUnappliedAreTheDraftsOwingTheirDeclaredEffects(t *testing.T) {
 	}
 	if got, _ := db.DraftEffects().Unapplied(ctx); len(got) != 2 || got[0].ID != 4 {
 		t.Fatalf("unapplied after the mark %+v", got)
+	}
+}
+
+// TestAHeldDraftListsAsItsOwnRead holds what a page's one read of the held drafts answers equal to each draft's
+// own read.
+func TestAHeldDraftListsAsItsOwnRead(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db, _ := openTemp(t)
+	for _, st := range []draft.State{draft.Held, draft.Sent, draft.Held} {
+		d := sampleDraft(slackThread, noteAt)
+		d.State, d.Effects = st, []string{"task.nudged"}
+		if _, err := db.Drafts().Insert(ctx, d); err != nil {
+			t.Fatal(err)
+		}
+	}
+	held, err := db.Drafts().List(ctx, outbox.Filter{States: []draft.State{draft.Held}})
+	if err != nil || len(held) != 2 {
+		t.Fatalf("held = %d drafts, %v; want 2", len(held), err)
+	}
+	for _, d := range held {
+		if one, err := db.Drafts().Get(ctx, d.ID); err != nil || !reflect.DeepEqual(one, d) {
+			t.Errorf("draft %d: List = %+v, Get = %+v, %v", d.ID, d, one, err)
+		}
 	}
 }

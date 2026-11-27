@@ -9,6 +9,7 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/sweep"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -49,6 +50,8 @@ type view struct {
 	// reports are the plugin's reports read, nil for a pull request it
 	// has not reported.
 	reports map[pr.Ref]*prrow.Report
+	// primed is the last pass whose pull requests' events and reports were read into the view.
+	primed *coretasks.Pass
 }
 
 func (p *Provider) build(ctx context.Context, now time.Time) (*view, error) {

@@ -151,38 +151,73 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 	return v.facts(ref, p.now()), nil
 }
 
-// passView is the view every unit's facts read in the page ctx serves, with the events and reports of each pull
-// request its pass's open tasks link read at once; outside a page, such as in the sweep's pass, whose List renews
-// the view between reads, the view each call finds current.
+// passView is the view a unit's facts read in the pass ctx carries, primed with the events and reports of every
+// pull request the pass's open tasks link, read at once: in a page, one view for the whole page; outside one,
+// such as in the sweep's pass, whose List renews the view between reads, the view each call finds current.
 func (p *Provider) passView(ctx context.Context) (*view, error) {
 	pass, ok := coretasks.PassOf(ctx)
-	if !ok || !coretasks.InPage(ctx) {
+	if !ok {
 		return p.fresh(ctx, false)
 	}
-	return coretasks.PageOnce(ctx, sharedViewKey, func() (*view, error) {
-		v, err := p.fresh(ctx, false)
-		if err != nil {
-			return nil, err
-		}
-		var prs []unit.Unit
-		seen := map[unit.Unit]bool{}
-		for _, e := range pass.Tasks {
-			if !e.Open() {
-				continue
+	if coretasks.InPage(ctx) {
+		return coretasks.PageOnce(ctx, sharedViewKey, func() (*view, error) {
+			v, err := p.fresh(ctx, false)
+			if err != nil {
+				return nil, err
 			}
-			for _, u := range e.LinkedUnits() {
-				if u.Provider == unit.GitHub && !seen[u] {
-					seen[u] = true
-					prs = append(prs, u)
-				}
-			}
-		}
-		if err := v.loadEvents(ctx, prs); err != nil {
-			return nil, err
-		}
-		return v, v.loadReports(ctx, prs)
-	})
+			return v, v.prime(ctx, pass)
+		})
+	}
+	v, err := p.fresh(ctx, false)
+	if err != nil {
+		return nil, err
+	}
+	return v, v.prime(ctx, pass)
 }
+
+// prime reads the events and reports of every pull request pass's open tasks link into v, once per pass.
+func (v *view) prime(ctx context.Context, pass *coretasks.Pass) error {
+	v.mu.Lock()
+	primed := v.primed == pass
+	v.mu.Unlock()
+	if primed {
+		return nil
+	}
+	prs, err := coretasks.Once(ctx, openPRsOnce, func() ([]unit.Unit, error) { return openPRs(pass), nil })
+	if err != nil {
+		return err
+	}
+	if err := v.loadEvents(ctx, prs); err != nil {
+		return err
+	}
+	if err := v.loadReports(ctx, prs); err != nil {
+		return err
+	}
+	v.mu.Lock()
+	v.primed = pass
+	v.mu.Unlock()
+	return nil
+}
+
+// openPRs are the pull requests pass's open tasks link, each once.
+func openPRs(pass *coretasks.Pass) []unit.Unit {
+	var prs []unit.Unit
+	seen := map[unit.Unit]bool{}
+	for _, e := range pass.Tasks {
+		if !e.Open() {
+			continue
+		}
+		for _, u := range e.LinkedUnits() {
+			if u.Provider == unit.GitHub && !seen[u] {
+				seen[u] = true
+				prs = append(prs, u)
+			}
+		}
+	}
+	return prs
+}
+
+const openPRsOnce = "facts.github.prs"
 
 const sharedViewKey = "facts.github.view"
 

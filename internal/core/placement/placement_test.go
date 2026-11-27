@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/core/placement"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	dplacement "github.com/wloophq/wloop/internal/domain/placement"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -151,5 +152,41 @@ func TestFixedCheckoutIsShared(t *testing.T) {
 	}
 	if got, err := s.Place(ctx, unit.Unit{Provider: thread, Key: "T000/C009/1.1"}, ""); err != nil || got.Shared {
 		t.Errorf("a new worktree: %+v %v, want not shared", got, err)
+	}
+}
+
+// counted are overrides that read every override at once too, counting the reads of each kind.
+type counted struct {
+	overrides
+	ones, alls int
+}
+
+func (c *counted) Override(ctx context.Context, u unit.Unit) (dplacement.Placement, bool, error) {
+	c.ones++
+	return c.overrides.Override(ctx, u)
+}
+
+func (c *counted) All(context.Context) (map[unit.Unit]dplacement.Placement, error) {
+	c.alls++
+	return c.overrides, nil
+}
+
+func TestAPageReadsEveryOverrideOnceAndPlacesAsAloneDoes(t *testing.T) {
+	o := &counted{overrides: overrides{threadA: {Repo: "acme/widgets", Checkout: "main"}}}
+	def := &fixed{p: dplacement.Placement{Repo: "acme/gears"}, ok: true}
+	s := &placement.Service{Overrides: o, Defaults: map[unit.ProviderID]dplacement.Defaults{thread: *def}}
+	page := coretasks.WithPage(context.Background())
+	for _, u := range []unit.Unit{threadA, threadB, threadA, threadB} {
+		inPage, err := s.Place(page, u, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		alone, err := s.Place(context.Background(), u, "")
+		if err != nil || inPage != alone {
+			t.Errorf("%s in a page = %+v, alone = %+v, %v", u, inPage, alone, err)
+		}
+	}
+	if o.alls != 1 || o.ones != 4 {
+		t.Errorf("%d reads of every override and %d of one, want 1 and the 4 outside the page", o.alls, o.ones)
 	}
 }

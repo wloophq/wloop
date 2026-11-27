@@ -343,17 +343,28 @@ func (s *Server) messageOf(ctx context.Context, g gate.Gate) (dmessage.Message, 
 	return m, ok && err == nil && m.Kind.Gate() == g.Kind
 }
 
-// message is the stored message id; in a page, read once.
+// message is the stored message id; in a page, the open messages are read once for all, and any other once.
 func (s *Server) message(ctx context.Context, id int64) (dmessage.Message, bool, error) {
+	st := s.deps.Messages.Store
+	open := func() (map[int64]dmessage.Message, error) {
+		ms, err := st.Open(ctx)
+		out := make(map[int64]dmessage.Message, len(ms))
+		for _, m := range ms {
+			out[m.ID] = m
+		}
+		return out, err
+	}
 	type read struct {
 		m  dmessage.Message
 		ok bool
 	}
-	r, err := coretasks.PageOnce(ctx, "message."+strconv.FormatInt(id, 10), func() (read, error) {
-		m, ok, err := s.deps.Messages.Store.Message(ctx, id)
-		return read{m, ok}, err
+	return coretasks.PageLookupSome(ctx, "messages.open", id, open, func() (dmessage.Message, bool, error) {
+		r, err := coretasks.PageOnce(ctx, "message."+strconv.FormatInt(id, 10), func() (read, error) {
+			m, ok, err := st.Message(ctx, id)
+			return read{m, ok}, err
+		})
+		return r.m, r.ok, err
 	})
-	return r.m, r.ok, err
 }
 
 // gateMessage is the id of the message of question or post gate raw names; false for any other.

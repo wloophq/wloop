@@ -2,8 +2,10 @@ package factsgithub_test
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/core/change"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -55,5 +57,56 @@ func TestASweepsPassReadsTheCurrentView(t *testing.T) {
 	}
 	if w.snapReads != 2 {
 		t.Errorf("%d views built for two calls in a sweep's pass over no change log, want one each", w.snapReads)
+	}
+}
+
+// TestAPassOutsideAPageReadsItsOpenTasksEventsOnce reads, in a pass that serves no page, the events of every
+// pull request its open tasks link at once, for every view the calls find current.
+func TestAPassOutsideAPageReadsItsOpenTasksEventsOnce(t *testing.T) {
+	t.Parallel()
+	w := newWorld()
+	var es []task.Task
+	for i, n := range []int{1, 2, 3} {
+		w.add(n, "ana", nil)
+		es = append(es, task.Task{ID: task.ID("t-" + string(rune('a'+i))), State: "next", Category: task.CategoryReady, Units: []unit.Unit{ref(n).Unit()}})
+	}
+	p := w.providerWith(change.NewLog(8, nil))
+	ctx := coretasks.WithPass(context.Background(), &coretasks.Pass{Tasks: es})
+	for _, e := range es {
+		if _, err := p.Facts(ctx, e.Units[0]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if w.snapReads != 1 || w.eventReads != 1 {
+		t.Errorf("%d views built and %d event reads for the facts of three pull requests in a pass, want 1 and 1", w.snapReads, w.eventReads)
+	}
+}
+
+// TestAPrimedViewGivesTheFactsOfAViewReadAlone holds a pull request's facts in a pass, whose view read its open
+// tasks' events and reports at once, equal to those a call outside any pass reads, a pull request the pass does
+// not hold included.
+func TestAPrimedViewGivesTheFactsOfAViewReadAlone(t *testing.T) {
+	t.Parallel()
+	w := newWorld()
+	var es []task.Task
+	for i, n := range []int{1, 2} {
+		w.add(n, "ana", nil)
+		es = append(es, task.Task{ID: task.ID("t-" + string(rune('a'+i))), State: "next", Category: task.CategoryReady, Units: []unit.Unit{ref(n).Unit()}})
+	}
+	w.add(3, "bea", nil)
+	p := w.providerWith(change.NewLog(8, nil))
+	pass := coretasks.WithPass(context.Background(), &coretasks.Pass{Tasks: es})
+	for _, n := range []int{1, 2, 3} {
+		in, err := p.Facts(pass, ref(n).Unit())
+		if err != nil {
+			t.Fatal(err)
+		}
+		alone, err := w.provider().Facts(context.Background(), ref(n).Unit())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(in, alone) {
+			t.Errorf("pull request %d: in a pass %v, alone %v", n, in, alone)
+		}
 	}
 }
