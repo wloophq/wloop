@@ -27,6 +27,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/meter"
@@ -39,7 +40,7 @@ import (
 )
 
 // cockpitShape is a store as the cockpit reads it on a busy day: every task open, each linked to a pull request
-// or a Slack thread holding up to four items, a question on one task in ten, a held draft on one in twenty, and
+// or a Slack thread holding up to four items, a question on one task in ten, a held draft on one in twenty with a question that offers it, and
 // a project every fifty tasks whose next tasks are its children.
 type cockpitShape struct{ tasks int }
 
@@ -133,6 +134,15 @@ func (s cockpitShape) seed(tb testing.TB, db *sqlite.DB) {
 				tb.Fatal(err)
 			}
 			if _, err := gs.Open(ctx, gate.Gate{Task: id, Unit: u, Kind: gate.KindDraft, Subject: strconv.FormatInt(int64(d.ID), 10)}); err != nil {
+				tb.Fatal(err)
+			}
+			m, err := msgs.Upsert(ctx, message.Message{TaskID: string(id), Unit: task.UnitOf(id), Kind: message.Question, Text: "Send this nudge?",
+				Options: []record.Option{{ID: "send", Label: "Send", Draft: &record.DraftRef{ID: int64(d.ID), Rev: d.Rev}}, {ID: "skip", Label: "Skip"}},
+				Origin:  message.Origin{Kind: message.OriginWorkflow, Workflow: "widget-pick"}, CreatedAt: testNow.Add(-time.Hour)})
+			if err != nil {
+				tb.Fatal(err)
+			}
+			if _, err := gs.Open(ctx, gate.Gate{Task: id, Unit: task.UnitOf(id), Kind: gate.KindQuestion, Subject: strconv.FormatInt(m.ID, 10)}); err != nil {
 				tb.Fatal(err)
 			}
 		}

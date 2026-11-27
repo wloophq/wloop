@@ -9,9 +9,14 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/items"
+	dmessage "github.com/wloophq/wloop/internal/domain/message"
+	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/meter"
+	"github.com/wloophq/wloop/internal/meter/metertest"
 )
 
 // pageOf is a page's context over r's tasks, with its pass.
@@ -125,5 +130,27 @@ func TestATaskDetailsAsksCarryTheirBriefsQuotes(t *testing.T) {
 	v := r.view(t, "t-0000000000000001")
 	if len(v.Asks) != 1 || !reflect.DeepEqual(v.Asks[0].Quotes, []string{"can you send the widget specs?"}) {
 		t.Fatalf("asks %+v, want the one ask with its brief's quote", v.Asks)
+	}
+}
+
+// TestAPagesPinnedDraftsReadAsAloneInOneRead serves the drafts a question pins, with their gates, from one read
+// of the held drafts and their gates in a page, equal to what each draft's own reads serve.
+func TestAPagesPinnedDraftsReadAsAloneInOneRead(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	pr := unit.Unit{Provider: unit.GitHub, Key: "acme/widgets#7"}
+	a := r.propose(t, pr, "send the specs", draft.Wait)
+	b := r.propose(t, pr, "send the gears", draft.Wait)
+	m := dmessage.Message{ID: 9, Kind: dmessage.Question, Text: "Which reply?",
+		Options: []record.Option{{ID: "a", Label: "Specs", Draft: &record.DraftRef{ID: int64(a.ID), Rev: a.Rev}},
+			{ID: "b", Label: "Gears", Draft: &record.DraftRef{ID: int64(b.ID), Rev: b.Rev}}}}
+	alone := r.s.pinnedDrafts(context.Background(), m)
+	ctx, sc := metertest.Start(t, coretasks.WithPage(context.Background()))
+	inPage := r.s.pinnedDrafts(ctx, m)
+	if len(alone) != 2 || !reflect.DeepEqual(inPage, alone) {
+		t.Fatalf("pinned drafts in a page %+v, alone %+v", inPage, alone)
+	}
+	if n := sc.Tally().Total(meter.SQL).Calls; n != 2 {
+		t.Errorf("%d statements for two pinned drafts in a page, want 2: the held drafts and their gates", n)
 	}
 }

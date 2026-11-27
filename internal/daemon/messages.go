@@ -419,7 +419,7 @@ func (s *Server) pinnedDrafts(ctx context.Context, m dmessage.Message) []api.Dra
 			continue
 		}
 		seen[ref.ID] = true
-		d, err := o.Store.Get(ctx, draft.ID(ref.ID))
+		d, err := s.pageDraft(ctx, draft.ID(ref.ID))
 		if err != nil {
 			if !errors.Is(err, outbox.ErrNotFound) {
 				s.logf("the draft message %d pins: %v", m.ID, err)
@@ -429,7 +429,7 @@ func (s *Server) pinnedDrafts(ctx context.Context, m dmessage.Message) []api.Dra
 		if m.Open() && d.State != draft.Held {
 			continue
 		}
-		g, _, err := o.GateOf(ctx, d)
+		g, err := s.pageDraftGate(ctx, d)
 		if err != nil {
 			s.logf("the gate of the draft message %d pins: %v", m.ID, err)
 		}
